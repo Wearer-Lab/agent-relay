@@ -23,6 +23,9 @@ test('CLI forwards feature command options',async t=>{
  assert.equal(calls.find(r=>r.op==='claim').scope,'machine');assert.equal(calls.find(r=>r.op==='release').force,true);assert.equal(calls.find(r=>r.op==='release').agentId,'human');
 });
 
+test('gated claim refuses before broker requests when measured disk limit fails',async t=>{
+ const f=await fixture(t);await assert.rejects(f.run('claim','--as','a','--gate','--min-free-gb','1000000','native'),/Free disk/);assert.deepEqual(await f.requests(),[]);
+});
 test('CLI JSON watch flushes preview and exits zero on SIGINT and SIGTERM',async t=>{
  const f=await fixture(t);
  for(const signal of ['SIGINT','SIGTERM']){

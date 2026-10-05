@@ -19,6 +19,10 @@ for(let i=0;i<raw.length;i++){
 const project=path.resolve(opts.project||process.cwd()),dataDir=opts['data-dir']||defaultDataDir(),options={dataDir};
 const print=x=>process.stdout.write(JSON.stringify(x,null,2)+'\n');
 const requireAs=()=>{if(!opts.as)throw new Error('Use --as with your registered agent ID');return opts.as;};
+async function checkGate(){
+ const {machineGate}=await import('../lib/gate.mjs');
+ return machineGate({maxSwapGb:opts['max-swap-gb']===undefined?8:Number(opts['max-swap-gb']),maxLoad:opts['max-load']===undefined?40:Number(opts['max-load']),minFreeGb:opts['min-free-gb']===undefined?10:Number(opts['min-free-gb']),path:opts.path||'/'});
+}
 async function main(){
  switch(command){
  case 'version':{const pkg=JSON.parse(await fs.readFile(new URL('../package.json',import.meta.url),'utf8'));console.log(pkg.version);break;}
@@ -54,7 +58,8 @@ async function main(){
  }
  case 'inbox':print(await rpc(project,{op:'inbox',agentId:requireAs(),unacked:opts.unread?true:undefined,since:opts.since===undefined?undefined:Number(opts.since),from:opts.from,limit:opts.limit===undefined?undefined:Number(opts.limit)},options));break;
  case 'ack':if(!opts.id&&!opts.all&&opts.through===undefined)throw new Error('Use --id, --all or --through');print(await rpc(project,{op:'ack',agentId:requireAs(),messageId:opts.id,all:opts.all,through:opts.through===undefined?undefined:Number(opts.through)},options));break;
- case 'claim':if(!positional.length)throw new Error('Specify one or more file/resource claims');print(await rpc(project,{op:'claim',agentId:requireAs(),resources:positional,scope:opts.scope},options));break;
+ case 'gate':{const result=await checkGate();print(result);if(!result.ok)process.exitCode=1;break;}
+ case 'claim':if(opts.gate){const result=await checkGate();if(!result.ok)throw new Error(result.reasons.join('; '));if(result.unknown.length)console.error(`Gate unknown: ${result.unknown.join(', ')}`);}if(!positional.length)throw new Error('Specify one or more file/resource claims');print(await rpc(project,{op:'claim',agentId:requireAs(),resources:positional,scope:opts.scope},options));break;
  case 'release':print(await rpc(project,{op:'release',agentId:requireAs(),resources:positional.length?positional:undefined,scope:opts.scope,force:opts.force},options));break;
  case 'status':print(await rpc(project,opts.as?{op:'status',agentId:opts.as,status:opts.state,task:opts.task,frozen:opts.frozen===undefined?undefined:opts.frozen==='true'}:{op:'agents',staleMinutes:opts['stale-minutes']===undefined?undefined:Number(opts['stale-minutes'])},options));break;
  case 'watch':{
