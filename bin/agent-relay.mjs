@@ -13,7 +13,7 @@ if(raw.includes('--help')||raw.includes('-h')){command='help';raw.length=0;}
 const opts={},positional=[];let tail=[];
 for(let i=0;i<raw.length;i++){
  if(raw[i]==='--'){tail=raw.slice(i+1);break;}
- if(raw[i].startsWith('--')){const key=raw[i].slice(2);if(['channel','json','no-open','unread','json-lines','all','force','gate','active'].includes(key))opts[key]=true;else {if(!raw[i+1]||raw[i+1].startsWith('--'))throw new Error(`Missing value for --${key}`);opts[key]=raw[++i];}}
+ if(raw[i].startsWith('--')){const key=raw[i].slice(2);if(['channel','json','no-open','unread','json-lines','all','force','gate','active'].includes(key))opts[key]=true;else {if(!raw[i+1]||raw[i+1].startsWith('--'))throw new Error(`Missing value for --${key}`);if(key==='attach')(opts.attach??=[]).push(raw[++i]);else opts[key]=raw[++i];}}
  else positional.push(raw[i]);
 }
 const project=path.resolve(opts.project||process.cwd()),dataDir=opts['data-dir']||defaultDataDir(),options={dataDir};
@@ -55,8 +55,9 @@ async function main(){
  case 'send':{
   let body=opts.message;if(body==='-'){body='';for await(const chunk of process.stdin)body+=chunk;}
   if(!body||!opts.to)throw new Error('Use --to and --message (or --message - for stdin)');
-  print(await rpc(project,{op:'send',from:requireAs(),to:opts.to,body,replyTo:opts['reply-to'],messageId:opts.id||randomUUID()},options));break;
+  print(await rpc(project,{op:'send',from:requireAs(),to:opts.to,body,attachments:opts.attach?.map(f=>path.resolve(f)),replyTo:opts['reply-to'],messageId:opts.id||randomUUID()},options));break;
  }
+ case 'fetch':if(!opts.id)throw new Error('Use --id MESSAGE_ID');print(await rpc(project,{op:'fetch',agentId:requireAs(),messageId:opts.id,out:path.resolve(opts.out||process.cwd())},options));break;
  case 'inbox':print(await rpc(project,{op:'inbox',agentId:requireAs(),unacked:opts.unread?true:undefined,since:opts.since===undefined?undefined:Number(opts.since),from:opts.from,limit:opts.limit===undefined?undefined:Number(opts.limit)},options));break;
  case 'ack':if(!opts.id&&!opts.all&&opts.through===undefined)throw new Error('Use --id, --all or --through');print(await rpc(project,{op:'ack',agentId:requireAs(),messageId:opts.id,all:opts.all,through:opts.through===undefined?undefined:Number(opts.through)},options));break;
  case 'gate':{const result=await checkGate();print(result);if(!result.ok)process.exitCode=1;break;}

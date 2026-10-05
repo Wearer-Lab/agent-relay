@@ -54,6 +54,13 @@ test('leave removes presence while retaining history and cooperative claims',asy
  assert.equal((await f.rpc({op:'agents',active:true,within:0})).agents.length,0);
 });
 
+test('attachments are recipient/sender only and survive restart without scratch files',async t=>{
+ const f=await fixture(t);for(const id of ['a','b','c'])await f.register(id);const source=path.join(f.root,'packet');await fs.writeFile(source,'durable packet');
+ await f.rpc({op:'send',from:'a',to:'b',body:'read packet',messageId:'packet',attachments:[source]});await fs.unlink(source);await f.restart();
+ assert.equal((await f.request({op:'fetch',agentId:'c',messageId:'packet',out:path.join(f.root,'denied')})).ok,false);
+ const result=await f.rpc({op:'fetch',agentId:'b',messageId:'packet',out:path.join(f.root,'fetched')});assert.equal(await fs.readFile(result.files[0].path,'utf8'),'durable packet');
+});
+
 test('old optional-field-free ledger opens byte-for-byte unchanged and accepts old send fields',async t=>{
  const f=await fixture(t);await f.register('a');await f.register('b');await f.rpc({op:'send',from:'a',to:'b',body:'old CLI',messageId:'old'});
  const file=path.join(f.dataDir,'state.json'),before=await fs.readFile(file,'utf8');await f.restart();assert.equal(await fs.readFile(file,'utf8'),before);

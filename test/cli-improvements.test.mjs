@@ -17,10 +17,12 @@ async function fixture(t){
 }
 test('CLI forwards feature command options',async t=>{
  const f=await fixture(t);
+ await f.run('send','--as','a','--to','b','--message','body','--attach',path.join(f.root,'one'),'--attach',path.join(f.root,'two'));
  await f.run('inbox','--as','b','--unread','--since','7','--from','a','--limit','2');
  await f.run('ack','--as','b','--through','8');await f.run('claim','--as','a','--scope','machine','native');await f.run('release','--as','human','--force','--scope','machine','native');
  const calls=(await f.requests()).filter(r=>r.op!=='capabilities');const inbox=calls.find(r=>r.op==='inbox');assert.equal(inbox.since,7);assert.equal(inbox.limit,2);assert.equal(inbox.unacked,true);assert.equal(calls.find(r=>r.op==='ack').through,8);
  assert.equal(calls.find(r=>r.op==='claim').scope,'machine');assert.equal(calls.find(r=>r.op==='release').force,true);assert.equal(calls.find(r=>r.op==='release').agentId,'human');
+ assert.equal(calls.find(r=>r.op==='send').attachments.length,2);
 });
 
 test('gated claim refuses before broker requests when measured disk limit fails',async t=>{
