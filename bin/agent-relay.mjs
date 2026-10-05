@@ -50,7 +50,8 @@ async function main(){
   print(await setupProject(project,{runners:opts.runners?.split(',')}));await ensureBroker(options);break;
  }
  case 'join': print(await rpc(project,{op:'register',agentId:requireAs(),runner:opts.runner||'generic',sessionId:opts.session},options));break;
- case 'agents': print(await rpc(project,{op:'agents',staleMinutes:opts['stale-minutes']===undefined?undefined:Number(opts['stale-minutes'])},options));break;
+ case 'leave':print(await rpc(project,{op:'leave',agentId:requireAs()},options));break;
+ case 'agents': print(await rpc(project,{op:'agents',active:opts.active,within:opts.within===undefined?undefined:Number(opts.within),staleMinutes:opts['stale-minutes']===undefined?undefined:Number(opts['stale-minutes'])},options));break;
  case 'send':{
   let body=opts.message;if(body==='-'){body='';for await(const chunk of process.stdin)body+=chunk;}
   if(!body||!opts.to)throw new Error('Use --to and --message (or --message - for stdin)');
@@ -61,7 +62,7 @@ async function main(){
  case 'gate':{const result=await checkGate();print(result);if(!result.ok)process.exitCode=1;break;}
  case 'claim':if(opts.gate){const result=await checkGate();if(!result.ok)throw new Error(result.reasons.join('; '));if(result.unknown.length)console.error(`Gate unknown: ${result.unknown.join(', ')}`);}if(!positional.length)throw new Error('Specify one or more file/resource claims');print(await rpc(project,{op:'claim',agentId:requireAs(),resources:positional,scope:opts.scope},options));break;
  case 'release':print(await rpc(project,{op:'release',agentId:requireAs(),resources:positional.length?positional:undefined,scope:opts.scope,force:opts.force},options));break;
- case 'status':print(await rpc(project,opts.as?{op:'status',agentId:opts.as,status:opts.state,task:opts.task,frozen:opts.frozen===undefined?undefined:opts.frozen==='true'}:{op:'agents',staleMinutes:opts['stale-minutes']===undefined?undefined:Number(opts['stale-minutes'])},options));break;
+ case 'status':print(await rpc(project,opts.as?{op:'status',agentId:opts.as,status:opts.state,task:opts.task,frozen:opts.frozen===undefined?undefined:opts.frozen==='true'}:{op:'agents',active:opts.active,within:opts.within===undefined?undefined:Number(opts.within),staleMinutes:opts['stale-minutes']===undefined?undefined:Number(opts['stale-minutes'])},options));break;
  case 'watch':{
   const agentId=requireAs(),controller=new AbortController();
   process.once('SIGINT',()=>controller.abort());process.once('SIGTERM',()=>controller.abort());

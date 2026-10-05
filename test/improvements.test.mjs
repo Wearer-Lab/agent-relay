@@ -45,6 +45,15 @@ test('machine claims cross rooms, persist and require explicit logged forced rel
  const state=JSON.parse(await fs.readFile(path.join(f.dataDir,'state.json')));assert.equal(state.releaseLog[0].as,'owner');assert.equal(state.machineClaims.length,1);
 });
 
+test('leave removes presence while retaining history and cooperative claims',async t=>{
+ const f=await fixture(t);await f.register('a');await f.register('b');await f.rpc({op:'send',from:'a',to:'b',body:'history'});
+ await f.rpc({op:'claim',agentId:'a',resources:['build']});await f.rpc({op:'leave',agentId:'a'});
+ assert.equal((await f.rpc({op:'agents'})).agents.length,1);assert.equal((await f.rpc({op:'agents'})).claims.length,1);
+ await f.restart();assert.equal((await f.rpc({op:'inbox',agentId:'b'})).messages.length,1);
+ await f.register('a');assert.equal((await f.rpc({op:'agents'})).agents.length,2);
+ assert.equal((await f.rpc({op:'agents',active:true,within:0})).agents.length,0);
+});
+
 test('old optional-field-free ledger opens byte-for-byte unchanged and accepts old send fields',async t=>{
  const f=await fixture(t);await f.register('a');await f.register('b');await f.rpc({op:'send',from:'a',to:'b',body:'old CLI',messageId:'old'});
  const file=path.join(f.dataDir,'state.json'),before=await fs.readFile(file,'utf8');await f.restart();assert.equal(await fs.readFile(file,'utf8'),before);
