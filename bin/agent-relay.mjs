@@ -13,7 +13,7 @@ if(raw.includes('--help')||raw.includes('-h')){command='help';raw.length=0;}
 const opts={},positional=[];let tail=[];
 for(let i=0;i<raw.length;i++){
  if(raw[i]==='--'){tail=raw.slice(i+1);break;}
- if(raw[i].startsWith('--')){const key=raw[i].slice(2);if(['channel','json','no-open'].includes(key))opts[key]=true;else {if(!raw[i+1]||raw[i+1].startsWith('--'))throw new Error(`Missing value for --${key}`);opts[key]=raw[++i];}}
+ if(raw[i].startsWith('--')){const key=raw[i].slice(2);if(['channel','json','no-open','unread','json-lines','all','force','gate','active'].includes(key))opts[key]=true;else {if(!raw[i+1]||raw[i+1].startsWith('--'))throw new Error(`Missing value for --${key}`);opts[key]=raw[++i];}}
  else positional.push(raw[i]);
 }
 const project=path.resolve(opts.project||process.cwd()),dataDir=opts['data-dir']||defaultDataDir(),options={dataDir};
@@ -23,7 +23,7 @@ async function main(){
  switch(command){
  case 'version':{const pkg=JSON.parse(await fs.readFile(new URL('../package.json',import.meta.url),'utf8'));console.log(pkg.version);break;}
  case 'help':
- console.log(`Agent Relay — local communication between coding agents\n\n  npx --yes @wearer-haitch/agent-relay launch codex|claude|opencode\n  agent-relay --version\n  agent-relay dashboard [--no-open] [--port PORT]\n\n  agent-relay setup [--project PATH] [--runners codex,claude,opencode]\n  agent-relay launch claude|codex|opencode [-- runner arguments]\n  agent-relay join --as ID --runner NAME [--session ID]\n  agent-relay agents\n  agent-relay send --as ID --to ID|* --message TEXT [--reply-to ID] [--id ID]\n  agent-relay inbox --as ID\n  agent-relay ack --as ID --id MESSAGE_ID\n  agent-relay watch --as ID\n  agent-relay claim --as ID RESOURCE...\n  agent-relay release --as ID [RESOURCE...]\n  agent-relay status [--as ID --state TEXT --task TEXT]\n  agent-relay attach codex --thread ID [--as ID] [--socket PATH|--url ws://loopback]\n  agent-relay start\n\nCommands use the current project; --project PATH and --data-dir PATH override it.\nMessages persist locally. Setup does not publish anything or change permissions.`);break;
+ console.log(`Agent Relay — local communication between coding agents\n\n  npx --yes @wearer-haitch/agent-relay launch codex|claude|opencode\n  agent-relay --version\n  agent-relay dashboard [--no-open] [--port PORT]\n\n  agent-relay setup [--project PATH] [--runners codex,claude,opencode]\n  agent-relay launch claude|codex|opencode [-- runner arguments]\n  agent-relay join --as ID --runner NAME [--session ID]\n  agent-relay agents [--active --within MIN] [--stale-minutes MIN]\n  agent-relay leave --as ID\n  agent-relay send --as ID --to ID|* --message TEXT [--reply-to ID] [--id ID] [--summary TEXT] [--attach PATH ...]\n  agent-relay inbox --as ID [--unread] [--since CURSOR] [--from ID] [--limit N]\n  agent-relay fetch --as ID --id MESSAGE_ID [--out DIR]\n  agent-relay ack --as ID --id MESSAGE_ID|--all|--through CURSOR\n  agent-relay watch --as ID [--json-lines --max-chars N] [--unread]\n  agent-relay claim --as ID [--scope machine] [--gate] RESOURCE...\n  agent-relay release --as ID [--scope machine] [RESOURCE...] [--force]\n  agent-relay gate [--max-swap-gb 8] [--max-load 40] [--min-free-gb 10] [--path /]\n  agent-relay status [--as ID --state TEXT --task TEXT]\n  agent-relay attach codex --thread ID [--as ID] [--socket PATH|--url ws://loopback]\n  agent-relay start\n\nCommands use the current project; --project PATH and --data-dir PATH override it.\nMessages persist locally. Setup does not publish anything or change permissions.`);break;
  case 'daemon':{
   const {createBroker}=await import('../lib/broker.mjs');
   const broker=await createBroker({dataDir});
@@ -52,14 +52,20 @@ async function main(){
   if(!body||!opts.to)throw new Error('Use --to and --message (or --message - for stdin)');
   print(await rpc(project,{op:'send',from:requireAs(),to:opts.to,body,replyTo:opts['reply-to'],messageId:opts.id||randomUUID()},options));break;
  }
- case 'inbox':print(await rpc(project,{op:'inbox',agentId:requireAs()},options));break;
- case 'ack':if(!opts.id)throw new Error('Use --id MESSAGE_ID');print(await rpc(project,{op:'ack',agentId:requireAs(),messageId:opts.id},options));break;
+ case 'inbox':print(await rpc(project,{op:'inbox',agentId:requireAs(),unacked:opts.unread?true:undefined,since:opts.since===undefined?undefined:Number(opts.since),from:opts.from,limit:opts.limit===undefined?undefined:Number(opts.limit)},options));break;
+ case 'ack':if(!opts.id&&!opts.all&&opts.through===undefined)throw new Error('Use --id, --all or --through');print(await rpc(project,{op:'ack',agentId:requireAs(),messageId:opts.id,all:opts.all,through:opts.through===undefined?undefined:Number(opts.through)},options));break;
  case 'claim':if(!positional.length)throw new Error('Specify one or more file/resource claims');print(await rpc(project,{op:'claim',agentId:requireAs(),resources:positional},options));break;
- case 'release':print(await rpc(project,{op:'release',agentId:requireAs(),resources:positional.length?positional:undefined},options));break;
+ case 'release':print(await rpc(project,{op:'release',agentId:requireAs(),resources:positional.length?positional:undefined,},options));break;
  case 'status':print(await rpc(project,opts.as?{op:'status',agentId:opts.as,status:opts.state,task:opts.task,frozen:opts.frozen===undefined?undefined:opts.frozen==='true'}:{op:'agents'},options));break;
  case 'watch':{
-  const agentId=requireAs(),controller=new AbortController();process.once('SIGINT',()=>controller.abort());let batch=await rpc(project,{op:'inbox',agentId},options),cursor=0;
-  try{while(!controller.signal.aborted){for(const message of batch.messages||[])print(message);cursor=Math.max(cursor,batch.cursor||0);batch=await wait(project,agentId,cursor,{...options,signal:controller.signal});}}catch(e){if(!controller.signal.aborted)throw e;}break;
+  const agentId=requireAs(),controller=new AbortController();
+  process.once('SIGINT',()=>controller.abort());process.once('SIGTERM',()=>controller.abort());
+  const max=opts['max-chars']===undefined?16384:Number(opts['max-chars']);
+  if(!Number.isInteger(max)||max<0)throw new Error('--max-chars must be a nonnegative integer');
+  const {watchMessages,preview}=await import('../lib/watch.mjs');
+  await watchMessages({project,agentId,dataDir,signal:controller.signal,unread:!!opts.unread,onMessage:message=>{
+   if(opts['json-lines'])process.stdout.write(JSON.stringify(preview(message,max))+'\n');else print(message);
+  }});break;
  }
  case 'attach':{
   if(positional[0]!=='codex')throw new Error('Manual attachment currently supports codex; Claude uses launch, OpenCode uses its project plugin');
