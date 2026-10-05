@@ -26,7 +26,7 @@ async function main(){
  console.log(`Agent Relay — local communication between coding agents\n\n  npx --yes @wearer-haitch/agent-relay launch codex|claude|opencode\n  agent-relay --version\n  agent-relay dashboard [--no-open] [--port PORT]\n\n  agent-relay setup [--project PATH] [--runners codex,claude,opencode]\n  agent-relay launch claude|codex|opencode [-- runner arguments]\n  agent-relay join --as ID --runner NAME [--session ID]\n  agent-relay agents [--active --within MIN] [--stale-minutes MIN]\n  agent-relay leave --as ID\n  agent-relay send --as ID --to ID|* --message TEXT [--reply-to ID] [--id ID] [--summary TEXT] [--attach PATH ...]\n  agent-relay inbox --as ID [--unread] [--since CURSOR] [--from ID] [--limit N]\n  agent-relay fetch --as ID --id MESSAGE_ID [--out DIR]\n  agent-relay ack --as ID --id MESSAGE_ID|--all|--through CURSOR\n  agent-relay watch --as ID [--json-lines --max-chars N] [--unread]\n  agent-relay claim --as ID [--scope machine] [--gate] RESOURCE...\n  agent-relay release --as ID [--scope machine] [RESOURCE...] [--force]\n  agent-relay gate [--max-swap-gb 8] [--max-load 40] [--min-free-gb 10] [--path /]\n  agent-relay status [--as ID --state TEXT --task TEXT]\n  agent-relay attach codex --thread ID [--as ID] [--socket PATH|--url ws://loopback]\n  agent-relay start\n\nCommands use the current project; --project PATH and --data-dir PATH override it.\nMessages persist locally. Setup does not publish anything or change permissions.`);break;
  case 'daemon':{
   const {createBroker}=await import('../lib/broker.mjs');
-  const broker=await createBroker({dataDir});
+  const broker=await createBroker({dataDir,staleMinutes:opts['stale-minutes']===undefined?Number(process.env.AGENT_RELAY_STALE_MINUTES??30):Number(opts['stale-minutes'])});
   const discovery=path.join(dataDir,'broker.json'),tmp=discovery+`.${process.pid}.tmp`;
   await fs.writeFile(tmp,JSON.stringify({pid:process.pid,url:broker.url,token:broker.token}),{mode:0o600});await fs.rename(tmp,discovery);
   if(opts['startup-lock'])await fs.rm(opts['startup-lock'],{recursive:true,force:true});
@@ -46,7 +46,7 @@ async function main(){
   print(await setupProject(project,{runners:opts.runners?.split(',')}));await ensureBroker(options);break;
  }
  case 'join': print(await rpc(project,{op:'register',agentId:requireAs(),runner:opts.runner||'generic',sessionId:opts.session},options));break;
- case 'agents': print(await rpc(project,{op:'agents'},options));break;
+ case 'agents': print(await rpc(project,{op:'agents',staleMinutes:opts['stale-minutes']===undefined?undefined:Number(opts['stale-minutes'])},options));break;
  case 'send':{
   let body=opts.message;if(body==='-'){body='';for await(const chunk of process.stdin)body+=chunk;}
   if(!body||!opts.to)throw new Error('Use --to and --message (or --message - for stdin)');
@@ -54,9 +54,9 @@ async function main(){
  }
  case 'inbox':print(await rpc(project,{op:'inbox',agentId:requireAs(),unacked:opts.unread?true:undefined,since:opts.since===undefined?undefined:Number(opts.since),from:opts.from,limit:opts.limit===undefined?undefined:Number(opts.limit)},options));break;
  case 'ack':if(!opts.id&&!opts.all&&opts.through===undefined)throw new Error('Use --id, --all or --through');print(await rpc(project,{op:'ack',agentId:requireAs(),messageId:opts.id,all:opts.all,through:opts.through===undefined?undefined:Number(opts.through)},options));break;
- case 'claim':if(!positional.length)throw new Error('Specify one or more file/resource claims');print(await rpc(project,{op:'claim',agentId:requireAs(),resources:positional},options));break;
- case 'release':print(await rpc(project,{op:'release',agentId:requireAs(),resources:positional.length?positional:undefined,},options));break;
- case 'status':print(await rpc(project,opts.as?{op:'status',agentId:opts.as,status:opts.state,task:opts.task,frozen:opts.frozen===undefined?undefined:opts.frozen==='true'}:{op:'agents'},options));break;
+ case 'claim':if(!positional.length)throw new Error('Specify one or more file/resource claims');print(await rpc(project,{op:'claim',agentId:requireAs(),resources:positional,scope:opts.scope},options));break;
+ case 'release':print(await rpc(project,{op:'release',agentId:requireAs(),resources:positional.length?positional:undefined,scope:opts.scope,force:opts.force},options));break;
+ case 'status':print(await rpc(project,opts.as?{op:'status',agentId:opts.as,status:opts.state,task:opts.task,frozen:opts.frozen===undefined?undefined:opts.frozen==='true'}:{op:'agents',staleMinutes:opts['stale-minutes']===undefined?undefined:Number(opts['stale-minutes'])},options));break;
  case 'watch':{
   const agentId=requireAs(),controller=new AbortController();
   process.once('SIGINT',()=>controller.abort());process.once('SIGTERM',()=>controller.abort());

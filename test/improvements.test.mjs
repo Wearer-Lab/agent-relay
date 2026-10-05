@@ -34,6 +34,17 @@ test('poll filters and cursor pagination retain unacked work; bulk ack affects o
  assert.equal((await f.request({op:'inbox',agentId:'b',since:-1})).ok,false);
 });
 
+test('machine claims cross rooms, persist and require explicit logged forced release',async t=>{
+ const f=await fixture(t);await f.register('a');await f.register('b',f.other);
+ await f.rpc({op:'claim',agentId:'a',scope:'machine',resources:['native','build']});
+ assert.equal((await f.request({op:'claim',agentId:'b',scope:'machine',resources:['native','install']},f.other)).ok,false);
+ let view=await f.rpc({op:'agents',staleMinutes:0},f.other);assert.equal(view.claims.length,2);assert.equal(view.claims[0].stale,true);assert.equal(view.claims[0].project,await fs.realpath(f.project));
+ await f.rpc({op:'release',agentId:'b',scope:'machine'},f.other);await f.restart();
+ assert.equal((await f.rpc({op:'agents'},f.other)).claims.length,2);
+ await f.rpc({op:'release',agentId:'owner',scope:'machine',force:true,resources:['native']},f.other);
+ const state=JSON.parse(await fs.readFile(path.join(f.dataDir,'state.json')));assert.equal(state.releaseLog[0].as,'owner');assert.equal(state.machineClaims.length,1);
+});
+
 test('old optional-field-free ledger opens byte-for-byte unchanged and accepts old send fields',async t=>{
  const f=await fixture(t);await f.register('a');await f.register('b');await f.rpc({op:'send',from:'a',to:'b',body:'old CLI',messageId:'old'});
  const file=path.join(f.dataDir,'state.json'),before=await fs.readFile(file,'utf8');await f.restart();assert.equal(await fs.readFile(file,'utf8'),before);

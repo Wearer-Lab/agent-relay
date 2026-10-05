@@ -8,6 +8,6 @@ test('extended CLI fields never reach a legacy broker that would ignore them',as
   if(input.op==='capabilities')return {ok:false,json:async()=>({ok:false,error:{code:'UNKNOWN_OPERATION'}})};
   return {ok:true,json:async()=>({ok:true})};
  };
- await assert.rejects(rpc('/tmp',{op:'inbox',agentId:'a',since:1},{dataDir:dir}),/restart/);assert.deepEqual(calls,['capabilities']);
+ await assert.rejects(rpc('/tmp',{op:'claim',agentId:'a',scope:'machine',resources:['native']},{dataDir:dir}),/restart/);assert.deepEqual(calls,['capabilities']);
  await rpc('/tmp',{op:'claim',agentId:'a',resources:['native']},{dataDir:dir});assert.deepEqual(calls,['capabilities','claim']);
 });
