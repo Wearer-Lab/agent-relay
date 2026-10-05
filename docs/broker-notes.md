@@ -19,18 +19,20 @@ release claims, or execute work.
 | Operation | Fields after `op, project` | Result after `ok:true` |
 | --- | --- | --- |
 | `register` | `agentId`, `runner`, optional `sessionId` | `{agent}` |
-| `agents` | none | `{agents,claims,cursor}` |
-| `send` | `from`, `to` (ID or `"*"`), `body`, optional `replyTo`, `messageId` | `{messageId,recipients,duplicate,cursor}` |
-| `inbox` | `agentId`, optional `unacked` (default true) | `{messages,cursor}` |
-| `ack` | `agentId`, `messageId` | `{messageId,acked,duplicate}` |
+| `agents` | optional `active`, `within` (minutes), `staleMinutes` | `{agents,claims,cursor}` |
+| `send` | `from`, `to` (ID or `"*"`), `body`, optional `replyTo`, `messageId`, `summary`, `attachments` (absolute local paths) | `{messageId,recipients,duplicate,cursor}` |
+| `inbox` | `agentId`, optional `unacked` (default true), `since` (exclusive cursor), `from`, `limit` | `{messages,cursor,roomCursor}` |
+| `ack` | `agentId`, `messageId` or `all:true` or `through` | single receipt or `{acked:count}` |
 | `notified` | `agentId`, `messageId`, `adapter` | `{messageId,acked,duplicate}` |
 | `status` | `agentId`, optional `status`, `frozen`, `resources`, `task` | `{agent}` |
-| `claim` | `agentId`, `resources` | `{claims,owned}` |
-| `release` | `agentId`, optional `resources` | `{released,claims}` |
+| `claim` | `agentId`, `resources`, optional `scope` | `{claims,owned}` |
+| `release` | `agentId`, optional `resources`, `scope`, `force` | `{released,claims}` |
+| `leave` | `agentId` | `{left:agentId}` |
+| `fetch` | `agentId`, `messageId`, absolute `out` directory | `{files}` with name, hash, size and output path |
 | `wait` | `agentId`, optional `after` (0), `timeoutMs` (25000) | `{messages,cursor}` |
 
 Agent records contain `agentId, runner, registeredAt, updatedAt, status, frozen, resources,
-task` and optional `sessionId`. Initial status is `idle`, frozen is false, resources is an
+task` and optional `sessionId` and `left`. Left records remain internal for history validation; presence queries exclude them. Query records add `lastSeenAgeMs`. Agent operations refresh last seen at most once a second; `agents`, `rooms` and `snapshot` do not. Initial status is `idle`, frozen is false, resources is an
 empty array and task is null. Status accepts any nonempty string up to 80 UTF-8 bytes,
 including `busy`, `offline`, `awaiting-attachment` and `channel-ready`. Re-registration and
 partial status updates retain omitted fields. Task is null, a string, or a JSON object
@@ -38,13 +40,13 @@ up to 8 KiB. Status has no action semantics: offline never releases resources.
 Reported `status.resources` is metadata; actual authority is the claims list.
 
 Inbox/wait messages contain `messageId, from, to, body, createdAt, cursor, recipients,
-acked, notified` and optional `replyTo`. Notices are this recipient's
+acked, notified` and optional `replyTo`, `summary`, `attachments`. Each attachment is `{name,sha256,size}`. Notices are this recipient's
 `{agentId,adapter,at}` entries. Reading an inbox, waking a waiter, or successfully handing
 data to an adapter is **not an acknowledgement**. Only recipient `ack` changes the ack
 state. `notified` records an adapter's transport notice and remains pending until ack.
 
 The caller should supply a stable message ID when retrying an uncertain send. Same room,
-same ID and exact same sender/target/body/reply target returns the original receipt with
+same ID and exact same sender/target/body/reply target/summary/attachment metadata returns the original receipt with
 `duplicate:true`; changed content returns `MESSAGE_ID_CONFLICT`. Broadcast recipients
 are registered peers at the first durable send, excluding its sender. Later registrations
 and duplicate sends never backfill that recipient set. Replies must identify an existing
@@ -64,8 +66,7 @@ Relative/absolute file paths resolve inside the canonical project, including can
 existing ancestors for files not created yet. Paths outside it, including escaping
 symlinks, are rejected. A parent directory conflicts with any descendant claimed by
 another agent. Bare `build`, `install` and `native` are separate exclusive logical names;
-they are project scoped in v1. To coordinate work across projects, use an explicitly shared
-room. `agents` is the read-only claim query. `release` removes only the requesting agent's
+they remain project scoped by default. Opt-in `scope:"machine"` claims exact logical resource names across every room using the same store. These optional top-level `machineClaims` records contain `agentId,project,resource,claimedAt`. The project is part of holder identity, even for identical agent IDs. Query rows add `scope,ageMs,lastSeenAgeMs,stale`. The default stale threshold is 30 minutes, configurable with `createBroker({staleMinutes})`, daemon `--stale-minutes`, or `AGENT_RELAY_STALE_MINUTES` for CLI startup. No marker releases ownership. `agents` is the read-only claim query. `release` removes only the requesting agent's
 exact resources; omitted resources releases all that agent's claims. There are no expiry,
 offline-stealing or automatic-release rules. `CLAIM_CONFLICT` includes retained conflicting
 rows and acquires nothing.
@@ -99,3 +100,17 @@ room isolation, stable broadcasts, exact ack identity, restart retention, concur
 transactional claims, long polling, corrupt-state retention, cross-process writer refusal,
 dead-PID recovery and unknown-owner refusal. These checks do not validate Codex/OpenCode
 adapter wake-up behavior or actual external tool execution.
+
+## Optional ledger additions and local files
+
+Version remains 1. Old messages and stores require no migration or rewrite on startup. New fields are optional: message summary/attachments, agent left marker, top-level machineClaims/releaseLog. A forced release requires `force:true`, an explicit resources list and `agentId` naming the human; that identity need not be registered. It applies only to the selected scope and records human, time, requesting project, scope and removed claims in `releaseLog`. The log is bounded at 10000 entries and never evicted.
+
+Inbox filters combine, sort in durable cursor order and apply limit after filtering. Its returned cursor is the last returned message or supplied since when empty; roomCursor is independent. Bulk ack only changes the caller's recipient rows. The existing default unacked inbox and wait contract stay compatible with adapters.
+
+Send copies local attachment paths into a private attachments directory using hash filenames. Files are flushed before a message references them; hash/size are validated on fetch, with sender-or-recipient access checked first. A file is at most 25 MiB, the stored directory at most 100 MiB. Identical content shares a copy. There is no deletion or eviction. Files admitted before a failed/uncertain send may remain and count toward capacity; operators must not blindly retry with changed IDs. Attachments are local data and are excluded from releases and transfers together with history and tokens. Use a private data directory: cooperative IDs and broker tokens are not per-user security boundaries.
+
+The gate is a CLI preflight using read-only measurements, not a broker lock or atomic guarantee about later machine load. Unknown values are printed and do not fail it. Claims remain all-or-nothing after a successful preflight. No dependencies were added.
+
+New feature tests use an injected HTTP server to exercise real handler validation, serial transactions, disk persistence and restart without TCP. Existing loopback tests remain unchanged. `node scripts/smoke-improvements.mjs` runs the actual CLI with temporary projects, private storage and ephemeral ports; it also tests watch recovery and SIGTERM. It never uses the globally installed command or default storage.
+
+The updated client checks a read-only `capabilities` RPC before submitting extended fields. An older running broker fails that check with a restart-required error; it must not silently drop summaries/attachments or interpret machine claims as project claims. Existing command fields still work without that check. Upgrade the broker before using new options. Older code is not safe for coordinating machine claims after a downgrade.

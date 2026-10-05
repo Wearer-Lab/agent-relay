@@ -15,16 +15,13 @@ async function fixture(t){
  const args=['--import',preload,cli],env={...process.env,AGENT_RELAY_HOME:root,RELAY_TEST_JOURNAL:journal};
  return {root,journal,args,env,run:(...command)=>exec(process.execPath,[...args,...command,'--data-dir',root],{env,timeout:10000}),requests:async()=>{try{return (await fs.readFile(journal,'utf8')).trim().split('\n').map(line=>JSON.parse(line));}catch(e){if(e.code==='ENOENT')return [];throw e;}}};
 }
-test('CLI forwards feature command options',async t=>{
+test('CLI forwards repeatable attachments, summary, filters, machine scope and explicit forced identity',async t=>{
  const f=await fixture(t);
- await f.run('send','--as','a','--to','b','--message','body','--attach',path.join(f.root,'one'),'--attach',path.join(f.root,'two'));
+ await f.run('send','--as','a','--to','b','--message','body','--summary','preview','--attach',path.join(f.root,'one'),'--attach',path.join(f.root,'two'));
  await f.run('inbox','--as','b','--unread','--since','7','--from','a','--limit','2');
  await f.run('ack','--as','b','--through','8');await f.run('claim','--as','a','--scope','machine','native');await f.run('release','--as','human','--force','--scope','machine','native');
- const calls=(await f.requests()).filter(r=>r.op!=='capabilities');const inbox=calls.find(r=>r.op==='inbox');assert.equal(inbox.since,7);assert.equal(inbox.limit,2);assert.equal(inbox.unacked,true);assert.equal(calls.find(r=>r.op==='ack').through,8);
- assert.equal(calls.find(r=>r.op==='claim').scope,'machine');assert.equal(calls.find(r=>r.op==='release').force,true);assert.equal(calls.find(r=>r.op==='release').agentId,'human');
- assert.equal(calls.find(r=>r.op==='send').attachments.length,2);
+ const calls=(await f.requests()).filter(r=>r.op!=='capabilities');assert.equal(calls[0].attachments.length,2);assert.equal(calls[0].summary,'preview');assert.equal(calls[1].since,7);assert.equal(calls[1].limit,2);assert.equal(calls[1].unacked,true);assert.equal(calls[2].through,8);assert.equal(calls[3].scope,'machine');assert.equal(calls[4].force,true);assert.equal(calls[4].agentId,'human');
 });
-
 test('gated claim refuses before broker requests when measured disk limit fails',async t=>{
  const f=await fixture(t);await assert.rejects(f.run('claim','--as','a','--gate','--min-free-gb','1000000','native'),/Free disk/);assert.deepEqual(await f.requests(),[]);
 });
@@ -35,7 +32,7 @@ test('CLI JSON watch flushes preview and exits zero on SIGINT and SIGTERM',async
   t.after(()=>{if(child.exitCode===null)child.kill('SIGTERM');});
   let stdout='';const line=new Promise((resolve,reject)=>{child.once('error',reject);child.stdout.on('data',chunk=>{stdout+=chunk;if(stdout.includes('\n'))resolve(JSON.parse(stdout.split('\n')[0]));});});
   const timer=AbortSignal.timeout(5000);const timed=new Promise((_,reject)=>timer.addEventListener('abort',()=>reject(Error('watch timeout')),{once:true}));
-  const row=await Promise.race([line,timed]);assert.equal(row.id,'watch-id');assert.equal(row.body,'😀');assert.equal(row.truncated,true);
+  const row=await Promise.race([line,timed]);assert.equal(row.id,'watch-id');assert.equal(row.body,'😀');assert.equal(row.summary,'preview');assert.equal(row.truncated,true);
   const stopped=new Promise(resolve=>child.once('exit',(code,signal)=>resolve({code,signal})));child.kill(signal);assert.deepEqual(await stopped,{code:0,signal:null});
  }
 });

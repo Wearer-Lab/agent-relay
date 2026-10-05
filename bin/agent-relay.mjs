@@ -55,7 +55,7 @@ async function main(){
  case 'send':{
   let body=opts.message;if(body==='-'){body='';for await(const chunk of process.stdin)body+=chunk;}
   if(!body||!opts.to)throw new Error('Use --to and --message (or --message - for stdin)');
-  print(await rpc(project,{op:'send',from:requireAs(),to:opts.to,body,attachments:opts.attach?.map(f=>path.resolve(f)),replyTo:opts['reply-to'],messageId:opts.id||randomUUID()},options));break;
+  print(await rpc(project,{op:'send',from:requireAs(),to:opts.to,body,summary:opts.summary,attachments:opts.attach?.map(f=>path.resolve(f)),replyTo:opts['reply-to'],messageId:opts.id||randomUUID()},options));break;
  }
  case 'fetch':if(!opts.id)throw new Error('Use --id MESSAGE_ID');print(await rpc(project,{op:'fetch',agentId:requireAs(),messageId:opts.id,out:path.resolve(opts.out||process.cwd())},options));break;
  case 'inbox':print(await rpc(project,{op:'inbox',agentId:requireAs(),unacked:opts.unread?true:undefined,since:opts.since===undefined?undefined:Number(opts.since),from:opts.from,limit:opts.limit===undefined?undefined:Number(opts.limit)},options));break;

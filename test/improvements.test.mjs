@@ -61,6 +61,13 @@ test('attachments are recipient/sender only and survive restart without scratch 
  const result=await f.rpc({op:'fetch',agentId:'b',messageId:'packet',out:path.join(f.root,'fetched')});assert.equal(await fs.readFile(result.files[0].path,'utf8'),'durable packet');
 });
 
+test('summary is optional, bounded, durable and part of send idempotency',async t=>{
+ const f=await fixture(t);await f.register('a');await f.register('b');const input={op:'send',from:'a',to:'b',messageId:'summary',body:'details',summary:'preview'};
+ await f.rpc(input);assert.equal((await f.rpc(input)).duplicate,true);assert.equal((await f.request({...input,summary:'changed'})).ok,false);
+ assert.equal((await f.request({...input,messageId:'long',summary:'x'.repeat(121)})).ok,false);
+ await f.restart();assert.equal((await f.rpc({op:'inbox',agentId:'b'})).messages[0].summary,'preview');
+});
+
 test('old optional-field-free ledger opens byte-for-byte unchanged and accepts old send fields',async t=>{
  const f=await fixture(t);await f.register('a');await f.register('b');await f.rpc({op:'send',from:'a',to:'b',body:'old CLI',messageId:'old'});
  const file=path.join(f.dataDir,'state.json'),before=await fs.readFile(file,'utf8');await f.restart();assert.equal(await fs.readFile(file,'utf8'),before);

@@ -125,13 +125,50 @@ agent-relay release --as worker-a src/module.js build
 agent-relay watch --as worker-a
 ```
 
-Use `--reply-to MESSAGE_ID` for a reply, `--id STABLE_ID` for an idempotent send, and `--message -` to read text from stdin. `--to '*'` broadcasts to peers registered at send time. Each command defaults to the current directory; `--project PATH` chooses the canonical project room. Agents started at a subdirectory should use the root path consistently.
+Use `--reply-to MESSAGE_ID` for a reply, `--id STABLE_ID` for an idempotent send, and `--message -` to read text from stdin. `--to '*'` broadcasts to peers present at send time. Each command defaults to the current directory; `--project PATH` chooses the canonical project room. Agents started at a subdirectory should use the root path consistently.
+
+For sessions that poll instead of receiving push:
+
+```sh
+agent-relay inbox --as worker-a --unread --since 0 --from worker-b --limit 20
+agent-relay watch --as worker-a --json-lines --unread --max-chars 500
+agent-relay ack --as worker-a --through CURSOR
+agent-relay ack --as worker-a --all
+```
+
+Inbox remains unacknowledged-only by default for compatibility. `--since` is a numeric message cursor, exclusive; filters combine, and `--limit` is 1–10000. Save the returned `cursor` after consuming a page. `roomCursor` reports the room's latest message independently of pagination. Reading never acknowledges. Bulk acknowledgement affects only messages addressed to the caller. Watch emits existing messages then new arrivals; `--unread` restricts it to pending messages. JSON lines include `id`, `from`, `createdAt`, nullable `replyTo`, optional `summary`, `body`, and `truncated`. Truncation counts Unicode characters. Watch retries connection failures with bounded backoff, preserves its cursor across broker restarts, and exits successfully on SIGINT/SIGTERM. After restarting the watch process, recover pending work through inbox or deduplicate message IDs.
+
+Machine resources and presence:
+
+```sh
+agent-relay claim --as worker-a --scope machine native build
+agent-relay release --as worker-a --scope machine native build
+agent-relay agents --active --within 30
+agent-relay agents --stale-minutes 30
+agent-relay leave --as worker-a
+agent-relay release --force --as owner --scope machine native
+agent-relay gate --max-swap-gb 8 --max-load 40 --min-free-gb 10 --path /
+agent-relay claim --as worker-a --scope machine --gate native
+```
+
+Machine claims use exact resource names across rooms in the same data directory. Their holder, project, age and stale marker appear in agents, status and the dashboard. Project claims keep their existing path rules. Claims never expire or get stolen; stale means the holder has not been seen for 30 minutes or has left. `agents --stale-minutes MIN` changes that query's threshold; `AGENT_RELAY_STALE_MINUTES` configures a newly started broker's default and dashboard. `agents --active --within MIN` filters presence using a default 30-minute window. Agent commands refresh last-seen time; observer queries do not. Leave removes presence while retaining history and claims; join restores it. A forced release requires explicit resource names and a human identity, recorded with the removed claims in the ledger.
+
+Gate prints measured swap, one-minute load and free disk, with unknown values identified. It exits nonzero for exceeded limits. On macOS it uses read-only `sysctl` and `df`; elsewhere it is best effort. Unknown values do not fail the gate. Claim accepts `--gate` and the same limit/path options, refusing before acquiring resources if a measured limit fails. There is no polling gate daemon.
+
+Durable local files and previews:
+
+```sh
+agent-relay send --as worker-a --to worker-b --message "Review packet" --summary "Build results" --attach ./packet.txt --attach ./log.txt
+agent-relay fetch --as worker-b --id MESSAGE_ID --out ./received
+```
+
+New options require an updated broker. The CLI checks capabilities and reports that the owner must restart an older broker before submitting them. Existing basic commands continue to work. Summary is optional and limited to 120 Unicode characters; inbox, watch and the dashboard show it before the body. Attachments are private copies identified by SHA-256 and byte size, limited to 25 MiB each and 100 MiB total stored content. Capacity errors retain existing files. Only the sender and fixed recipients may fetch. Fetch checks every hash and size before writing files, prefixes names with an index and hash, and refuses to overwrite existing files. Attachments stay on this computer and are never included in a transfer or release.
 
 ## Local behavior and boundaries
 
-One loopback-only broker persists one private JSON ledger in the user's application data directory. `agent-relay start` starts it on demand. A separate writer lease prevents two processes from mutating the ledger. Project roots are canonical real paths; histories and ownership do not cross rooms. Messages can contain sensitive project details, so history stays on this computer and is not part of a transfer/release.
+One loopback-only broker persists one private JSON ledger in the user's application data directory. `agent-relay start` starts it on demand. A separate writer lease prevents two processes from mutating the ledger. Project roots are canonical real paths; histories and project ownership do not cross rooms. Opt-in machine claims cross rooms within that broker data directory. Messages can contain sensitive project details, so history stays on this computer and is not part of a transfer/release.
 
-A durable send, a transport notice, model-context inclusion and an explicit agent acknowledgement are different facts. The broker does not auto-ack. Claims are cooperative file/resource ownership, not operating-system locks; they do not expire or get stolen when a peer goes idle. `build`, `install` and `native` claims are project-scoped. Agents sharing a physical resource across projects must coordinate deliberately; v1 does not silently make those claims global.
+A durable send, a transport notice, model-context inclusion and an explicit agent acknowledgement are different facts. The broker does not auto-ack. Claims are cooperative file/resource ownership, not operating-system locks; they do not expire or get stolen when a peer goes idle. `build`, `install` and `native` remain project-scoped unless `--scope machine` is supplied. Machine claims are cooperative too; they are not operating-system locks.
 
 Peer messages do not change user authorization, approval rules or permissions. The broker never runs arbitrary shell commands, approves tools, replays external actions or launches model servers. Duplex means messages can arrive while an agent works, with safe consumption at its runner's available boundary; it does not mean two concurrent model turns in one session.
 

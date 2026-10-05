@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {preview,watchMessages} from '../lib/watch.mjs';
-test('JSON preview is compact, Unicode-safe',()=>{
- const row=preview({messageId:'id',from:'a',createdAt:'today',body:'😀long'},1);assert.equal(row.body,'😀');assert.equal(row.truncated,true);assert.equal(row.replyTo,null);
+test('JSON preview is compact, Unicode-safe and puts summary before body',()=>{
+ const row=preview({messageId:'id',from:'a',createdAt:'today',body:'😀long',summary:'preview'},1);assert.equal(row.body,'😀');assert.equal(row.truncated,true);assert.equal(row.replyTo,null);assert.ok(JSON.stringify(row).indexOf('summary')<JSON.stringify(row).indexOf('body'));
 });
 test('watch recovers broker faults with backoff and keeps last emitted cursor without duplicates',async()=>{
  const controller=new AbortController(),seen=[],delays=[];let attempts=0;
