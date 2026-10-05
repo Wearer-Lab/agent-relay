@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Agent Relay · All projects</title>
+<script src="/theme.js"></script><link rel="stylesheet" href="/dashboard.css"><script src="/dashboard.js" defer></script>
+</head>
+<body>
+<header class="toolbar">
+<a class="brand" href="/"><span class="brand-mark" aria-hidden="true">↔</span>Agent Relay</a>
+<label class="toolbar-search"><span aria-hidden="true" class="search-icon">⌕</span><span class="sr-only">Search messages</span><input id="search" type="search" placeholder="Search messages or agent IDs"></label>
+<div class="toolbar-actions"><span class="connection" id="connection" role="status">Connecting…</span><button id="pause" type="button">Pause updates</button><label class="theme-control"><span class="sr-only">Color theme</span><select id="theme" aria-label="Color theme"><option value="dark">Dark</option><option value="light">Light</option><option value="system">System</option></select></label></div>
+</header>
+<main>
+<div id="error" class="error" role="alert" hidden></div>
+<section class="summary" aria-label="Selected project totals">
+<div><span class="metric-title"><span class="metric-symbol" aria-hidden="true">◉</span>Agents</span><strong id="agents-count">—</strong><span>Registered in this project</span><span class="metric-rule" aria-hidden="true"></span></div>
+<div><span class="metric-title"><span class="metric-symbol" aria-hidden="true">↔</span>Messages</span><strong id="messages-count">—</strong><span>Retained conversation history</span><span class="metric-rule" aria-hidden="true"></span></div>
+<div><span class="metric-title"><span class="metric-symbol" aria-hidden="true">◷</span>Awaiting acknowledgement</span><strong id="pending-count">—</strong><span>Pending recipient deliveries</span><span class="metric-rule" aria-hidden="true"></span></div>
+<div><span class="metric-title"><span class="metric-symbol" aria-hidden="true">◇</span>Active claims</span><strong id="claims-count">—</strong><span>Files and shared resources</span><span class="metric-rule" aria-hidden="true"></span></div>
+</section>
+<section class="projects-section" aria-label="Projects"><div class="section-title"><h2>Projects <span id="projects-count">Discovering rooms…</span></h2><span>Shared local broker</span></div><div id="projects" class="projects"></div></section>
+<div class="intro"><div><h1>Project activity</h1><p id="project" class="project">Waiting for the project…</p></div><span class="note">Updates every 3 seconds</span></div>
+<div class="workspace">
+<section class="agents-section" aria-label="Agents"><div class="section-title"><h2>Agents</h2><span>Reported status and tasks</span></div><div id="agents" class="agents"><p class="empty">Loading agents…</p></div><p class="footnote">Recent activity reflects recorded updates, not a verified live connection.</p></section>
+<section class="activity"><div class="section-title"><h2>Conversation <span id="message-range">Latest 100 messages</span></h2><div class="filters"><label><span class="sr-only">Filter by agent</span><select id="agent-filter"><option value="">All agents</option></select></label><label class="pending-filter"><input id="pending-only" type="checkbox">Unacknowledged</label></div></div><div id="messages" class="messages"><p class="empty">Loading conversation…</p></div></section>
+</div>
+<section class="claims-section"><div class="section-title"><h2>Claimed resources</h2><span>Cooperative ownership</span></div><div class="table-scroll"><table><thead><tr><th>Resource</th><th>Owner</th><th>Claimed</th></tr></thead><tbody id="claims"></tbody></table></div><p id="no-claims" class="empty" hidden>No resources are currently claimed.</p></section>
+<footer><span>Local to this computer · Read-only</span><span id="updated">No snapshot yet</span></footer>
+</main></body></html>

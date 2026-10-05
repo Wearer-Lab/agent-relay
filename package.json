@@ -1,0 +1,54 @@
+{
+  "name": "@wearer-haitch/agent-relay",
+  "version": "0.1.0",
+  "description": "Local project-scoped coordination and notifications for coding agents",
+  "type": "module",
+  "bin": {
+    "agent-relay": "bin/agent-relay.mjs"
+  },
+  "engines": {
+    "node": ">=20.12.0"
+  },
+  "scripts": {
+    "test": "node --test",
+    "start": "node bin/agent-relay.mjs start",
+    "release:check": "npm test && node scripts/release-check.mjs",
+    "prepublishOnly": "npm run release:check"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.31.0",
+    "@opencode-ai/plugin": "1.18.34",
+    "cross-spawn": "7.0.6",
+    "jsonc-parser": "3.3.1",
+    "ws": "8.22.0"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "docs/*.md",
+    "README.md",
+    "LICENSE",
+    "npm-shrinkwrap.json"
+  ],
+  "license": "MIT",
+  "keywords": [
+    "coding-agents",
+    "codex",
+    "claude-code",
+    "opencode",
+    "mcp",
+    "agent-relay"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Wearer-Lab/agent-relay.git"
+  },
+  "homepage": "https://github.com/Wearer-Lab/agent-relay#readme",
+  "bugs": {
+    "url": "https://github.com/Wearer-Lab/agent-relay/issues"
+  }
+}
