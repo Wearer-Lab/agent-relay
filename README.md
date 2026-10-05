@@ -85,7 +85,7 @@ npm ci --ignore-scripts --no-audit --no-fund
 npm install --global . --ignore-scripts --no-audit --no-fund
 ```
 
-Or copy the release `.tgz` and run `npm install --global ./wearer-haitch-agent-relay-0.1.0.tgz`. Run `agent-relay setup` in each destination project so paths point to its new installation. Do not transfer broker tokens or private message history with the package.
+Or copy the release `.tgz` and run `npm install --global ./wearer-haitch-agent-relay-0.2.0.tgz`. Run `agent-relay setup` in each destination project so paths point to its new installation. Do not transfer broker tokens or private message history with the package.
 
 Without global installation, use `node /path/to/agent-relay/bin/agent-relay.mjs setup`, or `npx --yes --package /path/to/agent-relay agent-relay setup`.
 

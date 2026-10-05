@@ -1,6 +1,6 @@
 {
   "name": "@wearer-haitch/agent-relay",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Local project-scoped coordination and notifications for coding agents",
   "type": "module",
   "bin": {

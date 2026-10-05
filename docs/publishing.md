@@ -40,8 +40,8 @@ name availability.
 
 ```sh
 npm pack --pack-destination /tmp
-npx --yes --package /tmp/wearer-haitch-agent-relay-0.1.0.tgz agent-relay --version
-npx --yes --package /tmp/wearer-haitch-agent-relay-0.1.0.tgz agent-relay --help
+npx --yes --package /tmp/wearer-haitch-agent-relay-0.2.0.tgz agent-relay --version
+npx --yes --package /tmp/wearer-haitch-agent-relay-0.2.0.tgz agent-relay --help
 ```
 
 In a disposable project, try `setup` and then `launch codex` using the same
@@ -53,7 +53,7 @@ keep broker history separate from your normal installation.
 
 ```sh
 npm pack --pack-destination /tmp
-npm publish /tmp/wearer-haitch-agent-relay-0.1.0.tgz --access public --registry=https://registry.npmjs.org/
+npm publish /tmp/wearer-haitch-agent-relay-0.2.0.tgz --access public --registry=https://registry.npmjs.org/
 ```
 
 Publishing the archive sends the exact packed artifact. Archive publication
@@ -70,10 +70,10 @@ From a directory outside this source checkout:
 
 ```sh
 npm view @wearer-haitch/agent-relay version dist.integrity
-npx --yes @wearer-haitch/agent-relay@0.1.0 --version
-npx --yes @wearer-haitch/agent-relay@0.1.0 --help
+npx --yes @wearer-haitch/agent-relay@0.2.0 --version
+npx --yes @wearer-haitch/agent-relay@0.2.0 --help
 # From a real project:
-npx --yes @wearer-haitch/agent-relay@0.1.0 launch codex
+npx --yes @wearer-haitch/agent-relay@0.2.0 launch codex
 ```
 
 Launch performs setup automatically. Global installation is optional:
