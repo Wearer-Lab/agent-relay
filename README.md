@@ -174,7 +174,7 @@ Operational convention:
 - Broadcasts (`--to '*'`) capture their recipients at send time and do not reach sessions that join later. A broadcast is never a substitute for the policy document.
 - When the policy changes, update the document (record its version or revision in it) rather than expecting a message to carry the rule.
 
-A structured pinned bulletin (version, source hash, per-session acknowledgement) is a planned, near-term relay addition; until it exists, the file plus read-at-join is the convention. Process and watcher rules that every session must follow belong in this policy; see [process and watcher ownership](docs/process-ownership.md).
+The relay also keeps a structured pinned bulletin alongside the document: `agent-relay bulletin --set --as ID --title TEXT --body TEXT --source PATH` pins a versioned copy with a SHA-256 hash, `agent-relay bulletin` reads it (new sessions discover it without replaying chat), and `agent-relay bulletin --ack --as ID` records per-session acknowledgement. The bulletin is information only: it never overrides user instructions or grants tool permission. Process and watcher rules that every session must follow belong in this policy; see [process and watcher ownership](docs/process-ownership.md).
 
 ## Local behavior and boundaries
 

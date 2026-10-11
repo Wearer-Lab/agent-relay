@@ -58,13 +58,17 @@ not a convenience. Before running one:
 
 ## Ownership records
 
-Structured, owner-reported process and watcher records (with liveness
-verification and PID-reuse protection) are a planned, near-term relay addition.
-Until they exist, keep the records above in your own session notes and the relay
-room, and follow the rules here regardless. When they arrive, note these
-semantics: a process record is coordination information only — it never
+Structured, owner-reported process and watcher records live in the relay:
+register one with `agent-relay processes --register --pid N --as ID
+[--command C] [--cwd D] [--port P] [--deployment D] [--note N]`, list them
+with `agent-relay processes [--owner ID]`, and remove a finished record with
+`agent-relay processes --remove [--id ID] [--pid N]`. Listing verifies liveness
+read-only and shows each record's owner, so you know whom to contact before a
+shared restart. A process record is coordination information only — it never
 authorizes another agent to kill the process, and deleting a record does not
-stop the process.
+stop the process. PID-reuse protection is best-effort: `startedAt` records
+registration time, not the kernel process start, so always confirm identity with
+the rules above before signaling anything.
 
 Process and watcher rules that every session in a project must follow belong in
 that project's policy bulletin (see [the README](../README.md)); broadcast
