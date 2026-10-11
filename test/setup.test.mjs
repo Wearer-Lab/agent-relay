@@ -28,3 +28,28 @@ test('equivalent quoted and inline Codex relay entries are preserved before any 
   await assert.rejects(setupProject(dir,{runners:['codex']}),/preserved/);assert.equal(await fs.readFile(path.join(dir,'.codex/config.toml'),'utf8'),original);await assert.rejects(fs.stat(path.join(dir,'AGENTS.md')),{code:'ENOENT'});
  }
 });
+test('diagnose reports binding health and detects a moved installation',async t=>{
+ const {diagnoseSetup,refreshSetup}=await import('../lib/setup.mjs');
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'relay-diagnose-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+ const empty=await diagnoseSetup(dir);
+ assert.equal(empty.packageRoot.moved,false);
+ assert.ok(empty.bindings.every(b=>b.ok===false));
+ assert.equal(empty.ownerLoaded,'unknown');
+ await setupProject(dir);
+ const healthy=await diagnoseSetup(dir);
+ assert.equal(healthy.packageRoot.moved,false);
+ assert.ok(healthy.bindings.length>=3&&healthy.bindings.every(b=>b.ok===true));
+ const relocated=await diagnoseSetup(dir,{packageRoot:'/elsewhere/pkg'});
+ assert.equal(relocated.packageRoot.moved,true);
+ assert.ok(relocated.bindings.every(b=>b.ok===true), 'a comparison-only override leaves files intact');
+ const mcpPath=path.join(dir,'.mcp.json');
+ await fs.writeFile(mcpPath,(await fs.readFile(mcpPath,'utf8')).replace(process.execPath,'/elsewhere/node'));
+ const stale=await diagnoseSetup(dir);
+ const claude=stale.bindings.find(b=>b.runner==='claude');
+ assert.equal(claude.ok,false);assert.match(claude.detail,/not found/);
+ const refreshed=await refreshSetup(dir);
+ assert.deepEqual(refreshed.changed,['.mcp.json'], 'refresh repairs the stale binding');
+ assert.equal(refreshed.diagnosis.packageRoot.moved,false);
+ assert.ok(refreshed.diagnosis.bindings.every(b=>b.ok===true));
+ assert.deepEqual((await refreshSetup(dir)).changed,[]);
+});

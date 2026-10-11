@@ -139,17 +139,23 @@ test('existing inbox is recovered; failed acknowledgement retains context; self 
   assert.equal(h.prompts.length, 0);
 });
 
-test('seven standard tools bind sender and resource owner to context session and refuse cross-project calls', async t => {
+test('twelve standard tools bind sender and resource owner to context session and refuse cross-project calls', async t => {
   const h = harness(), hooks = await plugin(h); t.after(() => hooks.dispose()); await busy(hooks);
-  assert.equal(Object.keys(hooks.tool).length, 7);
+  assert.equal(Object.keys(hooks.tool).length, 12);
   for (const definition of Object.values(hooks.tool)) assert.ok(z.object(definition.args));
   await hooks.tool.relay_send.execute({ to: 'codex:existing', body: 'Safe coordination', from: 'forged', op: 'forged' }, toolContext());
   await hooks.tool.relay_claim.execute({ resources: ['build'] }, toolContext());
   await hooks.tool.relay_release.execute({}, toolContext());
-  await hooks.tool.relay_agents.execute({}, toolContext());
+  await hooks.tool.relay_agents.execute({ active: true, transport: 'connected' }, toolContext());
   await hooks.tool.relay_status.execute({status: 'blocked', task: 'Awaiting owner handoff'}, toolContext());
   assert.equal(h.calls.find(x => x.op === 'status' && x.status === 'blocked').task, 'Awaiting owner handoff');
-  await hooks.tool.relay_inbox.execute({}, toolContext());
+  await hooks.tool.relay_inbox.execute({ limit: 10 }, toolContext());
+  await hooks.tool.relay_ack.execute({ through: 3 }, toolContext());
+  await hooks.tool.relay_outbox.execute({}, toolContext());
+  await hooks.tool.relay_receipt.execute({ messageId: 'm-1' }, toolContext());
+  await hooks.tool.relay_history.execute({ acked: true }, toolContext());
+  await hooks.tool.relay_fetch.execute({ messageId: 'm-1' }, toolContext());
+  await hooks.tool.relay_leave.execute({}, toolContext());
   const send = h.calls.find(x => x.op === 'send'); assert.equal(send.from, id);
   assert.equal(h.calls.find(x => x.op === 'claim').agentId, id);
   assert.equal(h.calls.find(x => x.op === 'release').agentId, id);
@@ -257,4 +263,57 @@ test('concurrent duplicate durable admissions suppress runner calls even with st
   assert.match(output.messages[0].parts[1].text, /concurrent/);
   assert.equal(h.calls.some(x => x.op === 'ack'), false);
   await hooks.dispose();
+});
+test('watch recovers from broker disruption without another user turn and keeps its cursor', async t => {
+  const h = harness(), hooks = await plugin(h); t.after(() => hooks.dispose());
+  await busy(hooks); await flush();
+  assert.equal(h.waiters.length, 1);
+  h.waiters.shift().reject(new Error('connect ECONNREFUSED'));
+  await new Promise(resolve => setTimeout(resolve, 300)); await flush();
+  assert.equal(h.waiters.length, 1, 'watch re-arms after a wait error with no new user event');
+  assert.ok(h.calls.some(x => x.op === 'status' && x.transport?.state === 'disconnected' && x.transport?.adapter === 'opencode-watch'));
+  await h.deliver([message('recovered')]);
+  await idle(hooks);
+  assert.equal(h.prompts.length, 1);
+  assert.ok(h.calls.some(x => x.op === 'status' && x.transport?.state === 'connected'));
+  await h.deliver([]); await flush();
+  assert.equal(h.prompts.length, 1, 'recovered cursor produces no duplicate wake');
+  await hooks.dispose();
+});
+test('uncertain wake failure is recorded with structured detail and never retried', async t => {
+  const h = harness({ failPrompt: true }), hooks = await plugin(h); t.after(() => hooks.dispose());
+  await busy(hooks); await h.deliver([message('uncertain-wake')]); await idle(hooks);
+  assert.equal(h.prompts.length, 1);
+  assert.ok(h.toasts.some(toast => /uncertain/.test(toast.body.message)), 'warning carries the failure category');
+  await idle(hooks); await flush();
+  assert.equal(h.prompts.length, 1, 'uncertain submission is never retried automatically');
+});
+test('context transform bounds model input while every pending message stays discoverable', async t => {
+  const rows = Array.from({ length: 25 }, (_, i) => message('bulk-' + i, { body: 'payload-' + i + '-' + 'x'.repeat(2000),
+    cursor: i + 1, summary: 's' + i, attachments: [{ name: 'f.bin', size: 3, sha256: 'c'.repeat(64) }] }));
+  const h = harness({ initial: rows }), hooks = await plugin(h); t.after(() => hooks.dispose());
+  await busy(hooks);
+  await hooks.tool.relay_inbox.execute({}, toolContext());
+  const output = { messages: [user()] }; await hooks['experimental.chat.messages.transform']({}, output);
+  const text = output.messages[0].parts[1].text;
+  assert.ok(text.length <= 40 * 1024, `bounded context input, got ${text.length}`);
+  assert.match(text, /more pending via relay_inbox/);
+  assert.match(text, /"summary":"s0"/);
+  assert.match(text, /"attachments":\[{"name":"f.bin"/);
+  assert.match(text, /"cursor":1/);
+  await hooks['experimental.chat.messages.transform']({}, output);
+  assert.equal(output.messages[0].parts.length, 2, 'digest dedupe still applies');
+  const inbox = JSON.parse(await hooks.tool.relay_inbox.execute({ limit: 100 }, toolContext()));
+  assert.equal(inbox.messages.length, 25, 'nothing was dropped from the durable backlog');
+});
+test('bulk acknowledgement moves only handled pending rows to acknowledged', async t => {
+  const rows = [message('k1', { body: 'first', cursor: 1 }), message('k2', { body: 'second', cursor: 2 }), message('k3', { body: 'third', cursor: 3 })];
+  const h = harness({ initial: rows }), hooks = await plugin(h); t.after(() => hooks.dispose());
+  await busy(hooks);
+  await hooks.tool.relay_inbox.execute({}, toolContext());
+  await hooks.tool.relay_ack.execute({ through: 2 }, toolContext());
+  assert.ok(h.calls.some(x => x.op === 'ack' && x.through === 2));
+  const output = { messages: [user()] }; await hooks['experimental.chat.messages.transform']({}, output);
+  const text = output.messages[0].parts[1].text;
+  assert.match(text, /third/); assert.ok(!text.includes('first') && !text.includes('second'));
 });

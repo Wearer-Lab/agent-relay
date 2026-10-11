@@ -42,7 +42,12 @@ OpenCode 1.18.34's busy runner can accept an asynchronous prompt without schedul
 The status check cannot eliminate that race. Therefore a 204 response is not an acknowledgement,
 and an uncertain prompt submission is never automatically retried. Messages remain in the broker
 until explicit acknowledgement, available through `relay_inbox` and later model boundaries. Broker
-wait errors stop the watch with a warning; a later session/tool hook may reconnect. No recurring
+Broker wait errors no longer stop the watch: it warns once, records a structured failure
+(`errorCategory`, attempt, timestamp, context, `delivery: failed`), reports its transport as
+disconnected, and resumes automatically with bounded backoff (100ms doubling to 5s) while the
+session lives, preserving its cursor so no message is duplicated or lost. Recovery reports the
+transport as connected. An uncertain prompt submission is still never automatically retried; it is
+recorded with `delivery: uncertain`. No recurring
 model wake, copied mailbox or second inference loop exists. This favors retaining an unacknowledged
 message over risking a duplicate wake: a crash after recording an attempt but before calling the
 runner can leave that message pending for the next real model boundary or `relay_inbox`.

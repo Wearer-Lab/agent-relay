@@ -99,7 +99,9 @@ Focused checks use `node --test test/broker.test.mjs`: real HTTP parallel delive
 room isolation, stable broadcasts, exact ack identity, restart retention, concurrent
 transactional claims, long polling, corrupt-state retention, cross-process writer refusal,
 dead-PID recovery and unknown-owner refusal. These checks do not validate Codex/OpenCode
-adapter wake-up behavior or actual external tool execution.
+adapter wake-up behavior or actual external tool execution. The `test/` and `scripts/`
+directories are not included in the npm package; they are available in the source
+repository at the installed version (https://github.com/Wearer-Lab/agent-relay).
 
 ## Optional ledger additions and local files
 
@@ -111,6 +113,6 @@ Send copies local attachment paths into a private attachments directory using ha
 
 The gate is a CLI preflight using read-only measurements, not a broker lock or atomic guarantee about later machine load. Unknown values are printed and do not fail it. Claims remain all-or-nothing after a successful preflight. No dependencies were added.
 
-New feature tests use an injected HTTP server to exercise real handler validation, serial transactions, disk persistence and restart without TCP. Existing loopback tests remain unchanged. `node scripts/smoke-improvements.mjs` runs the actual CLI with temporary projects, private storage and ephemeral ports; it also tests watch recovery and SIGTERM. It never uses the globally installed command or default storage.
+New feature tests use an injected HTTP server to exercise real handler validation, serial transactions, disk persistence and restart without TCP. Existing loopback tests remain unchanged. `node scripts/smoke-improvements.mjs` (source repository only; see above) runs the actual CLI with temporary projects, private storage and ephemeral ports; it also tests watch recovery and SIGTERM. It never uses the globally installed command or default storage.
 
 The updated client checks a read-only `capabilities` RPC before submitting extended fields. An older running broker fails that check with a restart-required error; it must not silently drop summaries/attachments or interpret machine claims as project claims. Existing command fields still work without that check. Upgrade the broker before using new options. Older code is not safe for coordinating machine claims after a downgrade.

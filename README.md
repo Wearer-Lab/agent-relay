@@ -4,7 +4,7 @@
 
 One local communication room per project, shared by Codex, Claude Code, OpenCode and other coding agents. Agents can send messages, reply, acknowledge, report work and claim files or build slots directly. The user does not have to relay their conversations.
 
-The package lives outside any application repository. It runs on Node 20.12+ with portable Node libraries. macOS has been tested locally; the optional CI template covers macOS, Windows, and Linux.
+The package lives outside any application repository. It runs on Node 20.12+ with portable Node libraries. macOS has been tested locally; an optional CI template targets macOS, Windows, and Linux (GitHub Actions is not enabled in the repository). Current platform and runner evidence is recorded in the [validation matrix](docs/validation.md).
 
 ## Start using it
 
@@ -85,7 +85,7 @@ npm ci --ignore-scripts --no-audit --no-fund
 npm install --global . --ignore-scripts --no-audit --no-fund
 ```
 
-Or copy the release `.tgz` and run `npm install --global ./wearer-haitch-agent-relay-0.2.0.tgz`. Run `agent-relay setup` in each destination project so paths point to its new installation. Do not transfer broker tokens or private message history with the package.
+Or copy the release `.tgz` and run `npm install --global ./wearer-haitch-agent-relay-0.3.0.tgz`. Run `agent-relay setup` in each destination project so paths point to its new installation. Do not transfer broker tokens or private message history with the package.
 
 Without global installation, use `node /path/to/agent-relay/bin/agent-relay.mjs setup`, or `npx --yes --package /path/to/agent-relay agent-relay setup`.
 
@@ -164,17 +164,31 @@ agent-relay fetch --as worker-b --id MESSAGE_ID --out ./received
 
 New options require an updated broker. The CLI checks capabilities and reports that the owner must restart an older broker before submitting them. Existing basic commands continue to work. Summary is optional and limited to 120 Unicode characters; inbox, watch and the dashboard show it before the body. Attachments are private copies identified by SHA-256 and byte size, limited to 25 MiB each and 100 MiB total stored content. Capacity errors retain existing files. Only the sender and fixed recipients may fetch. Fetch checks every hash and size before writing files, prefixes names with an index and hash, and refuses to overwrite existing files. Attachments stay on this computer and are never included in a transfer or release.
 
+## Project policy bulletin
+
+Lasting coordination rules do not live in chat. The approved policy for a project is a pinned document in the consuming project's repository root — conventionally `POLICY.md` or `AGENT_BEST_PRACTICES.md`. These files belong to the consuming project; this package does not ship or enforce them.
+
+Operational convention:
+
+- Every new session reads the current policy document at join before coordinating.
+- Broadcasts (`--to '*'`) capture their recipients at send time and do not reach sessions that join later. A broadcast is never a substitute for the policy document.
+- When the policy changes, update the document (record its version or revision in it) rather than expecting a message to carry the rule.
+
+A structured pinned bulletin (version, source hash, per-session acknowledgement) is a planned, near-term relay addition; until it exists, the file plus read-at-join is the convention. Process and watcher rules that every session must follow belong in this policy; see [process and watcher ownership](docs/process-ownership.md).
+
 ## Local behavior and boundaries
 
 One loopback-only broker persists one private JSON ledger in the user's application data directory. `agent-relay start` starts it on demand. A separate writer lease prevents two processes from mutating the ledger. Project roots are canonical real paths; histories and project ownership do not cross rooms. Opt-in machine claims cross rooms within that broker data directory. Messages can contain sensitive project details, so history stays on this computer and is not part of a transfer/release.
 
 A durable send, a transport notice, model-context inclusion and an explicit agent acknowledgement are different facts. The broker does not auto-ack. Claims are cooperative file/resource ownership, not operating-system locks; they do not expire or get stolen when a peer goes idle. `build`, `install` and `native` remain project-scoped unless `--scope machine` is supplied. Machine claims are cooperative too; they are not operating-system locks.
 
-Peer messages do not change user authorization, approval rules or permissions. The broker never runs arbitrary shell commands, approves tools, replays external actions or launches model servers. Duplex means messages can arrive while an agent works, with safe consumption at its runner's available boundary; it does not mean two concurrent model turns in one session.
+Peer messages do not change user authorization, approval rules or permissions. The broker never runs arbitrary shell commands, approves tools, replays external actions or launches model servers. Processes and development watchers are started outside the relay: stop only process trees you own by verified identity (PID, start time, owner record), never broad name-based kills — see [process and watcher ownership](docs/process-ownership.md). Duplex means messages can arrive while an agent works, with safe consumption at its runner's available boundary; it does not mean two concurrent model turns in one session.
 
 `AGENT_RELAY_HOME` or `--data-dir` overrides local storage. Version1 bounds history at 10,000 messages/64MB and reports capacity errors rather than silently deleting messages. Corrupt history and ambiguous writer locks are retained and startup refuses them. See [broker details](docs/broker-notes.md), [Claude adapter](docs/claude-channel.md), [OpenCode adapter](docs/opencode.md) and [validation](docs/validation.md).
 
 ## Development
+
+From a source checkout (the npm package ships runtime files and documentation only; `test/` and `scripts/` are available in the source repository at https://github.com/Wearer-Lab/agent-relay):
 
 ```sh
 npm ci --ignore-scripts --no-audit --no-fund
@@ -188,4 +202,4 @@ Tests use temporary projects and data directories, real loopback HTTP/CLI and SD
 
 See [the npm release guide](docs/publishing.md) for validation, publication, and verification.
 
-An optional CI configuration is provided in [docs/ci-workflow.yml](docs/ci-workflow.yml). Copy it to `.github/workflows/test.yml` to enable GitHub Actions; pushing workflow files requires a GitHub credential with workflow permission.
+An optional CI configuration is documented in [docs/ci-workflow.md](docs/ci-workflow.md). Copy the fenced workflow template from that page to `.github/workflows/test.yml` to enable GitHub Actions; pushing workflow files requires a GitHub credential with workflow permission.

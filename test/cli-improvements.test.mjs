@@ -7,7 +7,7 @@ async function fixture(t){
  globalThis.fetch=async(url,options)=>{
   if(url.endsWith('/health'))return {ok:true};const input=JSON.parse(options.body);
   await fs.appendFile(process.env.RELAY_TEST_JOURNAL,JSON.stringify(input)+'\\n');
-  const result=input.op==='capabilities'?{ok:true,features:['test']}:input.op==='inbox'?{ok:true,messages:[{messageId:'watch-id',from:'a',createdAt:'today',body:'😀body',summary:'preview',cursor:1}]}:{ok:true};
+   const result=input.op==='capabilities'?{ok:true,features:['test','summary','attachments','inbox-filters','bulk-ack','machine-claims']}:input.op==='inbox'?{ok:true,messages:[{messageId:'watch-id',from:'a',createdAt:'today',body:'😀body',summary:'preview',cursor:1}]}:{ok:true};
   if(input.op==='wait')await new Promise((resolve,reject)=>{options.signal.addEventListener('abort',()=>reject(Error('stopped')),{once:true});});
   return {ok:true,json:async()=>result};
  };

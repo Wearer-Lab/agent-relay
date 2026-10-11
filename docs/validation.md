@@ -7,10 +7,11 @@ npm ci --ignore-scripts --no-audit --no-fund
 npm run release:check
 ```
 
-The current automated suite has **52 passing tests** on macOS. The optional
-`docs/ci-workflow.yml` template runs the suite on macOS, Linux, and Windows with
-Node.js 20 and 22. Automatic GitHub Actions is not enabled in this repository;
-activating it requires permission to push workflow files.
+The current automated suite has **68 passing tests** on macOS. The optional
+[`docs/ci-workflow.md`](./ci-workflow.md) template runs the suite on macOS,
+Linux, and Windows with Node.js 20 and 22. Automatic GitHub Actions is not
+enabled in this repository; activating it requires permission to push workflow
+files.
 
 The suite covers project isolation, durable message delivery, acknowledgements,
 replies, cooperative claims, restart retention, writer ownership, authentication,
@@ -32,3 +33,69 @@ integrations are not established by these tests.
 
 Local session evidence, machine-specific logs, and message histories are not part
 of this public repository.
+
+## Validation matrix
+
+This matrix describes the evidence behind the support claims for version 0.3.0
+of the npm package. It is versioned: every release that claims platform or
+runner support must update it to match its own evidence. "Automated" means the
+repeatable test suite or release checker; "live-verified" means observed in a
+real runner session; "not-verified" means no evidence exists in this
+environment, so support is not established.
+
+| Check type | Platform | Runner | Evidence status |
+| --- | --- | --- | --- |
+| basic messaging | macOS | Codex | automated + live-verified (two existing sessions, two-way) |
+| adapter activation | macOS | Codex | live-verified |
+| context insertion | macOS | Codex | live-verified (delivery steers the attached thread's turn) |
+| explicit acknowledgement | macOS | Codex | live-verified |
+| nonempty reply | macOS | Codex | live-verified |
+| basic messaging | macOS | Claude Code | automated |
+| adapter activation | macOS | Claude Code | live-verified (channel initialized, notification written) |
+| context insertion | macOS | Claude Code | not-verified |
+| explicit acknowledgement | macOS | Claude Code | not-verified (upstream rate-limit rejection before any tool call) |
+| nonempty reply | macOS | Claude Code | not-verified |
+| basic messaging | macOS | OpenCode | automated + live-verified (isolated runtime) |
+| adapter activation | macOS | OpenCode | live-verified (plugin loaded in an actual OpenCode 1.18.34 runtime) |
+| context insertion | macOS | OpenCode | live-verified (scripted local provider; cloud-model behavior unverified) |
+| explicit acknowledgement | macOS | OpenCode | live-verified (scripted local provider) |
+| nonempty reply | macOS | OpenCode | live-verified (scripted local provider joins reply; model understanding unverified) |
+| basic messaging | macOS | other MCP/CLI agents | automated (tool/transport tests) |
+| basic messaging | Linux | any | not-verified (CI template exists but GitHub Actions is not enabled) |
+| adapter activation | Linux | any | not-verified |
+| context insertion | Linux | any | not-verified |
+| explicit acknowledgement | Linux | any | not-verified |
+| nonempty reply | Linux | any | not-verified |
+| basic messaging | Windows | any | not-verified (CI template exists but GitHub Actions is not enabled) |
+| adapter activation | Windows | Codex | not-verified — default control attachment is known-broken (probe fails `EACCES`); the explicit `--url ws://127.0.0.1:PORT` path is documented but unverified |
+| adapter activation | Windows | Claude Code / OpenCode | not-verified |
+| context insertion | Windows | any | not-verified |
+| explicit acknowledgement | Windows | any | not-verified |
+| nonempty reply | Windows | any | not-verified |
+
+Notes kept deliberately separate from the matrix:
+
+- Machine measurement (the `gate` preflight) is measured on macOS (`sysctl` and
+  `df`) and best-effort elsewhere. On Windows, load is deliberately treated as
+  unknown and the probe can pass with every measurement unknown; such a pass is
+  not a measured capacity assessment.
+- Claude's channel is a research-preview capability subject to account and
+  organization policy. An OpenCode row verified with a scripted local provider
+  does not establish cloud-model behavior.
+
+## Release gate
+
+Platform and runner acceptance **should be a release gate wherever support is
+claimed**: before a release advertises live support for a platform/runner pair,
+perform nonempty send, explicit acknowledgement, and reply checks between real
+existing sessions on that platform, and record the outcome in the matrix above.
+Include disconnect/restart, unavailable endpoint, worktree binding, and capacity
+cases in that acceptance run. Claims without such evidence must remain marked
+not-verified.
+
+Release validation must also run the same packed artifact users install:
+`npm pack`, install the resulting `.tgz` in a disposable project outside the
+source checkout, and execute setup, launch, and the smoke checks from that
+installation — not from the checkout's dependencies. The
+[publishing guide](./publishing.md) includes this as an explicit step; treat it
+as part of validation, not an optional extra.
