@@ -7,7 +7,7 @@ npm ci --ignore-scripts --no-audit --no-fund
 npm run release:check
 ```
 
-The current automated suite has **68 passing tests** on macOS. The optional
+The current automated suite has **144 passing tests** on macOS. The optional
 [`docs/ci-workflow.md`](./ci-workflow.md) template runs the suite on macOS,
 Linux, and Windows with Node.js 20 and 22. Automatic GitHub Actions is not
 enabled in this repository; activating it requires permission to push workflow
@@ -75,10 +75,19 @@ environment, so support is not established.
 
 Notes kept deliberately separate from the matrix:
 
-- Machine measurement (the `gate` preflight) is measured on macOS (`sysctl` and
-  `df`) and best-effort elsewhere. On Windows, load is deliberately treated as
-  unknown and the probe can pass with every measurement unknown; such a pass is
-  not a measured capacity assessment.
+- Machine measurement (the `gate` preflight) reads swap, load, and free disk with
+  read-only OS probes: macOS uses `sysctl vm.swapusage`/`vm.loadavg` with an
+  `os.loadavg` fallback plus `df -Pk`; Linux uses `/proc/meminfo` plus `df -Pk`;
+  Windows uses PowerShell `Win32_OperatingSystem` for swap,
+  `Win32_PerfFormattedData_PerfOS_System.ProcessorQueueLength` for load, and
+  `Win32_LogicalDisk` free space for the selected drive. The default permissive
+  gate passes with unknown measurements unless a measured value breaches its
+  limit; the strict gate (`--gate-strict`) refuses when any required measurement
+  is unavailable. The result reports `mode`, per-key `coverage` (`measured` or
+  `unknown` for `swap`/`load`/`disk`), `assessed` (`pass`,
+  `insufficient-evidence`, or `refusal`), the unknown sources in `unknown`, and
+  per-measurement value/source/timestamp/error records. A pass with
+  `assessed:insufficient-evidence` is not a measured capacity assessment.
 - Claude's channel is a research-preview capability subject to account and
   organization policy. An OpenCode row verified with a scripted local provider
   does not establish cloud-model behavior.

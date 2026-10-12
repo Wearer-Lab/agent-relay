@@ -14,7 +14,7 @@ if(raw.includes('--help')||raw.includes('-h')){command='help';raw.length=0;}
 const opts={},positional=[];let tail=[];
 for(let i=0;i<raw.length;i++){
  if(raw[i]==='--'){tail=raw.slice(i+1);break;}
-  if(raw[i].startsWith('--')){const key=raw[i].slice(2);if(['channel','json','no-open','unread','json-lines','all','force','gate','active','detail','dry-run','accept','decline','arrived','missing','gate-strict','blocked','set','ack','register','remove','check','refresh'].includes(key))opts[key]=true;else {if(!raw[i+1]||raw[i+1].startsWith('--'))throw new Error(`Missing value for --${key}`);if(key==='attach')(opts.attach??=[]).push(raw[++i]);else opts[key]=raw[++i];}}
+  if(raw[i].startsWith('--')){const key=raw[i].slice(2);if(['channel','json','no-open','unread','json-lines','all','force','gate','active','detail','dry-run','accept','decline','arrived','missing','gate-strict','blocked','set','ack','register','remove','check','refresh','offline','allow-incomplete','relinquish'].includes(key))opts[key]=true;else {if(!raw[i+1]||raw[i+1].startsWith('--'))throw new Error(`Missing value for --${key}`);if(key==='attach')(opts.attach??=[]).push(raw[++i]);else opts[key]=raw[++i];}}
  else positional.push(raw[i]);
 }
 const project=path.resolve(opts.project||process.cwd()),dataDir=opts['data-dir']||defaultDataDir(),options={dataDir};
@@ -41,12 +41,34 @@ async function readDiscovery(){
 }
 async function verifiedBroker(){
  const info=await readDiscovery();
- if(!info||!daemonAlive(info.pid))return null;
+ if(!info)return null;
+ if(!Number.isSafeInteger(info.pid)||info.pid<1)return null;
+ let origin;
  try{
-  const response=await fetch(`${info.url}/health`,{signal:AbortSignal.timeout(2000)});
-  if(!response.ok)return null;
-  return info;
+  const parsed=new URL(info.url);
+  if(parsed.protocol!=='http:'||parsed.hostname!=='127.0.0.1')return null;
+  const port=Number(parsed.port);
+  if(!Number.isInteger(port)||port<1||port>65535)return null;
+  origin=parsed.origin;
  }catch{return null;}
+ if(typeof info.token!=='string'||!info.token)return null;
+ if(!daemonAlive(info.pid))return null;
+ try{
+  const health=await fetch(`${origin}/health`,{signal:AbortSignal.timeout(2000)});
+  if(!health.ok)return null;
+  const body=await health.json();
+  if(!body||body.ok!==true)return null;
+ }catch{return null;}
+ try{
+  const probe=await fetch(`${origin}/rpc`,{method:'POST',headers:{authorization:`Bearer ${info.token}`,'content-type':'application/json'},body:JSON.stringify({op:'capabilities'}),signal:AbortSignal.timeout(2000)});
+  const result=await probe.json().catch(()=>null);
+  if(!probe.ok||!result||result.ok!==true)return null;
+ }catch{return null;}
+ try{
+  const lease=JSON.parse(await fs.readFile(path.join(dataDir,'writer.lock'),'utf8'));
+  if(!lease||lease.pid!==info.pid)return null;
+ }catch{return null;}
+ return info;
 }
 async function stopBroker(){
  const info=await verifiedBroker();
@@ -66,12 +88,17 @@ async function main(){
    if(!opts.detail){console.log(pkg.version);break;}
    const {SCHEMA_VERSION}=await import('../lib/broker.mjs');
    const live=await verifiedBroker();
-   let protocol=null;
+   let protocol=null,brokerPackage=null;
    if(live){try{protocol=(await (await fetch(`${live.url}/health`,{signal:AbortSignal.timeout(2000)})).json()).version??null;}catch{}}
-   print({package:pkg.version,protocol,schema:SCHEMA_VERSION,build:{node:process.version,cli:fileURLToPath(new URL(import.meta.url))},broker:live?{running:true,url:live.url,pid:live.pid}:{running:false},dataDir});break;
+   if(live){try{
+    const info=JSON.parse(await fs.readFile(path.join(dataDir,'broker.json'),'utf8'));
+    const capabilities=await (await fetch(`${live.url}/rpc`,{method:'POST',headers:{authorization:`Bearer ${info.token}`,'content-type':'application/json'},body:JSON.stringify({op:'capabilities'}),signal:AbortSignal.timeout(5000)})).json();
+    brokerPackage=capabilities.runtime?.package??null;
+   }catch{}}
+   print({package:pkg.version,protocol,schema:SCHEMA_VERSION,build:{node:process.version,cli:fileURLToPath(new URL(import.meta.url))},broker:live?{running:true,url:live.url,pid:live.pid,package:brokerPackage}:{running:false},dataDir});break;
   }
  case 'help':
- console.log(`Agent Relay — local communication between coding agents\n\n  npx --yes @wearer-haitch/agent-relay launch codex|claude|opencode\n  agent-relay --version\n  agent-relay dashboard [--no-open] [--port PORT]\n\n  agent-relay setup [--project PATH] [--runners codex,claude,opencode] [--check|--refresh]\n  agent-relay launch claude|codex|opencode [-- runner arguments]\n  agent-relay join --as ID --runner NAME [--session ID] [--group ID]\n  agent-relay agents [--active --within MIN] [--stale-minutes MIN]\n  agent-relay leave --as ID\n  agent-relay send --as ID --to ID|* --message TEXT [--reply-to ID] [--id ID] [--summary TEXT] [--attach PATH ...]\n  agent-relay inbox --as ID [--unread] [--since CURSOR] [--from ID] [--limit N]\n  agent-relay fetch --as ID --id MESSAGE_ID [--out DIR]\n  agent-relay ack --as ID --id MESSAGE_ID|--all|--through CURSOR\n  agent-relay watch --as ID [--json-lines --max-chars N] [--unread]\n  agent-relay claim --as ID [--scope machine] [--gate] [--meta JSON] RESOURCE...\n  agent-relay release --as ID [--scope machine] [RESOURCE...] [--force]\n  agent-relay status [--as ID --state TEXT --task TEXT]\n  agent-relay attach codex --thread ID [--as ID] [--socket PATH|--url ws://loopback]\n  agent-relay diagnose-codex [--socket PATH] [--url ws://loopback] [--thread ID]\n  agent-relay outbox --as FROM [--id MESSAGE_ID] [--since CURSOR] [--limit N]\n  agent-relay receipt --id MESSAGE_ID\n  agent-relay history [--as ID] [--since CURSOR] [--before CURSOR] [--limit N] [--acked true|false] [--from ID] [--to ID] [--thread MESSAGE_ID]\n  agent-relay followup --as ID --id MESSAGE_ID [--note TEXT]\n  agent-relay bulletin [--set --title TEXT --body TEXT|--body - --source TEXT [--version N] --as ID] [--ack --as ID]\n  agent-relay claim-narrow --as ID --resource PATH [--meta JSON] CHILD...\n  agent-relay handoffs\n  agent-relay handoff-request --as ID [--to ID] --reason TEXT [--meta JSON] RESOURCE...\n  agent-relay handoff-respond --as ID --id HANDOFF_ID [--accept|--decline] [--resources a,b]\n  agent-relay blocked\n  agent-relay tasks [--state open|complete] [--blocked] [--owner ID]\n  agent-relay task-upsert --as ID --title TEXT [--id ID] [--owner ID] [--blocked-by a,b] [--resources a,b] [--source-rev REV] [--verification TEXT] [--to ID] [--handoff ID]\n  agent-relay task-complete --as ID --id TASK_ID [--verification TEXT]\n  agent-relay processes [--owner ID] | --register --pid N --as ID [--command C] [--cwd D] [--port P] [--deployment D] [--note N] | --remove [--id ID] [--pid N] [--owner ID]\n  agent-relay usage\n  agent-relay export [--out FILE]\n  agent-relay restore --in FILE [--dry-run]\n  agent-relay audit-attachments\n  agent-relay group-agents [--group ID]\n  agent-relay detect-group\n  agent-relay retire --as ID\n  agent-relay reconcile --as ID --id MESSAGE_ID [--arrived|--missing]\n  agent-relay gate [--gate-strict] [--max-swap-gb 8] [--max-load 40] [--min-free-gb 10] [--path /]\n  agent-relay doctor\n  agent-relay stop\n  agent-relay restart\n  agent-relay version [--detail]\n  agent-relay start\n\nCommands use the current project; --project PATH and --data-dir PATH override it.\nMessages persist locally. Setup does not publish anything or change permissions.`);break;
+ console.log(`Agent Relay — local communication between coding agents\n\n  npx --yes @wearer-haitch/agent-relay launch codex|claude|opencode\n  agent-relay --version\n  agent-relay dashboard [--no-open] [--port PORT]\n\n  agent-relay setup [--project PATH] [--runners codex,claude,opencode] [--check|--refresh]\n  agent-relay launch claude|codex|opencode [-- runner arguments]\n  agent-relay join --as ID --runner NAME [--session ID] [--group ID]\n  agent-relay agents [--active --within MIN] [--stale-minutes MIN]\n  agent-relay leave --as ID\n  agent-relay send --as ID --to ID|* --message TEXT [--reply-to ID] [--id ID] [--summary TEXT] [--attach PATH ...]\n  agent-relay inbox --as ID [--unread] [--since CURSOR] [--from ID] [--limit N]\n  agent-relay fetch --as ID --id MESSAGE_ID [--out DIR]\n  agent-relay ack --as ID --id MESSAGE_ID|--all|--through CURSOR\n  agent-relay watch --as ID [--json-lines --max-chars N] [--unread]\n  agent-relay claim --as ID [--scope machine] [--gate] [--meta JSON] RESOURCE...\n  agent-relay release --as ID [--scope machine] [RESOURCE...] [--force]\n  agent-relay status [--as ID --state TEXT --task TEXT]\n  agent-relay attach codex --thread ID [--as ID] [--socket PATH|--url ws://loopback]\n  agent-relay diagnose-codex [--socket PATH] [--url ws://loopback] [--thread ID]\n  agent-relay outbox --as FROM [--id MESSAGE_ID] [--since CURSOR] [--limit N]\n  agent-relay receipt --id MESSAGE_ID\n  agent-relay history [--as ID] [--since CURSOR] [--before CURSOR] [--limit N] [--acked true|false] [--from ID] [--to ID] [--thread MESSAGE_ID]\n  agent-relay followup --as ID --id MESSAGE_ID [--note TEXT]\n  agent-relay bulletin [--set --title TEXT --body TEXT|--body - --source TEXT [--version N] --as ID] [--ack --as ID [--version N] [--hash H]]\n  agent-relay claim-narrow --as ID --resource PATH [--meta JSON] CHILD...\n  agent-relay handoffs\n  agent-relay handoff-request --as ID [--to ID] --reason TEXT [--meta JSON] RESOURCE...\n  agent-relay handoff-respond --as ID --id HANDOFF_ID [--accept|--decline] [--resources a,b]\n  agent-relay blocked\n  agent-relay tasks [--state open|complete] [--blocked] [--owner ID]\n  agent-relay task-upsert --as ID --title TEXT [--id ID] [--owner ID] [--blocked-by a,b] [--resources a,b] [--source-rev REV] [--verification TEXT] [--to ID] [--handoff ID]\n  agent-relay task-complete --as ID --id TASK_ID [--verification TEXT]\n  agent-relay processes [--owner ID] | --register --pid N --as ID [--command C] [--cwd D] [--port P] [--deployment D] [--note N] | --remove [--id ID] [--pid N] [--owner ID]\n  agent-relay usage\n  agent-relay export [--out FILE]\n  agent-relay restore --in FILE [--dry-run] [--offline --allow-incomplete]\n  agent-relay audit-attachments\n  agent-relay group-agents [--group ID]\n  agent-relay detect-group\n  agent-relay retire --as ID\n  agent-relay reconcile --as ID --id MESSAGE_ID [--arrived|--missing]\n  agent-relay gate [--gate-strict] [--max-swap-gb 8] [--max-load 40] [--min-free-gb 10] [--path /]\n  agent-relay doctor\n  agent-relay stop\n  agent-relay restart\n  agent-relay version [--detail]\n  agent-relay start\n\nCommands use the current project; --project PATH and --data-dir PATH override it.\nMessages persist locally. Setup does not publish anything or change permissions.`);break;
  case 'daemon':{
   const {createBroker}=await import('../lib/broker.mjs');
   const broker=await createBroker({dataDir,staleMinutes:opts['stale-minutes']===undefined?Number(process.env.AGENT_RELAY_STALE_MINUTES??30):Number(opts['stale-minutes'])});
@@ -116,7 +143,7 @@ async function main(){
   case 'followup':if(!opts.id)throw new Error('Use --id MESSAGE_ID');print(await rpc(project,{op:'requestFollowup',agentId:requireAs(),messageId:opts.id,note:opts.note},options));break;
   case 'bulletin':{
    if(opts.set){if(!opts.title||!opts.source)throw new Error('Use --title, --body and --source with --set');let body=opts.body;if(body==='-'){body='';for await(const chunk of process.stdin)body+=chunk;}if(!body)throw new Error('Use --title, --body and --source with --set');print(await rpc(project,{op:'setBulletin',agentId:requireAs(),title:opts.title,body,source:opts.source,version:opts.version===undefined?undefined:Number(opts.version)},options));}
-   else if(opts.ack)print(await rpc(project,{op:'ackBulletin',agentId:requireAs()},options));
+    else if(opts.ack)print(await rpc(project,{op:'ackBulletin',agentId:requireAs(),version:opts.version===undefined?undefined:Number(opts.version),hash:opts.hash},options));
    else print(await rpc(project,{op:'getBulletin'},options));break;
   }
   case 'claim-narrow':if(!opts.resource||!positional.length)throw new Error('Use --resource PATH and child paths');print(await rpc(project,{op:'claimNarrow',agentId:requireAs(),resource:opts.resource,resources:positional,meta:opts.meta===undefined?undefined:JSON.parse(opts.meta)},options));break;
@@ -136,18 +163,86 @@ async function main(){
   case 'export':{
    const result=await rpc(project,{op:'export'},options);
    if(!opts.out)print(result);
-   else{await fs.writeFile(path.resolve(opts.out),JSON.stringify(result));print({exported:path.resolve(opts.out),schemaVersion:result.schemaVersion,rooms:result.state.rooms.length});}
+   else{
+    const dest=path.resolve(opts.out);
+    let existing=null;
+    try{
+     const seen=await fs.lstat(dest);
+     if(seen.isSymbolicLink())throw new Error(`Refusing to export to symlink destination ${dest}; choose a regular file.`);
+     if(seen.isDirectory())throw new Error(`Export destination ${dest} is a directory; choose a regular file.`);
+     existing=seen.mode&0o777;
+    }catch(e){
+     if(e.code!=='ENOENT')throw e;
+    }
+    const mode=existing??0o600;
+    const tmp=`${dest}.${process.pid}.${randomUUID()}.tmp`;
+    await fs.writeFile(tmp,JSON.stringify(result),{mode});
+    await fs.chmod(tmp,mode);
+    await fs.rename(tmp,dest);
+    print({exported:dest,schemaVersion:result.schemaVersion,rooms:result.state.rooms.length,mode:mode.toString(8),overwrote:existing!==null});
+   }
    break;
   }
   case 'restore':{
    if(!opts.in)throw new Error('Use --in FILE');
+   if(opts.offline){
+    const live=await verifiedBroker();
+    if(live)throw new Error(`A live broker owns this data directory (${live.url} pid ${live.pid}); stop it first, then retry offline restore.`);
+    const directory=path.resolve(dataDir);
+    await fs.mkdir(directory,{recursive:true,mode:0o700});
+    const stateFile=path.join(directory,'state.json');
+    try{
+     const seen=await fs.lstat(stateFile);
+     if(seen.isSymbolicLink())throw new Error(`Refusing offline restore with symlinked state file ${stateFile}; resolve it manually.`);
+    }catch(e){
+     if(e.message.includes('symlinked'))throw e;
+     if(e.code!=='ENOENT')throw e;
+    }
+    const payload=JSON.parse(await fs.readFile(path.resolve(opts.in),'utf8'));
+    const incoming=payload.state??payload;
+    let validateStore,verifyAttachmentReferences,schemaVersion=1;
+    try{
+     const broker=await import('../lib/broker.mjs');
+     validateStore=broker.validateStore;
+     verifyAttachmentReferences=broker.verifyAttachmentReferences;
+     if(typeof broker.SCHEMA_VERSION==='number')schemaVersion=broker.SCHEMA_VERSION;
+     if(typeof validateStore!=='function')throw new Error('missing validateStore');
+     if(typeof verifyAttachmentReferences!=='function')throw new Error('missing verifyAttachmentReferences');
+    }catch(e){
+     if(e.message.includes('verifyAttachmentReferences'))throw new Error('Broker export verifyAttachmentReferences is missing; update the runtime before offline restore.');
+     if(e.message.includes('validateStore'))throw new Error('Broker export validateStore is missing; update the runtime before offline restore.');
+     throw new Error(`Broker export verifyAttachmentReferences is missing; update the runtime before offline restore: ${e.message}`);
+    }
+    if(payload.schemaVersion!==undefined&&payload.schemaVersion!==schemaVersion)throw new Error(`Export schema ${payload.schemaVersion} is not supported by this runtime (expected ${schemaVersion}); the ledger was left intact.`);
+    try{validateStore(structuredClone(incoming));}catch(e){throw new Error(`Restored state failed validation; the ledger was left intact: ${e.message}`);}
+    const verified=await verifyAttachmentReferences(directory,incoming);
+    const missingAttachments=verified.missing??[];
+    const corruptAttachments=verified.corrupt??[];
+    const rooms=incoming.rooms.length;
+    const messages=incoming.rooms.reduce((n,r)=>n+r.messages.length,0);
+    if(opts['dry-run']){print({valid:missingAttachments.length===0&&corruptAttachments.length===0,dryRun:true,missingAttachments,corruptAttachments,rooms,messages});break;}
+    if((missingAttachments.length||corruptAttachments.length)&&!opts['allow-incomplete'])throw new Error(`Restored state references missing or corrupt attachments; the ledger was left intact: missing ${JSON.stringify(missingAttachments)} corrupt ${JSON.stringify(corruptAttachments)}; retry with --allow-incomplete to restore anyway.`);
+    let backup=null;
+    try{
+     const current=await fs.readFile(stateFile);
+     backup=path.join(directory,`state.backup-${Date.now()}.json`);
+     await fs.writeFile(backup,current,{mode:0o600});
+     await fs.chmod(backup,0o600);
+    }catch(e){if(e.code!=='ENOENT')throw e;}
+    const tmp=path.join(directory,`.state-${randomUUID()}.tmp`);
+    await fs.writeFile(tmp,JSON.stringify(incoming),{mode:0o600});
+    await fs.chmod(tmp,0o600);
+    await fs.rename(tmp,stateFile);
+    print({restored:true,backup,missingAttachments,corruptAttachments,rooms,messages});
+    break;
+   }
    const payload=JSON.parse(await fs.readFile(path.resolve(opts.in),'utf8'));
-   print(await rpc(project,{op:'restore',state:payload.state??payload,schemaVersion:payload.schemaVersion,dryRun:opts['dry-run']},options));break;
+   print(await rpc(project,{op:'restore',state:payload.state??payload,schemaVersion:payload.schemaVersion,dryRun:opts['dry-run'],allowIncomplete:opts['allow-incomplete']},options));break;
   }
   case 'audit-attachments':print(await rpc(project,{op:'auditAttachments',dryRun:true},options));break;
   case 'group-agents':print(await rpc(project,{op:'groupAgents',groupId:opts.group},options));break;
   case 'detect-group':print(await rpc(project,{op:'detectGroup'},options));break;
-  case 'retire':print(await rpc(project,{op:'retire',agentId:requireAs()},options));break;
+  case 'retire':print(await rpc(project,{op:'retire',agentId:requireAs(),relinquish:opts.relinquish||undefined},options));break;
   case 'reconcile':{
    if(!opts.id||(!opts.arrived&&!opts.missing))throw new Error('Use --id MESSAGE_ID with --arrived or --missing');
    const {reconcileCodexDelivery}=await import('../lib/codex.mjs');

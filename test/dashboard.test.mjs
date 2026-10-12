@@ -180,18 +180,82 @@ test('receipts summarize every recipient from old snapshot markers and richer re
  assert.deepEqual(plain(page.sandbox.receiptSummary(oldShape)),{rows:[
   {agentId:'b',state:'acked',ts:T[1],adapters:['codex']},
   {agentId:'c',state:'accepted',ts:T[2],adapters:['opencode-accepted']},
-  {agentId:'d',state:'stored',ts:T[0],adapters:[]}],counts:{recipients:3,acked:1,notified:1,pending:1}});
+  {agentId:'d',state:'stored',ts:T[0],adapters:[],reason:'no-transport-markers'}],counts:{recipients:3,acked:1,accepted:1,notified:0,attempted:0,missing:0,stored:1,pending:1}});
  assert.deepEqual(plain(page.sandbox.receiptSummary({...oldShape,ackedBy:[]})).rows[0],{agentId:'b',state:'notified',ts:T[1],adapters:['codex']});
  assert.deepEqual(plain(page.sandbox.receiptSummary({...oldShape,acks:[{agentId:'b',at:T[3]}]})).rows[0],{agentId:'b',state:'acked',ts:T[3],adapters:['codex']});
  assert.deepEqual(plain(page.sandbox.receiptSummary(newShape)),{rows:[
   {agentId:'x',state:'acked',ts:T[5],adapters:['codex']},
-  {agentId:'y',state:'notified',ts:T[6],adapters:['opencode-attempted']}],counts:{recipients:2,acked:1,notified:1,pending:0}});
+  {agentId:'y',state:'attempted',ts:T[6],adapters:['opencode-attempted']}],counts:{recipients:2,acked:1,accepted:0,notified:0,attempted:1,missing:0,stored:0,pending:0}});
  const summaries=findAll(page.$('messages'),el=>el.tag==='summary').map(textOf);
- assert.ok(summaries.includes('Delivery · 3 recipients · 1 acked · 1 notified · 1 pending'));
- assert.ok(summaries.includes('Delivery · 2 recipients · 1 acked · 1 notified · 0 pending'));
+ assert.ok(summaries.includes('Delivery · 3 recipients · 1 acked · 1 accepted · 0 notified · 0 attempted · 0 missing · 1 stored'));
+ assert.ok(summaries.includes('Delivery · 2 recipients · 1 acked · 0 accepted · 0 notified · 1 attempted · 0 missing · 0 stored'));
  const badges=findAll(page.$('messages'),el=>el.tag==='span'&&el.className.startsWith('tag')).map(textOf);
- for(const label of ['acked','accepted','stored','notified'])assert.ok(badges.includes(label));
+ for(const label of ['acked','accepted','stored','attempted'])assert.ok(badges.includes(label));
+ assert.ok(!badges.includes('notified')||badges.includes('attempted'));
  assert.ok(findAll(page.$('messages'),el=>el.tag==='span'&&el.textContent==='2 unacked').length===1);
+ const counts=page.sandbox.receiptSummary(oldShape).counts;
+ assert.equal(counts.acked+counts.accepted+counts.notified+counts.attempted+counts.missing+counts.stored,counts.recipients);
+});
+test('attempted and notified stay distinct on legacy marker shapes',async()=>{
+ const legacy={messageId:'legacy-attempted',cursor:3,from:'a',to:'*',body:'Attempted vs notified',createdAt:T[0],recipients:['n','t'],ackedBy:[],notified:[{agentId:'n',adapter:'codex',at:T[1]},{agentId:'t',adapter:'codex-attempted',at:T[2]}]};
+ const page=boot({projects:projectsOf(1),snapshot:{project:'/work/alpha',agents:[agent],claims:[],messages:[legacy],totalMessages:1,pendingDeliveries:2,pendingByAgent:{a:0},cursor:3}});
+ await page.flush();
+ const summary=plain(page.sandbox.receiptSummary(legacy));
+ assert.deepEqual(summary.rows.map(r=>({agentId:r.agentId,state:r.state})),[{agentId:'n',state:'notified'},{agentId:'t',state:'attempted'}]);
+ assert.deepEqual(summary.counts,{recipients:2,acked:0,accepted:0,notified:1,attempted:1,missing:0,stored:0,pending:0});
+ assert.equal(summary.counts.acked+summary.counts.accepted+summary.counts.notified+summary.counts.attempted+summary.counts.missing+summary.counts.stored,summary.counts.recipients);
+ const badges=findAll(page.$('messages'),el=>el.tag==='span'&&el.className.startsWith('tag')).map(textOf);
+ assert.ok(badges.includes('notified'));
+ assert.ok(badges.includes('attempted'));
+ const summaries=findAll(page.$('messages'),el=>el.tag==='summary').map(textOf);
+ assert.ok(summaries.includes('Delivery · 2 recipients · 0 acked · 0 accepted · 1 notified · 1 attempted · 0 missing · 0 stored'));
+});
+test('missing renders as an explicitly negative badge and stays out of delivered counts',async()=>{
+ const legacyMissing={messageId:'legacy-missing',cursor:4,from:'a',to:'b',body:'Lost delivery',createdAt:T[0],recipients:['m'],ackedBy:[],notified:[{agentId:'m',adapter:'codex-reconciled-missing',at:T[3]}]};
+ const richMissing={messageId:'rich-missing',cursor:5,from:'a',to:'b',body:'Reconciled loss',createdAt:T[0],receipt:{recipients:[{agentId:'r',state:'missing',missing:[{adapter:'codex-reconciled-missing',ts:T[3]}],notified:[],accepted:[]}],pending:[{agentId:'r',reason:'operator-confirmed-missing',ts:T[3]}]}};
+ const genericMissing={messageId:'generic-missing',cursor:6,from:'a',to:'b',body:'Failed push',createdAt:T[0],recipients:['g'],ackedBy:[],notified:[{agentId:'g',adapter:'push-failed',at:T[4]}]};
+ const page=boot({projects:projectsOf(3),snapshot:{project:'/work/alpha',agents:[agent],claims:[],messages:[genericMissing,richMissing,legacyMissing],totalMessages:3,pendingDeliveries:3,pendingByAgent:{a:0},cursor:6}});
+ await page.flush();
+ const legacySummary=plain(page.sandbox.receiptSummary(legacyMissing));
+ assert.equal(legacySummary.rows[0].state,'missing');
+ assert.equal(legacySummary.rows[0].reason,'operator-confirmed-missing');
+ assert.deepEqual(legacySummary.counts,{recipients:1,acked:0,accepted:0,notified:0,attempted:0,missing:1,stored:0,pending:1});
+ const richSummary=plain(page.sandbox.receiptSummary(richMissing));
+ assert.equal(richSummary.rows[0].state,'missing');
+ assert.equal(richSummary.rows[0].reason,'operator-confirmed-missing');
+ assert.equal(richSummary.counts.missing,1);
+ assert.equal(richSummary.counts.notified,0);
+ assert.equal(richSummary.counts.pending,1);
+ const genericSummary=plain(page.sandbox.receiptSummary(genericMissing));
+ assert.equal(genericSummary.rows[0].state,'missing');
+ assert.equal(genericSummary.rows[0].reason,'negative-reconciliation');
+ for(const summary of [legacySummary,richSummary,genericSummary]){
+  assert.equal(summary.counts.acked+summary.counts.accepted+summary.counts.notified+summary.counts.attempted+summary.counts.missing+summary.counts.stored,summary.counts.recipients);
+ }
+ const badges=findAll(page.$('messages'),el=>el.tag==='span'&&el.className.startsWith('tag')).map(textOf);
+ assert.ok(badges.includes('missing — confirmed not delivered'));
+ assert.ok(!badges.includes('missing')||badges.includes('missing — confirmed not delivered'));
+ const metas=findAll(page.$('messages'),el=>el.tag==='span'&&el.className==='meta').map(textOf);
+ assert.ok(metas.some(text=>text.includes('operator-confirmed-missing')));
+ assert.ok(metas.some(text=>text.includes('negative-reconciliation')));
+ const summaries=findAll(page.$('messages'),el=>el.tag==='summary').map(textOf);
+ assert.ok(summaries.some(text=>text.includes('1 missing')));
+ assert.ok(findAll(page.$('messages'),el=>el.tag==='span'&&el.textContent==='1 unacked').length>=1);
+});
+test('legacy-only snapshots without richer receipt fields still render',async()=>{
+ const minimal={messageId:'minimal',cursor:7,from:'a',to:'b',body:'Hello',createdAt:T[0],recipients:['b'],ackedBy:[],notified:[]};
+ const bare={messageId:'bare',cursor:8,from:'a',to:'b',body:'Bare',createdAt:T[0],recipients:['b']};
+ const page=boot({projects:projectsOf(2),snapshot:{project:'/work/alpha',agents:[agent],claims:[],messages:[bare,minimal],totalMessages:2,pendingDeliveries:2,pendingByAgent:{a:0},cursor:8}});
+ await page.flush();
+ for(const message of [minimal,bare]){
+  const summary=plain(page.sandbox.receiptSummary(message));
+  assert.equal(summary.rows[0].state,'stored');
+  assert.equal(summary.rows[0].reason,'no-transport-markers');
+  assert.equal(summary.counts.stored,1);
+  assert.equal(summary.counts.acked+summary.counts.accepted+summary.counts.notified+summary.counts.attempted+summary.counts.missing+summary.counts.stored,summary.counts.recipients);
+ }
+ const summaries=findAll(page.$('messages'),el=>el.tag==='summary').map(textOf);
+ assert.ok(summaries.includes('Delivery · 1 recipients · 0 acked · 0 accepted · 0 notified · 0 attempted · 0 missing · 1 stored'));
 });
 test('reply threads link parents and replies for navigation inside the loaded window',async()=>{
  const parent={messageId:'parent',cursor:2,from:'a',to:'b',body:'Root',createdAt:T[0],recipients:['b'],ackedBy:['b'],notified:[]};

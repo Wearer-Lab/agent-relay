@@ -32,8 +32,13 @@ jobs:
 
 `release:check` runs the automated test suite, packs an archive in a temporary
 directory, checks the published file list, and runs help/version from the
-extracted package. The final step dry-runs publication of that same packed
-artifact. The `test/` and `scripts/` directories the workflow runs live in the
+extracted package; that archive is deleted with the temporary directory, so it
+never reaches later steps. The final `npm publish --dry-run --ignore-scripts`
+step takes no archive path, so it repacks the checkout: it validates that the
+checkout packs and would publish, not the exact archive `release:check`
+examined. To validate one exact artifact end to end, pack once and install that
+`.tgz` in a disposable project (see [validation](./validation.md) and
+[publishing](./publishing.md)). The `test/` and `scripts/` directories the workflow runs live in the
 source repository (https://github.com/Wearer-Lab/agent-relay), not in the npm
 package.
 

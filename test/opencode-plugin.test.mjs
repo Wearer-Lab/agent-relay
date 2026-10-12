@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { z } from 'zod';
 import { AgentRelayPlugin, default as defaultPlugin } from '../lib/opencode-plugin.mjs';
+import { createBroker } from '../lib/broker.mjs';
 
 const directory = '/tmp/relay-project';
 const sessionID = 'ses_existing';
@@ -139,9 +143,9 @@ test('existing inbox is recovered; failed acknowledgement retains context; self 
   assert.equal(h.prompts.length, 0);
 });
 
-test('twelve standard tools bind sender and resource owner to context session and refuse cross-project calls', async t => {
+test('twenty-one standard tools bind sender and resource owner to context session and refuse cross-project calls', async t => {
   const h = harness(), hooks = await plugin(h); t.after(() => hooks.dispose()); await busy(hooks);
-  assert.equal(Object.keys(hooks.tool).length, 12);
+  assert.equal(Object.keys(hooks.tool).length, 21);
   for (const definition of Object.values(hooks.tool)) assert.ok(z.object(definition.args));
   await hooks.tool.relay_send.execute({ to: 'codex:existing', body: 'Safe coordination', from: 'forged', op: 'forged' }, toolContext());
   await hooks.tool.relay_claim.execute({ resources: ['build'] }, toolContext());
@@ -316,4 +320,514 @@ test('bulk acknowledgement moves only handled pending rows to acknowledged', asy
   const output = { messages: [user()] }; await hooks['experimental.chat.messages.transform']({}, output);
   const text = output.messages[0].parts[1].text;
   assert.match(text, /third/); assert.ok(!text.includes('first') && !text.includes('second'));
+});
+test('r24 coordination tools forward exact broker fields with context identity and refuse cross-project calls', async t => {
+  const h = harness(), hooks = await plugin(h); t.after(() => hooks.dispose()); await busy(hooks);
+  assert.equal(Object.keys(hooks.tool).length, 21);
+  for (const definition of Object.values(hooks.tool)) assert.ok(z.object(definition.args));
+  const schemas = Object.fromEntries(Object.entries(hooks.tool).map(([name, definition]) => [name, z.object(definition.args)]));
+  schemas.relay_bulletin_get.parse({});
+  assert.throws(() => schemas.relay_bulletin_ack.parse({}));
+  schemas.relay_bulletin_ack.parse({ version: 2 });
+  schemas.relay_bulletin_ack.parse({ version: 2, hash: 'abc' });
+  assert.throws(() => schemas.relay_bulletin_ack.parse({ version: 0 }));
+  schemas.relay_handoffs.parse({});
+  assert.throws(() => schemas.relay_handoff_request.parse({ reason: 'move' }));
+  schemas.relay_handoff_request.parse({ resources: ['a.txt'], reason: 'move' });
+  schemas.relay_handoff_request.parse({ to: 'opencode:other', resources: ['a.txt'], reason: 'move' });
+  assert.throws(() => schemas.relay_handoff_respond.parse({}));
+  schemas.relay_handoff_respond.parse({ id: 'h-1', accept: true });
+  schemas.relay_handoff_respond.parse({ id: 'h-1', accept: false, resources: ['a.txt'] });
+  assert.throws(() => schemas.relay_claim_narrow.parse({}));
+  schemas.relay_claim_narrow.parse({ resource: 'src', resources: ['src/a.mjs'] });
+  assert.throws(() => schemas.relay_tasks.parse({}));
+  assert.throws(() => schemas.relay_tasks.parse({ action: 'bad' }));
+  schemas.relay_tasks.parse({ action: 'upsert', title: 'Work' });
+  schemas.relay_tasks.parse({ action: 'list', state: 'open', blocked: true });
+  schemas.relay_tasks.parse({ action: 'complete', id: 't-1' });
+  schemas.relay_processes_list.parse({});
+  schemas.relay_processes_list.parse({ owner: 'opencode:other' });
+  schemas.relay_group_agents.parse({});
+  schemas.relay_group_agents.parse({ groupId: 'g-1' });
+  await hooks.tool.relay_bulletin_get.execute({}, toolContext());
+  await hooks.tool.relay_bulletin_ack.execute({ version: 2, hash: 'abc' }, toolContext());
+  await hooks.tool.relay_handoff_request.execute({ to: 'opencode:other', resources: ['a.txt'], reason: 'move' }, toolContext());
+  await hooks.tool.relay_handoff_request.execute({ resources: ['a.txt'], reason: 'open offer' }, toolContext());
+  await hooks.tool.relay_handoff_respond.execute({ id: 'h-1', accept: true }, toolContext());
+  await hooks.tool.relay_handoff_respond.execute({ id: 'h-2', accept: false, resources: ['a.txt'] }, toolContext());
+  await hooks.tool.relay_handoffs.execute({}, toolContext());
+  await hooks.tool.relay_claim_narrow.execute({ resource: 'src', resources: ['src/a.mjs'] }, toolContext());
+  await hooks.tool.relay_tasks.execute({ action: 'upsert', id: 't-1', title: 'Work', owner: 'opencode:other',
+    blockedBy: ['src/a.mjs'], resources: ['src/a.mjs'], sourceRevision: 'rev-1', verification: 'checked',
+    expectedRecipient: 'opencode:other', handoffId: 'h-1' }, toolContext());
+  await hooks.tool.relay_tasks.execute({ action: 'list', state: 'open', blocked: true, owner: 'opencode:other' }, toolContext());
+  await hooks.tool.relay_tasks.execute({ action: 'complete', id: 't-1', verification: 'done' }, toolContext());
+  await hooks.tool.relay_processes_list.execute({}, toolContext());
+  await hooks.tool.relay_processes_list.execute({ owner: 'opencode:other' }, toolContext());
+  await hooks.tool.relay_group_agents.execute({}, toolContext());
+  await hooks.tool.relay_group_agents.execute({ groupId: 'g-1' }, toolContext());
+  const bulletinGet = h.calls.find(x => x.op === 'getBulletin');
+  assert.equal(bulletinGet.project, directory);
+  assert.equal('agentId' in bulletinGet, false);
+  const bulletinAck = h.calls.find(x => x.op === 'ackBulletin');
+  assert.equal(bulletinAck.agentId, id);
+  assert.equal(bulletinAck.version, 2);
+  assert.equal(bulletinAck.hash, 'abc');
+  const handoffRequest = h.calls.find(x => x.op === 'requestHandoff' && x.to === 'opencode:other');
+  assert.equal(handoffRequest.agentId, id);
+  assert.deepEqual(handoffRequest.resources, ['a.txt']);
+  assert.equal(handoffRequest.reason, 'move');
+  const openRequest = h.calls.find(x => x.op === 'requestHandoff' && x.reason === 'open offer');
+  assert.equal(openRequest.agentId, id);
+  assert.equal('to' in openRequest, false);
+  const respondAccept = h.calls.find(x => x.op === 'respondHandoff' && x.id === 'h-1');
+  assert.equal(respondAccept.agentId, id);
+  assert.equal(respondAccept.accept, true);
+  assert.equal('resources' in respondAccept, false);
+  const respondDecline = h.calls.find(x => x.op === 'respondHandoff' && x.id === 'h-2');
+  assert.equal(respondDecline.accept, false);
+  assert.deepEqual(respondDecline.resources, ['a.txt']);
+  const handoffs = h.calls.find(x => x.op === 'handoffs');
+  assert.equal(handoffs.project, directory);
+  assert.equal('agentId' in handoffs, false);
+  const narrow = h.calls.find(x => x.op === 'claimNarrow');
+  assert.equal(narrow.agentId, id);
+  assert.equal(narrow.resource, 'src');
+  assert.deepEqual(narrow.resources, ['src/a.mjs']);
+  const upsert = h.calls.find(x => x.op === 'tasks' && x.action === 'upsert');
+  assert.equal(upsert.agentId, id);
+  assert.equal(upsert.id, 't-1');
+  assert.equal(upsert.title, 'Work');
+  assert.equal(upsert.owner, 'opencode:other');
+  assert.deepEqual(upsert.blockedBy, ['src/a.mjs']);
+  assert.deepEqual(upsert.resources, ['src/a.mjs']);
+  assert.equal(upsert.sourceRevision, 'rev-1');
+  assert.equal(upsert.verification, 'checked');
+  assert.equal(upsert.expectedRecipient, 'opencode:other');
+  assert.equal(upsert.handoffId, 'h-1');
+  const listed = h.calls.find(x => x.op === 'tasks' && x.action === 'list');
+  assert.equal(listed.state, 'open');
+  assert.equal(listed.blocked, true);
+  assert.equal(listed.owner, 'opencode:other');
+  const completed = h.calls.find(x => x.op === 'tasks' && x.action === 'complete');
+  assert.equal(completed.agentId, id);
+  assert.equal(completed.id, 't-1');
+  assert.equal(completed.verification, 'done');
+  const processesOpen = h.calls.filter(x => x.op === 'processes');
+  assert.equal(processesOpen.length, 2);
+  assert.equal(processesOpen[0].action, 'list');
+  assert.equal('agentId' in processesOpen[0], false);
+  assert.equal(processesOpen[1].agentId, 'opencode:other');
+  const groupOpen = h.calls.filter(x => x.op === 'groupAgents');
+  assert.equal(groupOpen.length, 2);
+  assert.equal('groupId' in groupOpen[0], false);
+  assert.equal(groupOpen[1].groupId, 'g-1');
+  assert.equal(h.calls.filter(x => x.op !== 'runner-prompt').every(x => x.project === directory), true);
+  const count = h.calls.length;
+  await assert.rejects(hooks.tool.relay_bulletin_get.execute({}, toolContext({ directory: '/tmp/foreign' })), /different project/);
+  await assert.rejects(hooks.tool.relay_handoff_request.execute({ resources: ['a'], reason: 'r' }, toolContext({ directory: '/tmp/foreign' })), /different project/);
+  await assert.rejects(hooks.tool.relay_handoff_respond.execute({ id: 'h-1', accept: true }, toolContext({ directory: '/tmp/foreign' })), /different project/);
+  await assert.rejects(hooks.tool.relay_handoffs.execute({}, toolContext({ directory: '/tmp/foreign' })), /different project/);
+  await assert.rejects(hooks.tool.relay_claim_narrow.execute({ resource: 'a', resources: ['a/b'] }, toolContext({ directory: '/tmp/foreign' })), /different project/);
+  await assert.rejects(hooks.tool.relay_tasks.execute({ action: 'list' }, toolContext({ directory: '/tmp/foreign' })), /different project/);
+  await assert.rejects(hooks.tool.relay_processes_list.execute({}, toolContext({ directory: '/tmp/foreign' })), /different project/);
+  await assert.rejects(hooks.tool.relay_group_agents.execute({}, toolContext({ directory: '/tmp/foreign' })), /different project/);
+  await assert.rejects(hooks.tool.relay_bulletin_ack.execute({ version: 1 }, toolContext({ directory: '/tmp/foreign' })), /different project/);
+  assert.equal(h.calls.length, count);
+});
+test('r24 gap fills pass claim meta, rich status and history time filters through only when provided', async t => {
+  const h = harness(), hooks = await plugin(h); t.after(() => hooks.dispose()); await busy(hooks);
+  const schemas = Object.fromEntries(Object.entries(hooks.tool).map(([name, definition]) => [name, z.object(definition.args)]));
+  schemas.relay_claim.parse({ resources: ['build'] });
+  schemas.relay_claim.parse({ resources: ['build'], meta: { baseCommit: 'abc' } });
+  assert.throws(() => schemas.relay_claim.parse({ resources: ['build'], meta: { baseCommit: '' } }));
+  schemas.relay_status.parse({ status: 'busy' });
+  schemas.relay_status.parse({ status: 'busy', frozen: true, resources: ['a'], task: 'detail',
+    transport: { adapter: 'opencode-watch', state: 'connected' } });
+  schemas.relay_status.parse({ status: 'busy', task: null });
+  schemas.relay_status.parse({ status: 'busy', task: { summary: 'detail' } });
+  schemas.relay_status.parse({ status: 'busy', transport: { adapter: 'opencode-watch', state: 'disconnected', push: true } });
+  assert.throws(() => schemas.relay_status.parse({ status: 'busy', transport: { adapter: 'x', state: 'bad' } }));
+  schemas.relay_history.parse({ afterTs: '2026-01-01T00:00:00.000Z', beforeTs: '2026-02-01T00:00:00.000Z', before: 5 });
+  await hooks.tool.relay_claim.execute({ resources: ['build'], meta: { baseCommit: 'abc' } }, toolContext());
+  await hooks.tool.relay_claim.execute({ resources: ['build'] }, toolContext());
+  await hooks.tool.relay_status.execute({ status: 'busy', frozen: true, resources: ['a.txt'],
+    task: 'Working', transport: { adapter: 'opencode-watch', state: 'connected', push: true } }, toolContext());
+  await hooks.tool.relay_status.execute({ status: 'idle', task: null }, toolContext());
+  await hooks.tool.relay_status.execute({ status: 'blocked', task: { summary: 'detail' } }, toolContext());
+  await hooks.tool.relay_status.execute({ status: 'busy' }, toolContext());
+  await hooks.tool.relay_history.execute({ afterTs: '2026-01-01T00:00:00.000Z', beforeTs: '2026-02-01T00:00:00.000Z', before: 5 }, toolContext());
+  const claims = h.calls.filter(x => x.op === 'claim');
+  assert.deepEqual(claims[0].meta, { baseCommit: 'abc' });
+  assert.equal(claims[0].agentId, id);
+  assert.equal('meta' in claims[1], false);
+  const statuses = h.calls.filter(x => x.op === 'status' && ['busy', 'idle', 'blocked'].includes(x.status));
+  const rich = statuses.find(x => x.status === 'busy' && x.frozen === true);
+  assert.equal(rich.agentId, id);
+  assert.equal(rich.frozen, true);
+  assert.deepEqual(rich.resources, ['a.txt']);
+  assert.equal(rich.task, 'Working');
+  assert.deepEqual(rich.transport, { adapter: 'opencode-watch', state: 'connected', push: true });
+  const nullTask = statuses.find(x => x.status === 'idle');
+  assert.equal(nullTask.task, null);
+  assert.equal('frozen' in nullTask, false);
+  assert.equal('resources' in nullTask, false);
+  assert.equal('transport' in nullTask, false);
+  const objectTask = statuses.find(x => x.status === 'blocked');
+  assert.deepEqual(objectTask.task, { summary: 'detail' });
+  const plain = statuses.find(x => x.status === 'busy' && !('frozen' in x));
+  assert.equal('frozen' in plain, false);
+  assert.equal('resources' in plain, false);
+  assert.equal('task' in plain, false);
+  assert.equal('transport' in plain, false);
+  const history = h.calls.find(x => x.op === 'history' && x.before === 5);
+  assert.equal(history.agentId, id);
+  assert.equal(history.afterTs, '2026-01-01T00:00:00.000Z');
+  assert.equal(history.beforeTs, '2026-02-01T00:00:00.000Z');
+  assert.equal(history.before, 5);
+});
+test('handoff request and respond round-trip through a real broker', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-relay-opencode-handoff-'));
+  const dataDir = path.join(root, 'data');
+  const project = path.join(root, 'project');
+  await Promise.all([dataDir, project].map(dir => fs.mkdir(dir, { recursive: true })));
+  const broker = await createBroker({ dataDir });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  async function brokerRpc(target, fields) {
+    const response = await fetch(broker.url + '/rpc', { method: 'POST',
+      headers: { authorization: 'Bearer ' + broker.token, 'content-type': 'application/json' },
+      body: JSON.stringify({ project: target, ...fields }) });
+    return response.json();
+  }
+  function realTransport() {
+    return {
+      async rpc(target, fields) { return brokerRpc(target, fields); },
+      wait(target, agentId, after, { signal }) {
+        return new Promise((resolve, reject) => {
+          signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+        });
+      },
+    };
+  }
+  const sessionA = 'ses_handoff_a';
+  const sessionB = 'ses_handoff_b';
+  const agentA = `opencode:${sessionA}`;
+  const agentB = `opencode:${sessionB}`;
+  const contextA = { client: harness().client, directory: project, worktree: project };
+  const contextB = { client: harness().client, directory: project, worktree: project };
+  const hooksA = await AgentRelayPlugin(contextA, { transport: realTransport() });
+  const hooksB = await AgentRelayPlugin(contextB, { transport: realTransport() });
+  t.after(async () => { await hooksA.dispose(); await hooksB.dispose(); });
+  const toolA = extra => ({ sessionID: sessionA, directory: project, worktree: project, abort: new AbortController().signal, ...extra });
+  const toolB = extra => ({ sessionID: sessionB, directory: project, worktree: project, abort: new AbortController().signal, ...extra });
+  await hooksB.tool.relay_agents.execute({}, toolB());
+  await hooksA.tool.relay_claim.execute({ resources: ['handoff.txt'] }, toolA());
+  const requested = JSON.parse(await hooksA.tool.relay_handoff_request.execute({ to: agentB, resources: ['handoff.txt'], reason: 'transfer work' }, toolA()));
+  assert.equal(requested.handoff.from, agentA);
+  assert.equal(requested.handoff.to, agentB);
+  const listed = JSON.parse(await hooksA.tool.relay_handoffs.execute({}, toolA()));
+  assert.equal(listed.handoffs.length, 1);
+  assert.equal(listed.handoffs[0].id, requested.handoff.id);
+  const responded = JSON.parse(await hooksB.tool.relay_handoff_respond.execute({ id: requested.handoff.id, accept: true }, toolB()));
+  assert.equal(responded.handoff.state, 'accepted');
+  const agents = await brokerRpc(project, { op: 'agents' });
+  assert.equal(agents.ok, true);
+  const held = agents.claims.filter(claim => claim.resource.endsWith('handoff.txt'));
+  assert.equal(held.length, 1);
+  assert.equal(held[0].agentId, agentB);
+});
+test('byte-limited pages rewrite continuation from the kept rows', async t => {
+  const rows = Array.from({ length: 12 }, (_, i) => message('page-' + i, { body: 'x'.repeat(8000), cursor: i + 1 }));
+  const client = harness().client;
+  const transport = {
+    async rpc(project, fields) {
+      if (fields.op === 'register') return { ok: true };
+      if (fields.op === 'inbox') return { ok: true, messages: structuredClone(rows), cursor: 12, roomCursor: 12 };
+      if (fields.op === 'history') return { ok: true, messages: structuredClone(rows), nextCursor: 12, done: true, scope: { totalMatching: 12 } };
+      if (fields.op === 'outbox') return { ok: true, messages: structuredClone(rows), nextCursor: 24, done: true };
+      return { ok: true, ...fields };
+    },
+    wait(project, agentId, after, { signal }) {
+      return new Promise((resolve, reject) => {
+        signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+      });
+    }
+  };
+  const hooks = await AgentRelayPlugin({ client, directory, worktree: directory }, { transport, dataDir: '/tmp/relay-isolated' });
+  t.after(() => hooks.dispose());
+  const started = user();
+  await hooks['chat.message']({ sessionID }, { message: started.info });
+  await flush();
+  const inbox = JSON.parse(await hooks.tool.relay_inbox.execute({ limit: 50 }, toolContext()));
+  assert.ok(inbox.omitted);
+  assert.ok(inbox.messages.length < 12);
+  assert.equal(inbox.cursor, inbox.messages.at(-1).cursor);
+  assert.equal(inbox.omitted.resumeCursor, inbox.messages.at(-1).cursor);
+  assert.equal(inbox.roomCursor, 12);
+  assert.ok(inbox.byteSize <= 64 * 1024);
+  const history = JSON.parse(await hooks.tool.relay_history.execute({ limit: 50 }, toolContext()));
+  assert.ok(history.omitted);
+  assert.equal(history.nextCursor, history.messages.at(-1).cursor);
+  assert.equal(history.done, false);
+  assert.equal(history.omitted.resumeCursor, history.messages.at(-1).cursor);
+  const outbox = JSON.parse(await hooks.tool.relay_outbox.execute({ limit: 50 }, toolContext()));
+  assert.ok(outbox.omitted);
+  assert.equal(outbox.nextCursor, outbox.messages.at(-1).cursor);
+  assert.equal(outbox.done, false);
+  assert.equal(outbox.omitted.resumeCursor, outbox.messages.at(-1).cursor);
+});
+test('unread forwards directly for true false and omitted', async t => {
+  const h = harness(), hooks = await plugin(h);
+  t.after(() => hooks.dispose());
+  await busy(hooks);
+  await flush();
+  const before = h.calls.filter(x => x.op === 'inbox').length;
+  await hooks.tool.relay_inbox.execute({}, toolContext());
+  await hooks.tool.relay_inbox.execute({ unread: true }, toolContext());
+  await hooks.tool.relay_inbox.execute({ unread: false }, toolContext());
+  const inboxCalls = h.calls.filter(x => x.op === 'inbox').slice(before);
+  assert.equal(inboxCalls.length, 3);
+  assert.equal('unacked' in inboxCalls[0], false);
+  assert.equal(inboxCalls[1].unacked, true);
+  assert.equal(inboxCalls[2].unacked, false);
+});
+test('unread matches broker acknowledgement state through a real broker', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-relay-opencode-unread-'));
+  const dataDir = path.join(root, 'data');
+  const project = path.join(root, 'project');
+  await Promise.all([dataDir, project].map(dir => fs.mkdir(dir, { recursive: true })));
+  const broker = await createBroker({ dataDir });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  async function brokerRpc(target, fields) {
+    const response = await fetch(broker.url + '/rpc', { method: 'POST',
+      headers: { authorization: 'Bearer ' + broker.token, 'content-type': 'application/json' },
+      body: JSON.stringify({ project: target, ...fields }) });
+    return response.json();
+  }
+  function realTransport() {
+    return {
+      async rpc(target, fields) { return brokerRpc(target, fields); },
+      wait(target, agentId, after, { signal }) {
+        return new Promise((resolve, reject) => {
+          signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+        });
+      }
+    };
+  }
+  const session = 'ses_unread_check';
+  const me = `opencode:${session}`;
+  const peer = 'unread-peer';
+  await brokerRpc(project, { op: 'register', agentId: peer, runner: 'review' });
+  await brokerRpc(project, { op: 'register', agentId: me, runner: 'opencode', sessionId: session });
+  await brokerRpc(project, { op: 'send', from: peer, to: me, body: 'first' });
+  await brokerRpc(project, { op: 'send', from: peer, to: me, body: 'second' });
+  const context = { client: harness().client, directory: project, worktree: project };
+  const hooks = await AgentRelayPlugin(context, { transport: realTransport() });
+  t.after(async () => { await hooks.dispose(); });
+  const toolCtx = extra => ({ sessionID: session, directory: project, worktree: project, abort: new AbortController().signal, ...extra });
+  const first = JSON.parse(await hooks.tool.relay_inbox.execute({ limit: 50 }, toolCtx()));
+  assert.equal(first.messages.length, 2);
+  await hooks.tool.relay_ack.execute({ messageId: first.messages[0].messageId }, toolCtx());
+  const onlyUnread = JSON.parse(await hooks.tool.relay_inbox.execute({ unread: true, limit: 50 }, toolCtx()));
+  assert.equal(onlyUnread.messages.length, 1);
+  assert.equal(onlyUnread.messages[0].acked, false);
+  const withRead = JSON.parse(await hooks.tool.relay_inbox.execute({ unread: false, limit: 50 }, toolCtx()));
+  assert.equal(withRead.messages.length, 2);
+  const omitted = JSON.parse(await hooks.tool.relay_inbox.execute({ limit: 50 }, toolCtx()));
+  assert.equal(omitted.messages.length, 1);
+  assert.equal(omitted.messages[0].messageId, onlyUnread.messages[0].messageId);
+});
+test('context hook marks only inserted message ids', async t => {
+  const rows = Array.from({ length: 30 }, (_, i) => message('ctx-' + i, { body: 'payload-' + i + '-' + 'x'.repeat(2000), cursor: i + 1 }));
+  const h = harness({ initial: rows }), hooks = await plugin(h);
+  t.after(() => hooks.dispose());
+  await busy(hooks);
+  await hooks.tool.relay_inbox.execute({}, toolContext());
+  const output = { messages: [user()] };
+  await hooks['experimental.chat.messages.transform']({}, output);
+  const text = output.messages[0].parts[1].text;
+  const shown = text.split('\n').filter(line => line.startsWith('{')).map(line => JSON.parse(line).messageId);
+  const marked = h.calls.filter(x => x.op === 'notified' && x.adapter === 'opencode-context').map(x => x.messageId);
+  assert.ok(shown.length < 30);
+  assert.deepEqual(new Set(marked), new Set(shown));
+  const omittedId = rows.map(row => row.messageId).find(value => !shown.includes(value));
+  assert.ok(omittedId);
+  assert.ok(!marked.includes(omittedId));
+  const byId = new Map(rows.map(row => [row.messageId, row]));
+  const maxShown = Math.max(...shown.map(value => byId.get(value).cursor));
+  await hooks.tool.relay_ack.execute({ through: maxShown }, toolContext());
+  const second = { messages: [user()] };
+  await hooks['experimental.chat.messages.transform']({}, second);
+  const secondText = second.messages[0].parts[1].text;
+  assert.ok(secondText.includes(omittedId));
+});
+test('context byte budget measures UTF-8 envelope including wrapper', async t => {
+  const rows = Array.from({ length: 30 }, (_, i) => message('cjk-' + i, { body: '漢'.repeat(5300), cursor: i + 1 }));
+  const h = harness({ initial: rows }), hooks = await plugin(h);
+  t.after(() => hooks.dispose());
+  await busy(hooks);
+  await hooks.tool.relay_inbox.execute({}, toolContext());
+  const output = { messages: [user()] };
+  await hooks['experimental.chat.messages.transform']({}, output);
+  const text = output.messages[0].parts[1].text;
+  assert.ok(Buffer.byteLength(text) <= 32 * 1024);
+  const shown = text.split('\n').filter(line => line.startsWith('{')).map(line => JSON.parse(line).messageId);
+  assert.ok(shown.length < 6);
+  const marked = h.calls.filter(x => x.op === 'notified' && x.adapter === 'opencode-context').map(x => x.messageId);
+  assert.deepEqual(new Set(marked), new Set(shown));
+});
+test('oversized single row uses compact envelope without truncating body', async t => {
+  const bigBody = 'A'.repeat(40000);
+  const row = message('big-1', { body: bigBody, cursor: 1, summary: 'big summary', attachments: [{ name: 'f.bin', size: 3, sha256: 'c'.repeat(64) }] });
+  const h = harness({ initial: [row] }), hooks = await plugin(h);
+  t.after(() => hooks.dispose());
+  await busy(hooks);
+  await hooks.tool.relay_inbox.execute({}, toolContext());
+  const output = { messages: [user()] };
+  await hooks['experimental.chat.messages.transform']({}, output);
+  const text = output.messages[0].parts[1].text;
+  assert.match(text, /big-1/);
+  assert.match(text, /big summary/);
+  assert.match(text, /f\.bin/);
+  assert.match(text, /"cursor":1/);
+  assert.match(text, /\[body 40000 bytes; read via relay_inbox\]/);
+  assert.ok(!text.includes('A'.repeat(1000)));
+  assert.ok(Buffer.byteLength(text) <= 32 * 1024);
+});
+test('attachment-heavy rows stay within UTF-8 budget with descriptors', async t => {
+  const rows = Array.from({ length: 10 }, (_, i) => message('att-' + i, { body: 'ok-' + i, cursor: i + 1, summary: 's' + i,
+    attachments: Array.from({ length: 20 }, (_, j) => ({ name: 'file-' + j + '-' + 'n'.repeat(80) + '.bin', size: 3, sha256: 'd'.repeat(64) })) }));
+  const h = harness({ initial: rows }), hooks = await plugin(h);
+  t.after(() => hooks.dispose());
+  await busy(hooks);
+  await hooks.tool.relay_inbox.execute({}, toolContext());
+  const output = { messages: [user()] };
+  await hooks['experimental.chat.messages.transform']({}, output);
+  const text = output.messages[0].parts[1].text;
+  assert.ok(Buffer.byteLength(text) <= 32 * 1024);
+  const shown = text.split('\n').filter(line => line.startsWith('{')).map(line => JSON.parse(line).messageId);
+  assert.ok(shown.length < 10);
+  assert.match(text, /file-0-/);
+  const marked = h.calls.filter(x => x.op === 'notified' && x.adapter === 'opencode-context').map(x => x.messageId);
+  assert.deepEqual(new Set(marked), new Set(shown));
+});
+test('receipt and agents paginate with bounded defaults and continuation', async t => {
+  const fullRecipients = Array.from({ length: 150 }, (_, i) => ({ agentId: 'receiver-' + i, stored: true, notified: [], accepted: [], missing: [], acked: false, state: 'stored', cursor: 1 }));
+  const fullAgents = Array.from({ length: 150 }, (_, i) => ({ agentId: 'agent-' + i, runner: 'review', status: 'idle' }));
+  const rpcCalls = [];
+  const client = harness().client;
+  const transport = {
+    async rpc(project, fields) {
+      rpcCalls.push(fields);
+      if (fields.op === 'register') return { ok: true };
+      if (fields.op === 'receipt') {
+        const limit = fields.recipientsLimit ?? 150;
+        const offset = fields.recipientsOffset ?? 0;
+        const page = fullRecipients.slice(offset, offset + limit);
+        return { ok: true, id: fields.messageId, recipients: page, recipientsTotal: 150, recipientsLimit: limit, recipientsOffset: offset,
+          counts: { recipients: 150, acked: 0, accepted: 0, notified: 0, pending: 150, missing: 0 }, pending: [] };
+      }
+      if (fields.op === 'agents') {
+        const limit = fields.limit ?? 150;
+        const offset = fields.offset ?? 0;
+        return { ok: true, agents: fullAgents.slice(offset, offset + limit), total: 150, claims: [], cursor: 0 };
+      }
+      return { ok: true, ...fields };
+    },
+    wait(project, agentId, after, { signal }) {
+      return new Promise((resolve, reject) => {
+        signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+      });
+    }
+  };
+  const hooks = await AgentRelayPlugin({ client, directory, worktree: directory }, { transport, dataDir: '/tmp/relay-isolated' });
+  t.after(() => hooks.dispose());
+  const started = user();
+  await hooks['chat.message']({ sessionID }, { message: started.info });
+  await flush();
+  const receiptDefault = JSON.parse(await hooks.tool.relay_receipt.execute({ messageId: 'm-1' }, toolContext()));
+  assert.equal(rpcCalls.find(x => x.op === 'receipt').recipientsLimit, 100);
+  assert.equal(receiptDefault.recipients.length, 100);
+  assert.equal(receiptDefault.recipientsTotal, 150);
+  assert.equal(receiptDefault.nextRecipientsOffset, 100);
+  assert.equal(receiptDefault.hasMoreRecipients, true);
+  const receiptExplicit = JSON.parse(await hooks.tool.relay_receipt.execute({ messageId: 'm-1', recipientsLimit: 10, recipientsOffset: 5 }, toolContext()));
+  assert.equal(rpcCalls.filter(x => x.op === 'receipt').at(-1).recipientsLimit, 10);
+  assert.equal(rpcCalls.filter(x => x.op === 'receipt').at(-1).recipientsOffset, 5);
+  assert.equal(receiptExplicit.nextRecipientsOffset, 15);
+  assert.equal(receiptExplicit.hasMoreRecipients, true);
+  const agentsDefault = JSON.parse(await hooks.tool.relay_agents.execute({}, toolContext()));
+  assert.equal(rpcCalls.find(x => x.op === 'agents').limit, 100);
+  assert.equal(agentsDefault.agents.length, 100);
+  assert.equal(agentsDefault.nextOffset, 100);
+  assert.equal(agentsDefault.hasMore, true);
+  const agentsExplicit = JSON.parse(await hooks.tool.relay_agents.execute({ limit: 10, offset: 5 }, toolContext()));
+  assert.equal(agentsExplicit.nextOffset, 15);
+  assert.equal(agentsExplicit.hasMore, true);
+});
+test('close folds disconnected into offline and dispose emits no new calls', async t => {
+  const h = harness(), hooks = await plugin(h);
+  t.after(() => hooks.dispose());
+  await busy(hooks);
+  await h.deliver([message('r11-1')]);
+  await flush();
+  assert.ok(h.calls.some(x => x.op === 'status' && x.transport?.state === 'connected'));
+  await hooks.event({ event: { type: 'session.deleted', properties: { info: { id: sessionID, directory } } } });
+  await flush();
+  const offline = h.calls.filter(x => x.op === 'status' && x.status === 'offline');
+  assert.equal(offline.length, 1);
+  assert.deepEqual(offline[0].transport, { adapter: 'opencode-watch', state: 'disconnected' });
+  const count = h.calls.length;
+  await hooks.dispose();
+  await flush();
+  assert.equal(h.calls.length, count);
+  await hooks.dispose();
+  assert.equal(h.calls.length, count);
+});
+test('legacy broker rejecting transport keeps working without loops', async t => {
+  const calls = [];
+  const waiters = [];
+  const client = harness().client;
+  const transport = {
+    async rpc(project, fields) {
+      calls.push(fields);
+      if (fields.op === 'register') return { ok: true };
+      if (fields.op === 'inbox') return { ok: true, messages: [], cursor: 0 };
+      if (fields.op === 'status' && fields.transport) {
+        const error = new Error('unsupported transport');
+        error.code = 'UNSUPPORTED_FEATURE';
+        throw error;
+      }
+      return { ok: true, ...fields };
+    },
+    wait(project, agentId, after, { signal }) {
+      return new Promise((resolve, reject) => {
+        waiters.push({ resolve, reject });
+        signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+      });
+    }
+  };
+  const hooks = await AgentRelayPlugin({ client, directory, worktree: directory }, { transport, dataDir: '/tmp/relay-isolated' });
+  t.after(() => hooks.dispose());
+  const started = user();
+  await hooks['chat.message']({ sessionID }, { message: started.info });
+  await flush();
+  assert.equal(waiters.length, 1);
+  waiters.shift().resolve({ ok: true, messages: [], cursor: 0 });
+  await flush();
+  await flush();
+  const transportReports = calls.filter(x => x.op === 'status' && x.transport);
+  assert.equal(transportReports.length, 1);
+  assert.equal(waiters.length, 1);
+  waiters.shift().resolve({ ok: true, messages: [], cursor: 0 });
+  await flush();
+  await flush();
+  assert.equal(calls.filter(x => x.op === 'status' && x.transport).length, 1);
+  const inbox = JSON.parse(await hooks.tool.relay_inbox.execute({}, toolContext()));
+  assert.equal(inbox.messages.length, 0);
+  await hooks.event({ event: { type: 'session.deleted', properties: { info: { id: sessionID, directory } } } });
+  await flush();
+  const offline = calls.filter(x => x.op === 'status' && x.status === 'offline');
+  assert.equal(offline.length, 1);
+  assert.equal('transport' in offline[0], false);
 });

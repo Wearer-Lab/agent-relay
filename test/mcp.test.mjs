@@ -123,18 +123,23 @@ test('real SDK tools use pinned project/agent identity and exact broker fields',
   assert.equal(f.calls[1].status, 'awaiting-attachment');
   assert.deepEqual(f.tools.tools.map(tool => tool.name),
     ['relay_agents', 'relay_send', 'relay_inbox', 'relay_ack', 'relay_status', 'relay_claim', 'relay_release',
-      'relay_leave', 'relay_fetch', 'relay_outbox', 'relay_receipt', 'relay_history']);
+      'relay_leave', 'relay_fetch', 'relay_outbox', 'relay_receipt', 'relay_history', 'relay_bulletin_get',
+      'relay_bulletin_ack', 'relay_handoff_request', 'relay_handoff_respond', 'relay_handoffs', 'relay_claim_narrow',
+      'relay_tasks', 'relay_processes_list', 'relay_group_agents']);
   const operations = [
-    ['relay_agents', {}, { op: 'agents' }],
+    ['relay_agents', {}, { op: 'agents', limit: 100 }],
     ['relay_agents', { active: true, within: 5, transport: 'connected' },
-      { op: 'agents', active: true, within: 5, transport: 'connected' }],
+      { op: 'agents', active: true, within: 5, transport: 'connected', limit: 100 }],
+    ['relay_agents', { limit: 10, offset: 5 }, { op: 'agents', limit: 10, offset: 5 }],
     ['relay_send', { to: 'peer', body: 'File frozen', replyTo: 'message-1' },
       { op: 'send', from: f.adapter.agentId, to: 'peer', body: 'File frozen', replyTo: 'message-1' }],
     ['relay_send', { to: 'peer', body: 'Full', summary: 's', messageId: 'stable-1' },
       { op: 'send', from: f.adapter.agentId, to: 'peer', body: 'Full', summary: 's', messageId: 'stable-1' }],
     ['relay_inbox', {}, { op: 'inbox', agentId: f.adapter.agentId, limit: 50 }],
     ['relay_inbox', { unread: true, since: 7, limit: 2, from: 'peer' },
-      { op: 'inbox', agentId: f.adapter.agentId, unacked: false, since: 7, limit: 2, from: 'peer' }],
+      { op: 'inbox', agentId: f.adapter.agentId, unacked: true, since: 7, limit: 2, from: 'peer' }],
+    ['relay_inbox', { unread: false, since: 7, limit: 2 },
+      { op: 'inbox', agentId: f.adapter.agentId, unacked: false, since: 7, limit: 2 }],
     ['relay_ack', { messageId: 'message-1' }, { op: 'ack', agentId: f.adapter.agentId, messageId: 'message-1' }],
     ['relay_ack', { through: 9 }, { op: 'ack', agentId: f.adapter.agentId, through: 9 }],
     ['relay_status', { status: 'reviewing', frozen: true, resources: ['a.swift'], task: null },
@@ -152,10 +157,50 @@ test('real SDK tools use pinned project/agent identity and exact broker fields',
     ['relay_leave', {}, { op: 'leave', agentId: f.adapter.agentId }],
     ['relay_fetch', { messageId: 'm', out: '/tmp/fetch-out' },
       { op: 'fetch', agentId: f.adapter.agentId, messageId: 'm', out: '/tmp/fetch-out' }],
-    ['relay_receipt', { messageId: 'message-1' }, { op: 'receipt', messageId: 'message-1' }],
+    ['relay_receipt', { messageId: 'message-1' }, { op: 'receipt', messageId: 'message-1', recipientsLimit: 100 }],
+    ['relay_receipt', { messageId: 'message-1', recipientsLimit: 10, recipientsOffset: 5 },
+      { op: 'receipt', messageId: 'message-1', recipientsLimit: 10, recipientsOffset: 5 }],
     ['relay_outbox', {}, { op: 'outbox', from: f.adapter.agentId, limit: 50 }],
     ['relay_history', { acked: true, threadOf: 'message-1' },
       { op: 'history', agentId: f.adapter.agentId, limit: 50, acked: true, threadOf: 'message-1' }],
+    ['relay_history', { afterTs: '2026-01-01T00:00:00.000Z', beforeTs: '2026-12-31T00:00:00.000Z', before: 9 },
+      { op: 'history', agentId: f.adapter.agentId, limit: 50, afterTs: '2026-01-01T00:00:00.000Z',
+        beforeTs: '2026-12-31T00:00:00.000Z', before: 9 }],
+    ['relay_bulletin_get', {}, { op: 'getBulletin' }],
+    ['relay_bulletin_ack', { version: 2 }, { op: 'ackBulletin', agentId: f.adapter.agentId, version: 2 }],
+    ['relay_bulletin_ack', { version: 2, hash: 'abc123' },
+      { op: 'ackBulletin', agentId: f.adapter.agentId, version: 2, hash: 'abc123' }],
+    ['relay_handoff_request', { resources: ['a.swift'], reason: 'transfer' },
+      { op: 'requestHandoff', agentId: f.adapter.agentId, resources: ['a.swift'], reason: 'transfer' }],
+    ['relay_handoff_request', { to: 'peer', resources: ['a.swift'], reason: 'transfer', meta: { baseCommit: 'abc' } },
+      { op: 'requestHandoff', agentId: f.adapter.agentId, to: 'peer', resources: ['a.swift'], reason: 'transfer',
+        meta: { baseCommit: 'abc' } }],
+    ['relay_handoff_respond', { id: 'h-1', accept: true },
+      { op: 'respondHandoff', agentId: f.adapter.agentId, id: 'h-1', accept: true }],
+    ['relay_handoff_respond', { id: 'h-1', accept: false, resources: ['a.swift'] },
+      { op: 'respondHandoff', agentId: f.adapter.agentId, id: 'h-1', accept: false, resources: ['a.swift'] }],
+    ['relay_handoffs', {}, { op: 'handoffs' }],
+    ['relay_claim_narrow', { resource: 'src', resources: ['src/a.mjs'] },
+      { op: 'claimNarrow', agentId: f.adapter.agentId, resource: 'src', resources: ['src/a.mjs'] }],
+    ['relay_claim_narrow', { resource: 'src', resources: ['src/a.mjs'], meta: { baseCommit: 'abc' } },
+      { op: 'claimNarrow', agentId: f.adapter.agentId, resource: 'src', resources: ['src/a.mjs'],
+        meta: { baseCommit: 'abc' } }],
+    ['relay_tasks', { action: 'upsert', title: 'Build' },
+      { op: 'tasks', action: 'upsert', agentId: f.adapter.agentId, title: 'Build' }],
+    ['relay_tasks', { action: 'upsert', id: 't-1', title: 'Build', owner: 'peer', blockedBy: ['a.swift'],
+        resources: ['a.swift'], sourceRevision: 'rev-1', verification: 'run tests', expectedRecipient: 'peer',
+        handoffId: 'h-1' },
+      { op: 'tasks', action: 'upsert', agentId: f.adapter.agentId, id: 't-1', title: 'Build', owner: 'peer',
+        blockedBy: ['a.swift'], resources: ['a.swift'], sourceRevision: 'rev-1', verification: 'run tests',
+        expectedRecipient: 'peer', handoffId: 'h-1' }],
+    ['relay_tasks', { action: 'list', state: 'open', blocked: true },
+      { op: 'tasks', action: 'list', agentId: f.adapter.agentId, state: 'open', blocked: true }],
+    ['relay_tasks', { action: 'complete', id: 't-1', verification: 'done' },
+      { op: 'tasks', action: 'complete', agentId: f.adapter.agentId, id: 't-1', verification: 'done' }],
+    ['relay_processes_list', {}, { op: 'processes', action: 'list' }],
+    ['relay_processes_list', { owner: 'peer' }, { op: 'processes', action: 'list', agentId: 'peer' }],
+    ['relay_group_agents', {}, { op: 'groupAgents' }],
+    ['relay_group_agents', { groupId: 'g1' }, { op: 'groupAgents', groupId: 'g1' }],
   ];
   for (const [name, args, expected] of operations) {
     const response = await f.client.callTool({ name, arguments: args });
@@ -216,6 +261,17 @@ test('invalid/spoofed arguments and broker conflicts cannot look successful', as
     ['relay_inbox', { limit: -1 }], ['relay_ack', { through: 'x' }],
     ['relay_agents', { transport: 'live' }],
     ['relay_send', { to: 'peer' }], ['relay_unknown', {}],
+    ['relay_bulletin_ack', {}], ['relay_bulletin_ack', { version: 0 }],
+    ['relay_bulletin_ack', { version: 1, agentId: 'spoof' }],
+    ['relay_handoff_request', { reason: 'x' }], ['relay_handoff_request', { resources: [] }],
+    ['relay_handoff_request', { resources: ['a'], reason: 'x', agentId: 'spoof' }],
+    ['relay_handoff_respond', { id: 'h', accept: 'yes' }], ['relay_handoff_respond', { id: 'h' }],
+    ['relay_claim_narrow', { resource: 'src' }], ['relay_claim_narrow', { resource: 'src', resources: [] }],
+    ['relay_tasks', {}], ['relay_tasks', { action: 'remove' }], ['relay_tasks', { action: 'list', blocked: 'yes' }],
+    ['relay_tasks', { action: 'list', state: 'done' }], ['relay_tasks', { action: 'upsert', blockedBy: [] }],
+    ['relay_processes_list', { owner: 'x', agentId: 'spoof' }],
+    ['relay_group_agents', { groupId: '' }], ['relay_group_agents', { groupId: 'g', project: '/other' }],
+    ['relay_history', { beforeTs: 42 }], ['relay_history', { before: -1 }],
   ]) {
     const before = f.calls.length;
     const response = await f.client.callTool({ name, arguments: args });
@@ -390,7 +446,7 @@ test('optional Codex attachment tool pins callback identity without claiming cha
     attachments.push(input);
     return { attached: true, threadId: input.threadId };
   } });
-  assert.equal(f.tools.tools.length, 13);
+  assert.equal(f.tools.tools.length, 22);
   assert.equal(f.tools.tools.at(-1).name, 'relay_attach_codex');
   assert.deepEqual(f.tools.tools.at(-1).inputSchema.required, ['threadId']);
   assert.equal(f.tools.tools.at(-1).inputSchema.additionalProperties, false);
@@ -490,4 +546,522 @@ test('new tools work end to end against a real broker with bounded backlog pages
   assert.equal(fetched.files.length, 1);
   assert.equal(await fs.readFile(fetched.files[0].path, 'utf8'), 'packet bytes');
   assert.equal(unpack(await client.callTool({ name: 'relay_leave', arguments: {} })).left, me);
+});
+
+test('new coordination tools work end to end against a real broker', async t => {
+  isolateEnv(t);
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-relay-mcp-coord-'));
+  const dataDir = path.join(root, 'data');
+  const project = path.join(root, 'project');
+  await Promise.all([dataDir, project].map(dir => fs.mkdir(dir)));
+  const broker = await createBroker({ dataDir });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  const forward = async (target, fields) => brokerRpc(broker, target, fields);
+  const neverWatch = async () => assert.fail('this test never opens a watcher');
+  const [serverA, clientA] = InMemoryTransport.createLinkedPair();
+  const adapterA = await createMcpAdapter({ project, runner: 'claude', sessionId: 'coord-a',
+    rpcImpl: forward, waitImpl: neverWatch });
+  const mcpA = new Client({ name: 'coord-a', version: '1' });
+  await adapterA.start(serverA);
+  await mcpA.connect(clientA);
+  const [serverB, clientB] = InMemoryTransport.createLinkedPair();
+  const adapterB = await createMcpAdapter({ project, runner: 'claude', sessionId: 'coord-b',
+    rpcImpl: forward, waitImpl: neverWatch });
+  const mcpB = new Client({ name: 'coord-b', version: '1' });
+  await adapterB.start(serverB);
+  await mcpB.connect(clientB);
+  t.after(async () => { await adapterA.close(); await mcpA.close(); await adapterB.close(); await mcpB.close(); });
+  const meA = adapterA.agentId;
+  const meB = adapterB.agentId;
+  const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+  assert.equal(unpack(await mcpA.callTool({ name: 'relay_bulletin_get', arguments: {} })).version, 0);
+  const set1 = await brokerRpc(broker, project,
+    { op: 'setBulletin', agentId: meA, title: 'Policy', body: 'Be kind', source: 'ops' });
+  assert.equal(set1.version, 1);
+  const got = unpack(await mcpA.callTool({ name: 'relay_bulletin_get', arguments: {} }));
+  assert.equal(got.version, 1);
+  assert.equal(got.hash, set1.hash);
+  const ack1 = unpack(await mcpA.callTool({ name: 'relay_bulletin_ack', arguments: { version: 1 } }));
+  assert.equal(ack1.version, 1);
+  assert.ok(ack1.acks.includes(meA));
+  assert.equal(unpack(await mcpA.callTool({ name: 'relay_bulletin_ack', arguments: { version: 1 } })).duplicate, true);
+  const set2 = await brokerRpc(broker, project,
+    { op: 'setBulletin', agentId: meA, title: 'Policy v2', body: 'Be kinder', source: 'ops' });
+  assert.equal(set2.version, 2);
+  const stale = unpack(await mcpB.callTool({ name: 'relay_bulletin_ack', arguments: { version: 1 } }));
+  assert.equal(stale.version, 1);
+  assert.equal(stale.current, 2);
+  assert.equal(stale.stale, true);
+  assert.ok(stale.acks.includes(meB));
+  const ackHash = unpack(await mcpA.callTool({ name: 'relay_bulletin_ack', arguments: { version: 2, hash: set2.hash } }));
+  assert.equal(ackHash.version, 2);
+  assert.ok(ackHash.acks.includes(meA));
+  assert.equal((await mcpA.callTool({ name: 'relay_bulletin_ack', arguments: {} })).isError, true);
+  assert.equal((await mcpA.callTool({ name: 'relay_bulletin_ack', arguments: { version: 0 } })).isError, true);
+  const claimHandoff = unpack(await mcpA.callTool({ name: 'relay_claim', arguments: { resources: ['handoff.txt'] } }));
+  assert.ok(claimHandoff.owned.some(row => row.agentId === meA));
+  const requested = unpack(await mcpA.callTool({ name: 'relay_handoff_request',
+    arguments: { to: meB, resources: ['handoff.txt'], reason: 'transfer', meta: { baseCommit: 'abc' } } }));
+  assert.equal(requested.handoff.from, meA);
+  assert.equal(requested.handoff.to, meB);
+  assert.equal(requested.handoff.state, 'pending');
+  const handoffId = requested.handoff.id;
+  const listed = unpack(await mcpA.callTool({ name: 'relay_handoffs', arguments: {} }));
+  assert.ok(listed.handoffs.some(row => row.id === handoffId && row.state === 'pending'));
+  const accepted = unpack(await mcpB.callTool({ name: 'relay_handoff_respond',
+    arguments: { id: handoffId, accept: true } }));
+  assert.equal(accepted.handoff.state, 'accepted');
+  const listedAgain = unpack(await mcpA.callTool({ name: 'relay_handoffs', arguments: {} }));
+  assert.ok(listedAgain.handoffs.some(row => row.id === handoffId && row.state === 'accepted'));
+  assert.equal((await mcpA.callTool({ name: 'relay_handoff_request', arguments: { resources: ['handoff.txt'] } })).isError, true);
+  assert.equal((await mcpB.callTool({ name: 'relay_handoff_respond', arguments: { id: handoffId } })).isError, true);
+  const claimDecline = unpack(await mcpA.callTool({ name: 'relay_claim', arguments: { resources: ['decline.txt'] } }));
+  assert.ok(claimDecline.owned.some(row => row.agentId === meA));
+  const openOffer = unpack(await mcpA.callTool({ name: 'relay_handoff_request',
+    arguments: { resources: ['decline.txt'], reason: 'open offer' } }));
+  assert.equal(openOffer.handoff.to, null);
+  const declined = unpack(await mcpB.callTool({ name: 'relay_handoff_respond',
+    arguments: { id: openOffer.handoff.id, accept: false } }));
+  assert.equal(declined.handoff.state, 'declined');
+  const claimSrc = unpack(await mcpA.callTool({ name: 'relay_claim', arguments: { resources: ['src'] } }));
+  assert.ok(claimSrc.owned.some(row => row.agentId === meA));
+  const narrowed = unpack(await mcpA.callTool({ name: 'relay_claim_narrow',
+    arguments: { resource: 'src', resources: ['src/a.mjs', 'src/b.mjs'] } }));
+  assert.equal(narrowed.released.length, 1);
+  assert.equal(narrowed.claimed.length, 2);
+  assert.equal((await mcpA.callTool({ name: 'relay_claim_narrow', arguments: { resource: 'src' } })).isError, true);
+  const claimBlocked = unpack(await mcpB.callTool({ name: 'relay_claim', arguments: { resources: ['blocked.txt'] } }));
+  assert.ok(claimBlocked.owned.some(row => row.agentId === meB));
+  const upserted = unpack(await mcpA.callTool({ name: 'relay_tasks',
+    arguments: { action: 'upsert', title: 'Needs blocked', blockedBy: ['blocked.txt'], resources: ['blocked.txt'] } }));
+  assert.equal(upserted.task.state, 'open');
+  assert.equal(upserted.task.blocked, true);
+  const taskId = upserted.task.id;
+  const listAll = unpack(await mcpA.callTool({ name: 'relay_tasks', arguments: { action: 'list' } }));
+  assert.ok(listAll.tasks.some(row => row.id === taskId && row.blocked === true));
+  const listBlocked = unpack(await mcpA.callTool({ name: 'relay_tasks', arguments: { action: 'list', blocked: true } }));
+  assert.ok(listBlocked.tasks.some(row => row.id === taskId));
+  assert.ok(listBlocked.tasks.every(row => row.blocked === true));
+  const listUnblocked = unpack(await mcpA.callTool({ name: 'relay_tasks', arguments: { action: 'list', blocked: false } }));
+  assert.ok(!listUnblocked.tasks.some(row => row.id === taskId));
+  const completed = unpack(await mcpA.callTool({ name: 'relay_tasks',
+    arguments: { action: 'complete', id: taskId, verification: 'ran checks' } }));
+  assert.equal(completed.task.state, 'complete');
+  const listComplete = unpack(await mcpA.callTool({ name: 'relay_tasks',
+    arguments: { action: 'list', state: 'complete' } }));
+  assert.ok(listComplete.tasks.some(row => row.id === taskId));
+  assert.equal((await mcpA.callTool({ name: 'relay_tasks', arguments: { action: 'remove' } })).isError, true);
+  const registered = await brokerRpc(broker, project,
+    { op: 'processes', action: 'register', agentId: meA, pid: process.pid, command: 'coord-probe' });
+  assert.equal(registered.process.pid, process.pid);
+  const processes = unpack(await mcpA.callTool({ name: 'relay_processes_list', arguments: {} }));
+  assert.ok(processes.processes.some(row => row.pid === process.pid && row.agentId === meA));
+  const owned = unpack(await mcpA.callTool({ name: 'relay_processes_list', arguments: { owner: meA } }));
+  assert.ok(owned.processes.some(row => row.pid === process.pid));
+  const foreign = unpack(await mcpA.callTool({ name: 'relay_processes_list', arguments: { owner: meB } }));
+  assert.ok(!foreign.processes.some(row => row.pid === process.pid));
+  assert.equal((await brokerRpc(broker, project,
+    { op: 'register', agentId: meA, runner: 'test', sessionId: 'coord-a', groupId: 'g-coord' })).group.id, 'g-coord');
+  const project2 = path.join(root, 'project2');
+  await fs.mkdir(project2);
+  assert.equal((await brokerRpc(broker, project2,
+    { op: 'register', agentId: 'group-peer', runner: 'test', sessionId: 'peer', groupId: 'g-coord' })).group.id, 'g-coord');
+  const group = unpack(await mcpA.callTool({ name: 'relay_group_agents', arguments: {} }));
+  assert.equal(group.groupId, 'g-coord');
+  assert.ok(group.rooms.length >= 2);
+  assert.ok(group.agents.some(row => row.agentId === meA));
+  const explicit = unpack(await mcpA.callTool({ name: 'relay_group_agents', arguments: { groupId: 'g-coord' } }));
+  assert.equal(explicit.groupId, 'g-coord');
+  assert.equal(explicit.rooms.length, group.rooms.length);
+  const sent1 = unpack(await mcpA.callTool({ name: 'relay_send', arguments: { to: meB, body: 'history-one' } }));
+  await delay(10);
+  const sent2 = unpack(await mcpA.callTool({ name: 'relay_send',
+    arguments: { to: meB, body: 'history-two', replyTo: sent1.messageId } }));
+  await delay(10);
+  const sent3 = unpack(await mcpA.callTool({ name: 'relay_send', arguments: { to: meB, body: 'history-three' } }));
+  assert.ok(sent1.messageId && sent2.messageId && sent3.messageId);
+  const full = unpack(await mcpA.callTool({ name: 'relay_history', arguments: { limit: 50 } }));
+  assert.equal(full.scope.totalMatching, 3);
+  const [first, , last] = full.messages;
+  const thread = unpack(await mcpA.callTool({ name: 'relay_history',
+    arguments: { threadOf: sent1.messageId, limit: 50 } }));
+  assert.ok(thread.messages.some(row => row.messageId === sent2.messageId));
+  assert.ok(!thread.messages.some(row => row.messageId === sent1.messageId));
+  const afterFirst = unpack(await mcpA.callTool({ name: 'relay_history',
+    arguments: { afterTs: first.createdAt, limit: 50 } }));
+  assert.ok(!afterFirst.messages.some(row => row.messageId === first.messageId));
+  assert.ok(afterFirst.scope.totalMatching < 3);
+  const beforeLast = unpack(await mcpA.callTool({ name: 'relay_history',
+    arguments: { beforeTs: last.createdAt, limit: 50 } }));
+  assert.ok(!beforeLast.messages.some(row => row.messageId === last.messageId));
+  assert.ok(beforeLast.scope.totalMatching < 3);
+  const beforeCursor = unpack(await mcpA.callTool({ name: 'relay_history',
+    arguments: { before: last.cursor, limit: 50 } }));
+  assert.ok(beforeCursor.messages.length >= 1);
+  assert.ok(beforeCursor.messages.every(row => row.cursor < last.cursor));
+  assert.equal((await mcpA.callTool({ name: 'relay_history', arguments: { afterTs: 'not-a-time' } })).isError, true);
+});
+
+test('count-limited inbox/history/outbox pages resume to every row exactly once', async t => {
+  isolateEnv(t);
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-relay-mcp-count-pages-'));
+  const dataDir = path.join(root, 'data');
+  const project = path.join(root, 'project');
+  await Promise.all([dataDir, project].map(dir => fs.mkdir(dir)));
+  const broker = await createBroker({ dataDir });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  assert.equal((await brokerRpc(broker, project,
+    { op: 'register', agentId: 'count-peer', runner: 'test', sessionId: 'peer' })).ok, true);
+  const [serverTransport, clientTransport] = InMemoryTransport.createLinkedPair();
+  const adapter = await createMcpAdapter({ project, runner: 'claude', sessionId: 'count-me',
+    rpcImpl: async (target, fields) => brokerRpc(broker, target, fields),
+    waitImpl: async () => assert.fail('no watcher') });
+  const client = new Client({ name: 'count', version: '1' });
+  await adapter.start(serverTransport);
+  await client.connect(clientTransport);
+  t.after(async () => { await adapter.close(); await client.close(); });
+  const me = adapter.agentId;
+  for (let i = 1; i <= 12; i++)
+    assert.equal((await brokerRpc(broker, project,
+      { op: 'send', agentId: 'count-peer', from: 'count-peer', to: me, body: `in-${i}` })).ok, true);
+  for (let i = 1; i <= 12; i++)
+    assert.equal(unpack(await client.callTool({ name: 'relay_send', arguments: { to: 'count-peer', body: `out-${i}` } })).ok, true);
+  const inboxSeen = [];
+  let since = 0;
+  for (let guard = 0; guard < 10; guard++) {
+    const page = unpack(await client.callTool({ name: 'relay_inbox', arguments: { since, limit: 5 } }));
+    assert.ok(page.messages.length <= 5);
+    assert.equal(page.omitted, null);
+    assert.ok(page.byteSize <= 64 * 1024);
+    for (const m of page.messages) inboxSeen.push(m.messageId);
+    if (page.messages.length === 0) break;
+    since = page.cursor;
+    if (inboxSeen.length === 12) {
+      const tail = unpack(await client.callTool({ name: 'relay_inbox', arguments: { since, limit: 5 } }));
+      assert.deepEqual(tail.messages, []);
+      break;
+    }
+  }
+  assert.equal(inboxSeen.length, 12);
+  assert.equal(new Set(inboxSeen).size, 12);
+  const historySeen = [];
+  since = 0;
+  for (let guard = 0; guard < 10; guard++) {
+    const page = unpack(await client.callTool({ name: 'relay_history', arguments: { since, limit: 5, from: 'count-peer' } }));
+    assert.ok(page.messages.length <= 5);
+    assert.equal(page.omitted, null);
+    if (page.omitted !== null) assert.equal(page.done, false);
+    for (const m of page.messages) historySeen.push(m.messageId);
+    if (page.done) break;
+    assert.equal(page.nextCursor, page.messages.at(-1).cursor);
+    since = page.nextCursor;
+  }
+  assert.equal(historySeen.length, 12);
+  assert.equal(new Set(historySeen).size, 12);
+  assert.deepEqual([...historySeen].sort(), [...inboxSeen].sort());
+  const outboxSeen = [];
+  since = 0;
+  for (let guard = 0; guard < 10; guard++) {
+    const page = unpack(await client.callTool({ name: 'relay_outbox', arguments: { since, limit: 5 } }));
+    assert.ok(page.messages.length <= 5);
+    assert.equal(page.omitted, null);
+    if (page.omitted !== null) assert.equal(page.done, false);
+    for (const m of page.messages) outboxSeen.push(m.id);
+    if (page.done) break;
+    assert.equal(page.nextCursor, page.messages.at(-1).cursor);
+    since = page.nextCursor;
+  }
+  assert.equal(outboxSeen.length, 12);
+  assert.equal(new Set(outboxSeen).size, 12);
+});
+
+test('byte-limited inbox/history/outbox pages keep consistent continuation', async t => {
+  isolateEnv(t);
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-relay-mcp-byte-pages-'));
+  const dataDir = path.join(root, 'data');
+  const project = path.join(root, 'project');
+  await Promise.all([dataDir, project].map(dir => fs.mkdir(dir)));
+  const broker = await createBroker({ dataDir });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  assert.equal((await brokerRpc(broker, project,
+    { op: 'register', agentId: 'byte-peer', runner: 'test', sessionId: 'peer' })).ok, true);
+  const [serverTransport, clientTransport] = InMemoryTransport.createLinkedPair();
+  const adapter = await createMcpAdapter({ project, runner: 'claude', sessionId: 'byte-me',
+    rpcImpl: async (target, fields) => brokerRpc(broker, target, fields),
+    waitImpl: async () => assert.fail('no watcher') });
+  const client = new Client({ name: 'byte', version: '1' });
+  await adapter.start(serverTransport);
+  await client.connect(clientTransport);
+  t.after(async () => { await adapter.close(); await client.close(); });
+  const me = adapter.agentId;
+  const big = 'x'.repeat(8000);
+  for (let i = 1; i <= 12; i++)
+    assert.equal((await brokerRpc(broker, project,
+      { op: 'send', agentId: 'byte-peer', from: 'byte-peer', to: me, body: `${big}-${i}` })).ok, true);
+  const inboxSeen = [];
+  let since = 0;
+  let truncated = false;
+  for (let guard = 0; guard < 10; guard++) {
+    const page = unpack(await client.callTool({ name: 'relay_inbox', arguments: { since, limit: 100 } }));
+    assert.ok(page.byteSize <= 64 * 1024);
+    assert.ok(page.messages.length >= 1);
+    if (page.omitted) {
+      truncated = true;
+      assert.equal(page.cursor, page.messages.at(-1).cursor);
+      assert.equal(page.omitted.resumeCursor, page.messages.at(-1).cursor);
+      if (Object.hasOwn(page, 'done')) assert.equal(page.done, false);
+      assert.equal(page.done !== true || page.omitted === null, true);
+    }
+    for (const m of page.messages) inboxSeen.push(m.messageId);
+    if (!page.omitted) break;
+    since = page.omitted.resumeCursor;
+  }
+  assert.ok(truncated);
+  assert.equal(inboxSeen.length, 12);
+  assert.equal(new Set(inboxSeen).size, 12);
+  const historySeen = [];
+  since = 0;
+  truncated = false;
+  for (let guard = 0; guard < 10; guard++) {
+    const page = unpack(await client.callTool({ name: 'relay_history', arguments: { since, limit: 100, from: 'byte-peer' } }));
+    assert.ok(page.byteSize <= 64 * 1024);
+    if (page.omitted) {
+      truncated = true;
+      assert.equal(page.nextCursor, page.messages.at(-1).cursor);
+      assert.equal(page.omitted.resumeCursor, page.messages.at(-1).cursor);
+      assert.equal(page.done, false);
+    } else if (!page.done) {
+      assert.equal(page.nextCursor, page.messages.at(-1).cursor);
+    }
+    assert.equal(page.done === true && page.omitted !== null, false);
+    for (const m of page.messages) historySeen.push(m.messageId);
+    if (page.done && !page.omitted) break;
+    since = page.omitted ? page.omitted.resumeCursor : page.nextCursor;
+  }
+  assert.ok(truncated);
+  assert.equal(historySeen.length, 12);
+  assert.equal(new Set(historySeen).size, 12);
+  for (let i = 1; i <= 12; i++)
+    assert.equal(unpack(await client.callTool({ name: 'relay_send', arguments: { to: 'byte-peer', body: `${big}-out-${i}` } })).ok, true);
+  const outboxSeen = [];
+  since = 0;
+  truncated = false;
+  for (let guard = 0; guard < 10; guard++) {
+    const page = unpack(await client.callTool({ name: 'relay_outbox', arguments: { since, limit: 100 } }));
+    assert.ok(page.byteSize <= 64 * 1024);
+    if (page.omitted) {
+      truncated = true;
+      assert.equal(page.nextCursor, page.messages.at(-1).cursor);
+      assert.equal(page.omitted.resumeCursor, page.messages.at(-1).cursor);
+      assert.equal(page.done, false);
+    } else if (!page.done) {
+      assert.equal(page.nextCursor, page.messages.at(-1).cursor);
+    }
+    assert.equal(page.done === true && page.omitted !== null, false);
+    for (const m of page.messages) {
+      assert.ok(Number.isSafeInteger(m.cursor));
+      outboxSeen.push(m.id);
+    }
+    if (page.done && !page.omitted) break;
+    since = page.omitted ? page.omitted.resumeCursor : page.nextCursor;
+  }
+  assert.ok(truncated);
+  assert.equal(outboxSeen.length, 12);
+  assert.equal(new Set(outboxSeen).size, 12);
+});
+
+test('unread forwards directly and matches broker acknowledgement state', async t => {
+  isolateEnv(t);
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-relay-mcp-unread-'));
+  const dataDir = path.join(root, 'data');
+  const project = path.join(root, 'project');
+  await Promise.all([dataDir, project].map(dir => fs.mkdir(dir)));
+  const broker = await createBroker({ dataDir });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  assert.equal((await brokerRpc(broker, project,
+    { op: 'register', agentId: 'unread-peer', runner: 'test', sessionId: 'peer' })).ok, true);
+  const [serverTransport, clientTransport] = InMemoryTransport.createLinkedPair();
+  const adapter = await createMcpAdapter({ project, runner: 'claude', sessionId: 'unread-me',
+    rpcImpl: async (target, fields) => brokerRpc(broker, target, fields),
+    waitImpl: async () => assert.fail('no watcher') });
+  const client = new Client({ name: 'unread', version: '1' });
+  await adapter.start(serverTransport);
+  await client.connect(clientTransport);
+  t.after(async () => { await adapter.close(); await client.close(); });
+  const me = adapter.agentId;
+  const first = await brokerRpc(broker, project,
+    { op: 'send', agentId: 'unread-peer', from: 'unread-peer', to: me, body: 'first' });
+  const second = await brokerRpc(broker, project,
+    { op: 'send', agentId: 'unread-peer', from: 'unread-peer', to: me, body: 'second' });
+  assert.equal(first.ok, true);
+  assert.equal(second.ok, true);
+  assert.equal(unpack(await client.callTool({ name: 'relay_ack', arguments: { messageId: first.messageId } })).ok, true);
+  const onlyUnread = unpack(await client.callTool({ name: 'relay_inbox', arguments: { unread: true, limit: 50 } }));
+  assert.deepEqual(onlyUnread.messages.map(m => m.messageId), [second.messageId]);
+  const withRead = unpack(await client.callTool({ name: 'relay_inbox', arguments: { unread: false, limit: 50 } }));
+  assert.equal(withRead.messages.length, 2);
+  assert.ok(withRead.messages.some(m => m.messageId === first.messageId));
+  assert.ok(withRead.messages.some(m => m.messageId === second.messageId));
+  const omitted = unpack(await client.callTool({ name: 'relay_inbox', arguments: { limit: 50 } }));
+  assert.deepEqual(omitted.messages.map(m => m.messageId), [second.messageId]);
+});
+
+test('512-recipient broadcast receipt stays bounded with full counts and continuation', async t => {
+  isolateEnv(t);
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-relay-mcp-receipt-'));
+  const dataDir = path.join(root, 'data');
+  const project = path.join(root, 'project');
+  await Promise.all([dataDir, project].map(dir => fs.mkdir(dir)));
+  const broker = await createBroker({ dataDir });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  const [serverTransport, clientTransport] = InMemoryTransport.createLinkedPair();
+  const adapter = await createMcpAdapter({ project, runner: 'claude', sessionId: 'receipt-me',
+    rpcImpl: async (target, fields) => brokerRpc(broker, target, fields),
+    waitImpl: async () => assert.fail('no watcher') });
+  const client = new Client({ name: 'receipt', version: '1' });
+  await adapter.start(serverTransport);
+  await client.connect(clientTransport);
+  t.after(async () => { await adapter.close(); await client.close(); });
+  const me = adapter.agentId;
+  for (let i = 0; i < 512; i++)
+    assert.equal((await brokerRpc(broker, project,
+      { op: 'register', agentId: `fanout-${i}`, runner: 'test', sessionId: `s-${i}` })).ok, true);
+  const sent = unpack(await client.callTool({ name: 'relay_send', arguments: { to: '*', body: 'broadcast', messageId: 'fanout-1' } }));
+  assert.equal(sent.ok, true);
+  const first = unpack(await client.callTool({ name: 'relay_receipt', arguments: { messageId: 'fanout-1' } }));
+  assert.equal(first.counts.recipients, 512);
+  assert.equal(first.recipientsTotal, 512);
+  assert.equal(first.recipients.length, 100);
+  assert.equal(first.recipientsOffset, 0);
+  assert.equal(first.nextRecipientsOffset, 100);
+  assert.equal(first.hasMoreRecipients, true);
+  assert.ok(Buffer.byteLength(JSON.stringify(first)) <= 64 * 1024);
+  const explicit = unpack(await client.callTool({ name: 'relay_receipt', arguments: { messageId: 'fanout-1', recipientsLimit: 10, recipientsOffset: 5 } }));
+  assert.equal(explicit.recipients.length, 10);
+  assert.equal(explicit.recipientsOffset, 5);
+  assert.equal(explicit.recipientsTotal, 512);
+  assert.equal(explicit.counts.recipients, 512);
+  const seen = [];
+  let offset = 0;
+  for (let guard = 0; guard < 10; guard++) {
+    const page = unpack(await client.callTool({ name: 'relay_receipt', arguments: { messageId: 'fanout-1', recipientsLimit: 100, recipientsOffset: offset } }));
+    assert.equal(page.counts.recipients, 512);
+    assert.equal(page.recipientsTotal, 512);
+    assert.ok(Buffer.byteLength(JSON.stringify(page)) <= 64 * 1024);
+    for (const r of page.recipients) seen.push(r.agentId);
+    if (!page.hasMoreRecipients) break;
+    offset = page.nextRecipientsOffset;
+  }
+  assert.equal(seen.length, 512);
+  assert.equal(new Set(seen).size, 512);
+});
+
+test('large agent listing is bounded with continuation', async t => {
+  isolateEnv(t);
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-relay-mcp-agents-'));
+  const dataDir = path.join(root, 'data');
+  const project = path.join(root, 'project');
+  await Promise.all([dataDir, project].map(dir => fs.mkdir(dir)));
+  const broker = await createBroker({ dataDir });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  const [serverTransport, clientTransport] = InMemoryTransport.createLinkedPair();
+  const adapter = await createMcpAdapter({ project, runner: 'claude', sessionId: 'agents-me',
+    rpcImpl: async (target, fields) => brokerRpc(broker, target, fields),
+    waitImpl: async () => assert.fail('no watcher') });
+  const client = new Client({ name: 'agents', version: '1' });
+  await adapter.start(serverTransport);
+  await client.connect(clientTransport);
+  t.after(async () => { await adapter.close(); await client.close(); });
+  for (let i = 0; i < 150; i++)
+    assert.equal((await brokerRpc(broker, project,
+      { op: 'register', agentId: `listed-${i}`, runner: 'test', sessionId: `s-${i}` })).ok, true);
+  const first = unpack(await client.callTool({ name: 'relay_agents', arguments: {} }));
+  assert.equal(first.total, 151);
+  assert.equal(first.agents.length, 100);
+  assert.equal(first.nextOffset, 100);
+  assert.equal(first.hasMore, true);
+  assert.ok(Buffer.byteLength(JSON.stringify(first)) <= 64 * 1024);
+  const rest = unpack(await client.callTool({ name: 'relay_agents', arguments: { offset: 100 } }));
+  assert.equal(rest.total, 151);
+  assert.equal(rest.agents.length, 51);
+  const explicit = unpack(await client.callTool({ name: 'relay_agents', arguments: { limit: 10 } }));
+  assert.equal(explicit.agents.length, 10);
+  assert.equal(explicit.total, 151);
+});
+
+test('channel close reports disconnected transport', async t => {
+  isolateEnv(t);
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-relay-mcp-close-'));
+  const dataDir = path.join(root, 'data');
+  const project = path.join(root, 'project');
+  await Promise.all([dataDir, project].map(dir => fs.mkdir(dir)));
+  const broker = await createBroker({ dataDir });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  const [serverTransport, clientTransport] = InMemoryTransport.createLinkedPair();
+  const adapter = await createMcpAdapter({ project, runner: 'claude', sessionId: 'close-me', channel: true,
+    rpcImpl: async (target, fields) => brokerRpc(broker, target, fields),
+    waitImpl: async (target, agentId, after, { signal }) => new Promise((resolve, reject) => {
+      if (signal.aborted) return reject(new Error('aborted'));
+      signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+    }) });
+  const client = new Client({ name: 'close', version: '1' });
+  await adapter.start(serverTransport);
+  await client.connect(clientTransport);
+  const me = adapter.agentId;
+  let connected = null;
+  for (let i = 0; i < 50; i++) {
+    const agents = await brokerRpc(broker, project, { op: 'agents', transport: 'connected' });
+    if (agents.agents.some(a => a.agentId === me)) { connected = agents; break; }
+    await new Promise(r => setTimeout(r, 20));
+  }
+  assert.ok(connected);
+  await adapter.close();
+  await client.close();
+  const disconnected = await brokerRpc(broker, project, { op: 'agents', transport: 'disconnected' });
+  assert.ok(disconnected.agents.some(a => a.agentId === me));
+  const stillConnected = await brokerRpc(broker, project, { op: 'agents', transport: 'connected' });
+  assert.ok(!stillConnected.agents.some(a => a.agentId === me));
+});
+
+test('transient transport report failure does not disable later reports', async t => {
+  isolateEnv(t);
+  const calls = [];
+  let transportCalls = 0;
+  const rpcImpl = async (project, fields) => {
+    calls.push(fields);
+    if (fields.op === 'register' || fields.op === 'agents') return { ok: true, agents: [], counts: {} };
+    if (fields.op === 'status' && fields.transport) {
+      transportCalls++;
+      if (transportCalls === 1) {
+        const error = new Error('ECONNREFUSED');
+        error.code = 'ECONNREFUSED';
+        throw error;
+      }
+      return { ok: true, agent: { agentId: 'x' }, claims: [] };
+    }
+    return { ok: true, ...fields };
+  };
+  let waits = 0;
+  const waitImpl = async () => {
+    waits++;
+    if (waits === 1) throw new Error('ECONNREFUSED');
+    return { ok: true, cursor: 0, messages: [] };
+  };
+  const [serverTransport, clientTransport] = InMemoryTransport.createLinkedPair();
+  const errors = [];
+  const adapter = await createMcpAdapter({ project: '/fixture/project', runner: 'claude', sessionId: 'transient-me',
+    channel: true, rpcImpl, waitImpl, onError: m => errors.push(m) });
+  const client = new Client({ name: 'transient', version: '1' });
+  await adapter.start(serverTransport);
+  await client.connect(clientTransport);
+  t.after(async () => { await adapter.close(); await client.close(); });
+  for (let i = 0; i < 50; i++) {
+    if (calls.filter(c => c.op === 'status' && c.transport?.state === 'connected').length >= 2) break;
+    await new Promise(r => setTimeout(r, 20));
+  }
+  const connectedReports = calls.filter(c => c.op === 'status' && c.transport?.state === 'connected');
+  const disconnectedReports = calls.filter(c => c.op === 'status' && c.transport?.state === 'disconnected');
+  assert.ok(disconnectedReports.length >= 1);
+  assert.ok(connectedReports.length >= 2);
+  assert.ok(calls.some(c => c.op === 'status' && c.transport?.state === 'disconnected'));
 });

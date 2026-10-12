@@ -85,10 +85,19 @@ sentinel requires manual inspection instead of automatic removal. Close/startup 
 removes only its own nonce-bearing lease. PID reuse conservatively rejects takeover.
 Startup discovery locking alone does not supply this writer guarantee.
 
-Bounds: 128 KiB HTTP JSON, 16 KiB message body, 128-byte IDs, 256 rooms, 256 agents per room,
-64 resources per input, 4096 claims per room, 1024 transport notices per message, 10000 total
-messages and 64 MiB history. There is no history eviction: reaching a bound fails visibly
-instead of discarding unacked work. The broker has no shell execution or tool dispatcher.
+Bounds: 128 KiB HTTP JSON, 16 KiB message body, 128-byte IDs, 256 rooms, 4096 active
+agents per room with 8192 retained identities per room, 64 resources per input, 4096
+claims per room, a derived transport-notice allowance of max(1024, 3 per recipient)
+per message, 10000 total messages and 64 MiB history. There is no history eviction:
+reaching a bound fails visibly instead of discarding unacked work. The broker has no
+shell execution or tool dispatcher.
+
+`leave` marks an identity departed but retained; a departed (non-retired) identity
+may re-register while active capacity allows. `retire` additionally marks the
+identity retired: it stays resolvable for history but can never register again.
+Both keep their slot in the retained count, so retirement does not free retained
+capacity; a full retained registry requires a fresh ledger with a deliberate
+handover.
 
 Persistence means retries do not create a second relay message and restart does not invent
 an ack or free ownership. It does **not** make an agent's external effects exactly once:
@@ -116,3 +125,11 @@ The gate is a CLI preflight using read-only measurements, not a broker lock or a
 New feature tests use an injected HTTP server to exercise real handler validation, serial transactions, disk persistence and restart without TCP. Existing loopback tests remain unchanged. `node scripts/smoke-improvements.mjs` (source repository only; see above) runs the actual CLI with temporary projects, private storage and ephemeral ports; it also tests watch recovery and SIGTERM. It never uses the globally installed command or default storage.
 
 The updated client checks a read-only `capabilities` RPC before submitting extended fields. An older running broker fails that check with a restart-required error; it must not silently drop summaries/attachments or interpret machine claims as project claims. Existing command fields still work without that check. Upgrade the broker before using new options. Older code is not safe for coordinating machine claims after a downgrade.
+
+Version identity: the relay package version is separate from the broker protocol
+version (`GET /health` reports `version:1`) and the store schema version.
+`agent-relay version --detail` reports the local package version, schema,
+Node/CLI paths, and the live broker's protocol version when one answers; it
+cannot identify the build of an already running broker. The Codex bridge's
+`initialize` clientInfo (`agent-relay/0.1.0`) is Codex-protocol metadata that
+must stay stable for protocol matching; it is not the relay package version.

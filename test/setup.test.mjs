@@ -53,3 +53,83 @@ test('diagnose reports binding health and detects a moved installation',async t=
  assert.ok(refreshed.diagnosis.bindings.every(b=>b.ok===true));
  assert.deepEqual((await refreshSetup(dir)).changed,[]);
 });
+test('diagnose selects exact relay table despite neighboring servers',async t=>{
+ const {diagnoseSetup}=await import('../lib/setup.mjs');
+ const valid=process.execPath;
+ async function binding(toml){
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'relay-exact-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+  await fs.mkdir(path.join(dir,'.codex'),{recursive:true});
+  await fs.writeFile(path.join(dir,'.codex/config.toml'),toml);
+  return (await diagnoseSetup(dir)).bindings.find(b=>b.runner==='codex');
+ }
+ const relayOnly=`[mcp_servers.agent-relay]\ncommand = ${JSON.stringify(valid)}\nargs = [${JSON.stringify(valid)}]\n`;
+ const otherInvalid=`[mcp_servers.other]\ncommand = "/definitely/missing/other"\nargs = ["/missing/other"]\n`;
+ assert.equal((await binding(otherInvalid+relayOnly)).ok,true);
+ assert.equal((await binding(relayOnly+otherInvalid)).ok,true);
+ const relayInvalid=`[mcp_servers.agent-relay]\ncommand = "/definitely/missing/relay"\nargs = ["/missing/relay"]\n`;
+ const otherValid=`[mcp_servers.other]\ncommand = ${JSON.stringify(valid)}\nargs = [${JSON.stringify(valid)}]\n`;
+ const blamedFirst=await binding(otherValid+relayInvalid);
+ assert.equal(blamedFirst.ok,false);
+ assert.match(blamedFirst.detail,/missing\/relay/);
+ const blamedLater=await binding(relayInvalid+otherValid);
+ assert.equal(blamedLater.ok,false);
+ assert.match(blamedLater.detail,/missing\/relay/);
+});
+test('diagnose handles quoted tables inline config and multiline args',async t=>{
+ const {diagnoseSetup}=await import('../lib/setup.mjs');
+ const valid=process.execPath;
+ async function binding(toml){
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'relay-forms-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+  await fs.mkdir(path.join(dir,'.codex'),{recursive:true});
+  await fs.writeFile(path.join(dir,'.codex/config.toml'),toml);
+  return (await diagnoseSetup(dir)).bindings.find(b=>b.runner==='codex');
+ }
+ for(const header of ['[mcp_servers.agent-relay]','[mcp_servers."agent-relay"]',"[mcp_servers.'agent-relay']"]){
+  const toml=`${header}\ncommand = ${JSON.stringify(valid)}\nargs = [${JSON.stringify(valid)}]\n`;
+  assert.equal((await binding(toml)).ok,true,header);
+ }
+ const inline=`[mcp_servers]\nagent-relay = {command = ${JSON.stringify(valid)}, args = [${JSON.stringify(valid)}]}\n`;
+ assert.equal((await binding(inline)).ok,true);
+ const inlineOther=`[mcp_servers]\nother = {command = "/definitely/missing/other", args = ["/missing/other"]}\nagent-relay = {command = ${JSON.stringify(valid)}, args = [${JSON.stringify(valid)}]}\n`;
+ assert.equal((await binding(inlineOther)).ok,true);
+ const inlineBlamed=`[mcp_servers]\nother = {command = ${JSON.stringify(valid)}, args = [${JSON.stringify(valid)}]}\nagent-relay = {command = "/definitely/missing/relay", args = ["/missing/relay"]}\n`;
+ const badInline=await binding(inlineBlamed);
+ assert.equal(badInline.ok,false);
+ assert.match(badInline.detail,/missing\/relay/);
+ const multiline=`[mcp_servers.other]\ncommand = "/definitely/missing/other"\nargs = ["/missing/other"]\n[mcp_servers.agent-relay]\ncommand = ${JSON.stringify(valid)}\nargs = [\n ${JSON.stringify(valid)},\n "--extra"\n]\n`;
+ assert.equal((await binding(multiline)).ok,true);
+ const multilineLater=`[mcp_servers.agent-relay]\ncommand = ${JSON.stringify(valid)}\nargs = [\n ${JSON.stringify(valid)},\n "--extra"\n]\n[mcp_servers.other]\ncommand = "/definitely/missing/other"\nargs = ["/missing/other"]\n`;
+ assert.equal((await binding(multilineLater)).ok,true);
+});
+test('diagnose decodes TOML escapes in relay table',async t=>{
+ const {diagnoseSetup}=await import('../lib/setup.mjs');
+ const valid=process.execPath;
+ async function binding(toml){
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'relay-escapes-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+  await fs.mkdir(path.join(dir,'.codex'),{recursive:true});
+  await fs.writeFile(path.join(dir,'.codex/config.toml'),toml);
+  return (await diagnoseSetup(dir)).bindings.find(b=>b.runner==='codex');
+ }
+ const winPath='C:\\Tools\\cli';
+ const escaped=`[mcp_servers.agent-relay]\ncommand = ${JSON.stringify(winPath)}\nargs = [${JSON.stringify(valid)}]\n`;
+ const decoded=await binding(escaped);
+ assert.equal(decoded.ok,false);
+ assert.equal(decoded.detail,'command not found: '+winPath);
+ const quotePath='a"b';
+ const quoted=`[mcp_servers.agent-relay]\ncommand = ${JSON.stringify(quotePath)}\nargs = [${JSON.stringify(valid)}]\n`;
+ const quoteResult=await binding(quoted);
+ assert.equal(quoteResult.ok,false);
+ assert.equal(quoteResult.detail,'command not found: '+quotePath);
+ const uni=`[mcp_servers.agent-relay]\ncommand = "\\u0041"\nargs = [${JSON.stringify(valid)}]\n`;
+ const uniResult=await binding(uni);
+ assert.equal(uniResult.ok,false);
+ assert.equal(uniResult.detail,'command not found: A');
+ const tab=`[mcp_servers.agent-relay]\ncommand = "a\\tb"\nargs = [${JSON.stringify(valid)}]\n`;
+ const tabResult=await binding(tab);
+ assert.equal(tabResult.ok,false);
+ assert.equal(tabResult.detail,'command not found: a\tb');
+ const newline=`[mcp_servers.agent-relay]\ncommand = "a\\nb"\nargs = [${JSON.stringify(valid)}]\n`;
+ const newlineResult=await binding(newline);
+ assert.equal(newlineResult.ok,false);
+ assert.equal(newlineResult.detail,'command not found: a\nb');
+});

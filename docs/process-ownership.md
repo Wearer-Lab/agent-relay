@@ -62,9 +62,12 @@ Structured, owner-reported process and watcher records live in the relay:
 register one with `agent-relay processes --register --pid N --as ID
 [--command C] [--cwd D] [--port P] [--deployment D] [--note N]`, list them
 with `agent-relay processes [--owner ID]`, and remove a finished record with
-`agent-relay processes --remove [--id ID] [--pid N]`. Listing verifies liveness
-read-only and shows each record's owner, so you know whom to contact before a
-shared restart. A process record is coordination information only — it never
+`agent-relay processes --remove [--id ID] [--pid N]`. Listing checks liveness
+with `process.kill(pid, 0)` — an existence probe that delivers no signal — and
+shows each record's owner, so you know whom to contact before a
+shared restart. The check is not side-effect free: when more than a second has
+elapsed since a record's `lastVerifiedAt`, listing persists a refreshed timestamp
+to the relay ledger. A process record is coordination information only — it never
 authorizes another agent to kill the process, and deleting a record does not
 stop the process. PID-reuse protection is best-effort: `startedAt` records
 registration time, not the kernel process start, so always confirm identity with
