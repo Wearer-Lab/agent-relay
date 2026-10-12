@@ -6,7 +6,7 @@ import path from 'node:path';
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { createHash } from 'node:crypto';
-import { createBroker, validateStore, verifyAttachmentReferences, MAX_AGENTS_PER_PROJECT, MAX_RETAINED_AGENTS, MAX_PROCESSES, MAX_ROOMS, noticeAllowance } from '../lib/broker.mjs';
+import { createBroker, validateStore, verifyAttachmentReferences, offlineRestore, MAX_STORE, MAX_AGENTS_PER_PROJECT, MAX_RETAINED_AGENTS, MAX_PROCESSES, MAX_ROOMS, noticeAllowance } from '../lib/broker.mjs';
 const runNode = promisify(execFile);
 
 async function fixture(t) {
@@ -560,7 +560,7 @@ test('outbox and receipt derive per-recipient delivery ladder states from transp
   const outbox = await f.rpc({ op: 'outbox', from: 'a' });
   assert.equal(outbox.nextCursor, sent.cursor);
   assert.equal(outbox.done, true);
-  assert.deepEqual(Object.keys(outbox.messages[0]).sort(), ['body', 'counts', 'cursor', 'followups', 'from', 'id', 'recipients', 'summary', 'to', 'ts']);
+  assert.deepEqual(Object.keys(outbox.messages[0]).sort(), ['body', 'counts', 'cursor', 'followups', 'from', 'id', 'pending', 'pendingTotal', 'recipients', 'recipientsTotal', 'summary', 'to', 'ts']);
   assert.equal(outbox.messages[0].summary, 'ladder');
   assert.equal(outbox.messages[0].cursor, sent.cursor);
   assert.deepEqual(outbox.messages[0].recipients, [{ agentId: 'b', stored: true, notified: [], accepted: [], missing: [], acked: false, state: 'stored', cursor: sent.cursor }]);
@@ -1786,4 +1786,583 @@ test('test-marked registrations are durably retained and filterable', async t =>
   assert.equal((await f.request({ op: 'register', agentId: 'bad', runner: 'test', test: 'yes' })).error.code, 'INVALID_INPUT');
   await f.restart();
   assert.deepEqual((await f.rpc({ op: 'agents', test: true })).agents.map(a => a.agentId), ['smoke']);
+});
+test('offline restore refuses live lease without using discovery', async t => {
+  const f = await fixture(t);
+  await f.register('a');
+  const before = await fs.readFile(path.join(f.dataDir, 'state.json'), 'utf8');
+  try {
+    await fs.stat(path.join(f.dataDir, 'broker.json'));
+    assert.fail('discovery should be absent');
+  } catch (error) {
+    assert.equal(error.code, 'ENOENT');
+  }
+  await assert.rejects(offlineRestore(f.dataDir, { version: 1, nextCursor: 1, rooms: [] }), /live broker|Another live/u);
+  assert.equal(await fs.readFile(path.join(f.dataDir, 'state.json'), 'utf8'), before);
+  assert.deepEqual((await fs.readdir(f.dataDir)).filter(name => name.startsWith('state.backup-')), []);
+  assert.deepEqual((await fs.readdir(f.dataDir)).filter(name => name.endsWith('.tmp')), []);
+});
+test('offline restore still refuses live lease when discovery is missing or corrupt', async t => {
+  const f = await fixture(t);
+  await f.register('a');
+  const before = await fs.readFile(path.join(f.dataDir, 'state.json'), 'utf8');
+  await fs.writeFile(path.join(f.dataDir, 'broker.json'), JSON.stringify({ pid: 1, url: 'http://127.0.0.1:1', token: 'bad' }));
+  await assert.rejects(offlineRestore(f.dataDir, { version: 1, nextCursor: 1, rooms: [] }), /live broker|Another live/u);
+  assert.equal(await fs.readFile(path.join(f.dataDir, 'state.json'), 'utf8'), before);
+  await fs.unlink(path.join(f.dataDir, 'broker.json'));
+  await assert.rejects(offlineRestore(f.dataDir, { version: 1, nextCursor: 1, rooms: [] }), /live broker|Another live/u);
+  assert.equal(await fs.readFile(path.join(f.dataDir, 'state.json'), 'utf8'), before);
+  assert.deepEqual((await fs.readdir(f.dataDir)).filter(name => name.startsWith('state.backup-')), []);
+});
+test('offline restore refuses ambiguous recovery sentinel and corrupt lock', async t => {
+  const f = await fixture(t);
+  await f.register('a');
+  await f.broker.close();
+  const before = await fs.readFile(path.join(f.dataDir, 'state.json'), 'utf8');
+  const sentinel = path.join(f.dataDir, 'writer-recovery.lock');
+  await fs.writeFile(sentinel, 'ambiguous recovery owner');
+  await assert.rejects(offlineRestore(f.dataDir, { version: 1, nextCursor: 1, rooms: [] }), /recovery/u);
+  assert.equal(await fs.readFile(path.join(f.dataDir, 'state.json'), 'utf8'), before);
+  assert.equal(await fs.readFile(sentinel, 'utf8'), 'ambiguous recovery owner');
+  await fs.unlink(sentinel);
+  const lock = path.join(f.dataDir, 'writer.lock');
+  await fs.unlink(lock).catch(() => {});
+  await fs.writeFile(lock, 'not-json');
+  await assert.rejects(offlineRestore(f.dataDir, { version: 1, nextCursor: 1, rooms: [] }), /corrupt|ownership is unknown/u);
+  assert.equal(await fs.readFile(path.join(f.dataDir, 'state.json'), 'utf8'), before);
+  assert.equal(await fs.readFile(lock, 'utf8'), 'not-json');
+  await fs.unlink(lock);
+  const unknown = '{"version":1,"pid":"unknown","nonce":"x"}';
+  await fs.writeFile(lock, unknown);
+  await assert.rejects(offlineRestore(f.dataDir, { version: 1, nextCursor: 1, rooms: [] }), /ownership is unknown|corrupt/u);
+  assert.equal(await fs.readFile(path.join(f.dataDir, 'state.json'), 'utf8'), before);
+  assert.deepEqual((await fs.readdir(f.dataDir)).filter(name => name.startsWith('state.backup-')), []);
+});
+test('offline restore holds exclusive lease so concurrent startup fails', async t => {
+  const f = await fixture(t);
+  await f.register('a');
+  await f.broker.close();
+  const incoming = { version: 1, nextCursor: 1, rooms: [] };
+  const delayFs = { ...fs, readFile: async (...args) => {
+    if (String(args[0]).endsWith('state.json')) await new Promise(resolve => setTimeout(resolve, 200));
+    return fs.readFile(...args);
+  } };
+  const pending = offlineRestore(f.dataDir, incoming, { fs: delayFs });
+  await new Promise(resolve => setTimeout(resolve, 50));
+  await assert.rejects(createBroker({ dataDir: f.dataDir }), /live broker|Another live|already owns/u);
+  const result = await pending;
+  assert.equal(result.restored, true);
+  assert.match(result.backup, /^state\.backup-\d+\.json$/u);
+  await f.restart();
+  assert.equal((await f.rpc({ op: 'agents' })).cursor, 0);
+});
+test('offline restore accepts state just below 64 MiB', async t => {
+  const f = await fixture(t);
+  await f.broker.close();
+  const real = await fs.realpath(f.project);
+  const ts = new Date().toISOString();
+  const agent = id => ({ agentId: id, runner: 'test', registeredAt: ts, updatedAt: ts, status: 'idle', frozen: false, resources: [], task: null });
+  const base = { version: 1, nextCursor: 1, rooms: [{ project: real, agents: [agent('a'), agent('b')], messages: [], claims: [], cursor: 0 }] };
+  const baseBytes = Buffer.byteLength(JSON.stringify(base));
+  const n = (MAX_STORE - 1) - baseBytes - 9;
+  const incoming = { ...base, pad: 'x'.repeat(n) };
+  assert.equal(Buffer.byteLength(JSON.stringify(incoming)), MAX_STORE - 1);
+  const before = await fs.readFile(path.join(f.dataDir, 'state.json'), 'utf8');
+  const result = await offlineRestore(f.dataDir, incoming);
+  assert.equal(result.restored, true);
+  assert.equal(result.bytes, MAX_STORE - 1);
+  assert.equal(result.rooms, 1);
+  assert.equal(result.messages, 0);
+  assert.match(result.backup, /^state\.backup-\d+\.json$/u);
+  assert.equal(Buffer.byteLength(await fs.readFile(path.join(f.dataDir, 'state.json'), 'utf8')), MAX_STORE - 1);
+  assert.equal(await fs.readFile(path.join(f.dataDir, result.backup), 'utf8'), before);
+  assert.equal((await fs.stat(path.join(f.dataDir, result.backup))).mode & 0o777, 0o600);
+});
+test('offline restore accepts state exactly at 64 MiB', async t => {
+  const f = await fixture(t);
+  await f.broker.close();
+  const real = await fs.realpath(f.project);
+  const ts = new Date().toISOString();
+  const agent = id => ({ agentId: id, runner: 'test', registeredAt: ts, updatedAt: ts, status: 'idle', frozen: false, resources: [], task: null });
+  const base = { version: 1, nextCursor: 1, rooms: [{ project: real, agents: [agent('a'), agent('b')], messages: [], claims: [], cursor: 0 }] };
+  const baseBytes = Buffer.byteLength(JSON.stringify(base));
+  const n = MAX_STORE - baseBytes - 9;
+  const incoming = { ...base, pad: 'x'.repeat(n) };
+  assert.equal(Buffer.byteLength(JSON.stringify(incoming)), MAX_STORE);
+  const result = await offlineRestore(f.dataDir, incoming);
+  assert.equal(result.restored, true);
+  assert.equal(result.bytes, MAX_STORE);
+  assert.equal(Buffer.byteLength(await fs.readFile(path.join(f.dataDir, 'state.json'), 'utf8')), MAX_STORE);
+});
+test('offline restore refuses state just above 64 MiB without writing', async t => {
+  const f = await fixture(t);
+  await f.broker.close();
+  const real = await fs.realpath(f.project);
+  const ts = new Date().toISOString();
+  const agent = id => ({ agentId: id, runner: 'test', registeredAt: ts, updatedAt: ts, status: 'idle', frozen: false, resources: [], task: null });
+  const base = { version: 1, nextCursor: 1, rooms: [{ project: real, agents: [agent('a'), agent('b')], messages: [], claims: [], cursor: 0 }] };
+  const baseBytes = Buffer.byteLength(JSON.stringify(base));
+  const n = (MAX_STORE + 1) - baseBytes - 9;
+  const incoming = { ...base, pad: 'x'.repeat(n) };
+  assert.equal(Buffer.byteLength(JSON.stringify(incoming)), MAX_STORE + 1);
+  const before = await fs.readFile(path.join(f.dataDir, 'state.json'), 'utf8');
+  const listedBefore = await fs.readdir(f.dataDir);
+  await assert.rejects(offlineRestore(f.dataDir, incoming), error => error.code === 'STORE_LIMIT' && error.details.bytes === MAX_STORE + 1 && error.details.limit === MAX_STORE);
+  assert.equal(await fs.readFile(path.join(f.dataDir, 'state.json'), 'utf8'), before);
+  assert.deepEqual(await fs.readdir(f.dataDir), listedBefore);
+});
+test('offline restore round-trips medium state and reopens', async t => {
+  const f = await fixture(t);
+  await f.register('a');
+  await f.register('b');
+  for (let i = 0; i < 24; i++) await f.rpc({ op: 'send', from: i % 2 ? 'b' : 'a', to: i % 2 ? 'a' : 'b', body: 'medium-' + i + '-' + 'x'.repeat(8000), messageId: 'm-' + i });
+  const exported = await f.rpc({ op: 'export' });
+  const bytes = Buffer.byteLength(JSON.stringify(exported.state));
+  assert.ok(bytes > 100000 && bytes < MAX_STORE);
+  await f.broker.close();
+  const before = await fs.readFile(path.join(f.dataDir, 'state.json'), 'utf8');
+  const result = await offlineRestore(f.dataDir, exported.state);
+  assert.equal(result.restored, true);
+  assert.equal(result.rooms, 1);
+  assert.equal(result.messages, 24);
+  assert.equal(result.bytes, bytes);
+  assert.deepEqual(result.missingAttachments, []);
+  assert.deepEqual(result.corruptAttachments, []);
+  assert.match(result.backup, /^state\.backup-\d+\.json$/u);
+  assert.equal(await fs.readFile(path.join(f.dataDir, result.backup), 'utf8'), before);
+  await f.restart();
+  assert.equal((await f.rpc({ op: 'inbox', agentId: 'b' })).messages.length, 12);
+  assert.equal((await f.rpc({ op: 'usage' })).messages.used, 24);
+});
+test('offline restore fsyncs backup state and directory', async t => {
+  const f = await fixture(t);
+  await f.register('a');
+  await f.broker.close();
+  const incoming = { version: 1, nextCursor: 1, rooms: [] };
+  let syncs = 0;
+  const counting = { ...fs, open: async (...args) => {
+    const handle = await fs.open(...args);
+    const original = handle.sync.bind(handle);
+    handle.sync = async (...rest) => {
+      syncs++;
+      return original(...rest);
+    };
+    return handle;
+  } };
+  const result = await offlineRestore(f.dataDir, incoming, { fs: counting });
+  assert.equal(result.restored, true);
+  assert.ok(syncs >= 3);
+});
+test('offline restore validates input shapes without writing', async t => {
+  const f = await fixture(t);
+  await f.register('a');
+  await f.broker.close();
+  const before = await fs.readFile(path.join(f.dataDir, 'state.json'), 'utf8');
+  const listedBefore = await fs.readdir(f.dataDir);
+  await assert.rejects(offlineRestore(f.dataDir, null), error => error.code === 'INVALID_INPUT');
+  await assert.rejects(offlineRestore(f.dataDir, []), error => error.code === 'INVALID_INPUT');
+  await assert.rejects(offlineRestore(f.dataDir, 'x'), error => error.code === 'INVALID_INPUT');
+  await assert.rejects(offlineRestore(f.dataDir, { version: 999, rooms: [] }), error => error.code === 'INVALID_RESTORE');
+  await assert.rejects(offlineRestore(f.dataDir, { version: 1, nextCursor: 1 }), error => error.code === 'INVALID_RESTORE');
+  assert.equal(await fs.readFile(path.join(f.dataDir, 'state.json'), 'utf8'), before);
+  assert.deepEqual(await fs.readdir(f.dataDir), listedBefore);
+});
+test('offline restore refuses missing corrupt attachments without writing unless allowed', async t => {
+  const f = await fixture(t);
+  await f.register('a');
+  await f.register('b');
+  const source = path.join(f.root, 'packet');
+  await fs.writeFile(source, 'packet bytes');
+  await f.rpc({ op: 'send', agentId: 'a', from: 'a', to: 'b', body: 'with file', messageId: 'att1', attachments: [source] });
+  const exported = await f.rpc({ op: 'export' });
+  const sha = (await f.rpc({ op: 'inbox', agentId: 'b' })).messages[0].attachments[0].sha256;
+  await fs.unlink(path.join(f.dataDir, 'attachments', sha));
+  await f.broker.close();
+  const before = await fs.readFile(path.join(f.dataDir, 'state.json'), 'utf8');
+  await assert.rejects(offlineRestore(f.dataDir, exported.state), error => error.code === 'INCOMPLETE_ATTACHMENTS' && error.details.missingAttachments.length === 1 && error.details.missingAttachments[0].sha256 === sha);
+  assert.equal(await fs.readFile(path.join(f.dataDir, 'state.json'), 'utf8'), before);
+  const allowed = await offlineRestore(f.dataDir, exported.state, { allowIncomplete: true });
+  assert.equal(allowed.restored, true);
+  assert.equal(allowed.missingAttachments.length, 1);
+  assert.deepEqual(allowed.corruptAttachments, []);
+  assert.equal(allowed.missingAttachments[0].sha256, sha);
+});
+test('offline restore refuses corrupt attachments without writing unless allowed', async t => {
+  const f = await fixture(t);
+  await f.register('a');
+  await f.register('b');
+  const source = path.join(f.root, 'original');
+  await fs.writeFile(source, 'original content bytes');
+  await f.rpc({ op: 'send', agentId: 'a', from: 'a', to: 'b', body: 'with attachment', messageId: 'attached', attachments: [source] });
+  const exported = await f.rpc({ op: 'export' });
+  const meta = (await f.rpc({ op: 'inbox', agentId: 'b' })).messages[0].attachments[0];
+  const stored = path.join(f.dataDir, 'attachments', meta.sha256);
+  const original = await fs.readFile(stored);
+  const corrupt = Buffer.from(original);
+  corrupt[0] ^= 1;
+  await fs.writeFile(stored, corrupt);
+  await f.broker.close();
+  const before = await fs.readFile(path.join(f.dataDir, 'state.json'), 'utf8');
+  await assert.rejects(offlineRestore(f.dataDir, exported.state), error => error.code === 'INCOMPLETE_ATTACHMENTS' && error.details.corruptAttachments.length === 1 && error.details.corruptAttachments[0].reason === 'hash-mismatch');
+  assert.equal(await fs.readFile(path.join(f.dataDir, 'state.json'), 'utf8'), before);
+  const allowed = await offlineRestore(f.dataDir, exported.state, { allowIncomplete: true });
+  assert.equal(allowed.restored, true);
+  assert.equal(allowed.corruptAttachments.length, 1);
+  assert.equal(allowed.corruptAttachments[0].reason, 'hash-mismatch');
+});
+test('offline restore refuses symlinked state without writing', async t => {
+  const f = await fixture(t);
+  await f.register('a');
+  await f.broker.close();
+  const stateFile = path.join(f.dataDir, 'state.json');
+  const before = await fs.readFile(stateFile, 'utf8');
+  const target = path.join(f.dataDir, 'real-state.json');
+  await fs.rename(stateFile, target);
+  await fs.symlink(target, stateFile);
+  const listedBefore = await fs.readdir(f.dataDir);
+  await assert.rejects(offlineRestore(f.dataDir, { version: 1, nextCursor: 1, rooms: [] }), error => error.code === 'SYMLINK_STATE');
+  assert.equal((await fs.lstat(stateFile)).isSymbolicLink(), true);
+  assert.equal(await fs.readFile(target, 'utf8'), before);
+  assert.deepEqual((await fs.readdir(f.dataDir)).filter(name => name.startsWith('state.backup-')), []);
+  await fs.unlink(stateFile);
+  await fs.rename(target, stateFile);
+});
+test('offline restore backs up prior state with private mode and returns shape', async t => {
+  const f = await fixture(t);
+  await f.register('a');
+  await f.register('b');
+  await f.rpc({ op: 'send', from: 'a', to: 'b', body: 'hello', messageId: 'm1' });
+  await f.broker.close();
+  const before = await fs.readFile(path.join(f.dataDir, 'state.json'), 'utf8');
+  const incoming = { version: 1, nextCursor: 1, rooms: [] };
+  const result = await offlineRestore(f.dataDir, incoming);
+  assert.deepEqual(Object.keys(result).sort(), ['backup', 'bytes', 'corruptAttachments', 'messages', 'missingAttachments', 'restored', 'rooms']);
+  assert.equal(result.restored, true);
+  assert.equal(result.rooms, 0);
+  assert.equal(result.messages, 0);
+  assert.deepEqual(result.missingAttachments, []);
+  assert.deepEqual(result.corruptAttachments, []);
+  assert.equal(result.bytes, Buffer.byteLength(JSON.stringify(incoming)));
+  assert.match(result.backup, /^state\.backup-\d+\.json$/u);
+  assert.equal(await fs.readFile(path.join(f.dataDir, result.backup), 'utf8'), before);
+  assert.equal((await fs.stat(path.join(f.dataDir, result.backup))).mode & 0o777, 0o600);
+  assert.equal((await fs.stat(path.join(f.dataDir, 'state.json'))).mode & 0o777, 0o600);
+  assert.deepEqual((await fs.readdir(f.dataDir)).filter(name => name.endsWith('.tmp')), []);
+  await f.restart();
+  assert.deepEqual((await f.rpc({ op: 'history' })).messages, []);
+});
+test('offline restore with no prior state returns null backup', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-relay-offline-fresh-'));
+  t.after(async () => {
+    await fs.rm(root, { recursive: true, force: true });
+  });
+  const dataDir = path.join(root, 'data');
+  await fs.mkdir(dataDir);
+  const incoming = { version: 1, nextCursor: 1, rooms: [] };
+  const result = await offlineRestore(dataDir, incoming);
+  assert.equal(result.restored, true);
+  assert.equal(result.backup, null);
+  assert.equal(result.bytes, Buffer.byteLength(JSON.stringify(incoming)));
+  assert.equal(await fs.readFile(path.join(dataDir, 'state.json'), 'utf8'), JSON.stringify(incoming));
+  const broker = await createBroker({ dataDir });
+  t.after(async () => {
+    await broker.close();
+  });
+  assert.equal((await fs.readFile(path.join(dataDir, 'state.json'), 'utf8')), JSON.stringify(incoming));
+  await broker.close();
+});
+test('offline restore leaves new state on post-rename durability failure without reverting', async t => {
+  const f = await fixture(t);
+  await f.broker.close();
+  const real = await fs.realpath(f.project);
+  const ts = new Date().toISOString();
+  const incoming = { version: 1, nextCursor: 1, rooms: [{ project: real, agents: [{ agentId: 'a', runner: 'test', registeredAt: ts, updatedAt: ts, status: 'idle', frozen: false, resources: [], task: null }], messages: [], claims: [], cursor: 0 }] };
+  const before = await fs.readFile(path.join(f.dataDir, 'state.json'), 'utf8');
+  let dirSyncs = 0;
+  const failing = { ...fs, open: async (...args) => {
+    const handle = await fs.open(...args);
+    if (args[1] === 'r') {
+      const original = handle.sync.bind(handle);
+      handle.sync = async () => {
+        dirSyncs++;
+        if (dirSyncs === 2) {
+          const failure = new Error('injected durability failure');
+          failure.code = 'EIO';
+          throw failure;
+        }
+        return original();
+      };
+    }
+    return handle;
+  } };
+  await assert.rejects(offlineRestore(f.dataDir, incoming, { fs: failing }), error => error.code === 'EIO');
+  assert.equal(await fs.readFile(path.join(f.dataDir, 'state.json'), 'utf8'), JSON.stringify(incoming));
+  assert.equal((await fs.readdir(f.dataDir)).filter(name => name.startsWith('state.backup-')).length, 1);
+  const backupName = (await fs.readdir(f.dataDir)).find(name => name.startsWith('state.backup-'));
+  assert.equal(await fs.readFile(path.join(f.dataDir, backupName), 'utf8'), before);
+});
+test('receipt pages pending with limit and offset while keeping full counts', async t => {
+  const f = await fixture(t);
+  await f.register('a');
+  for (let i = 0; i < 30; i++) await f.register('r-' + i);
+  await f.rpc({ op: 'send', from: 'a', to: '*', body: 'fan', messageId: 'fan' });
+  const full = await f.rpc({ op: 'receipt', messageId: 'fan' });
+  assert.equal(full.recipientsTotal, 30);
+  assert.equal(full.pendingTotal, 30);
+  assert.equal(full.pendingLimit, 25);
+  assert.equal(full.pendingOffset, 0);
+  assert.equal(full.pending.length, 25);
+  assert.deepEqual(full.counts, { recipients: 30, acked: 0, accepted: 0, notified: 0, pending: 30, missing: 0 });
+  const second = await f.rpc({ op: 'receipt', messageId: 'fan', pendingLimit: 10, pendingOffset: 25 });
+  assert.equal(second.pending.length, 5);
+  assert.equal(second.pendingTotal, 30);
+  assert.equal(second.pendingLimit, 10);
+  assert.equal(second.pendingOffset, 25);
+  assert.deepEqual(second.counts, full.counts);
+  const allPending = (await f.rpc({ op: 'receipt', messageId: 'fan', pendingLimit: 30 })).pending;
+  assert.deepEqual(second.pending, allPending.slice(25));
+  const empty = await f.rpc({ op: 'receipt', messageId: 'fan', pendingOffset: 30 });
+  assert.deepEqual(empty.pending, []);
+  assert.equal(empty.pendingTotal, 30);
+  assert.deepEqual(empty.counts, full.counts);
+  assert.equal((await f.request({ op: 'receipt', messageId: 'fan', pendingLimit: 0 })).error.code, 'INVALID_INPUT');
+  assert.equal((await f.request({ op: 'receipt', messageId: 'fan', pendingOffset: -1 })).error.code, 'INVALID_INPUT');
+  assert.equal((await f.request({ op: 'receipt', messageId: 'fan', pendingLimit: 1.5 })).error.code, 'INVALID_INPUT');
+});
+test('outbox caps recipients and pending with totals while keeping full counts', async t => {
+  const f = await fixture(t);
+  await f.register('a');
+  for (let i = 0; i < 30; i++) await f.register('r-' + i);
+  await f.rpc({ op: 'send', from: 'a', to: '*', body: 'fan', messageId: 'fan' });
+  await f.rpc({ op: 'send', from: 'a', to: 'r-0', body: 'direct', messageId: 'direct' });
+  const outbox = await f.rpc({ op: 'outbox', from: 'a' });
+  assert.equal(outbox.messages.length, 2);
+  const fan = outbox.messages.find(m => m.id === 'fan');
+  assert.equal(fan.recipients.length, 25);
+  assert.equal(fan.recipientsTotal, 30);
+  assert.equal(fan.pending.length, 25);
+  assert.equal(fan.pendingTotal, 30);
+  assert.deepEqual(fan.counts, { recipients: 30, acked: 0, accepted: 0, notified: 0, pending: 30, missing: 0 });
+  const direct = outbox.messages.find(m => m.id === 'direct');
+  assert.equal(direct.recipients.length, 1);
+  assert.equal(direct.recipientsTotal, 1);
+  assert.equal(direct.pending.length, 1);
+  assert.equal(direct.pendingTotal, 1);
+  assert.deepEqual(direct.counts, { recipients: 1, acked: 0, accepted: 0, notified: 0, pending: 1, missing: 0 });
+  const capped = await f.rpc({ op: 'outbox', from: 'a', recipientsLimit: 10, pendingLimit: 5 });
+  const cappedFan = capped.messages.find(m => m.id === 'fan');
+  assert.equal(cappedFan.recipients.length, 10);
+  assert.equal(cappedFan.recipientsTotal, 30);
+  assert.equal(cappedFan.pending.length, 5);
+  assert.equal(cappedFan.pendingTotal, 30);
+  assert.deepEqual(cappedFan.counts, fan.counts);
+  const full = await f.rpc({ op: 'outbox', from: 'a', recipientsLimit: 30, pendingLimit: 30 });
+  assert.equal(full.messages.find(m => m.id === 'fan').recipients.length, 30);
+  assert.equal(full.messages.find(m => m.id === 'fan').pending.length, 30);
+  assert.equal((await f.request({ op: 'outbox', from: 'a', recipientsLimit: 0 })).error.code, 'INVALID_INPUT');
+  assert.equal((await f.request({ op: 'outbox', from: 'a', pendingLimit: 0 })).error.code, 'INVALID_INPUT');
+});
+test('usage tightest reflects smallest remaining allowance', async t => {
+  const f = await fixture(t);
+  const at = new Date().toISOString();
+  const room = await fs.realpath(f.project);
+  const mk = id => ({ agentId: id, runner: 'test', registeredAt: at, updatedAt: at, status: 'idle',
+    frozen: false, resources: [], task: null });
+  const bigRecipients = Array.from({ length: 300 }, (_, i) => 'big-' + i);
+  const agents = ['sender', ...bigRecipients, 'small-0'].map(mk);
+  const bigNotified = [];
+  for (let i = 0; i < 1500; i++) bigNotified.push({ agentId: bigRecipients[i % bigRecipients.length], adapter: 'adapter-' + i, at });
+  const smallNotified = Array.from({ length: 1024 }, (_, i) => ({ agentId: 'small-0', adapter: 'small-' + i, at }));
+  await f.broker.close();
+  await fs.writeFile(path.join(f.dataDir, 'state.json'), JSON.stringify({ version: 1, nextCursor: 3,
+    rooms: [{ project: room, agents, claims: [], cursor: 2,
+      messages: [{ messageId: 'big', from: 'sender', to: '*', body: 'big', createdAt: at, cursor: 1,
+        recipients: bigRecipients, ackedBy: [], notified: bigNotified },
+        { messageId: 'small', from: 'sender', to: 'small-0', body: 'small', createdAt: at, cursor: 2,
+          recipients: ['small-0'], ackedBy: [], notified: smallNotified }] }] }));
+  await f.restart();
+  const usage = await f.rpc({ op: 'usage' });
+  assert.equal(usage.notices.used, 1500);
+  assert.equal(usage.notices.largest.messageId, 'big');
+  assert.equal(usage.notices.largest.markers, 1500);
+  assert.equal(usage.notices.largest.allowance, 1800);
+  assert.deepEqual(usage.notices.tightest, { messageId: 'small', remaining: 0, allowance: 1024 });
+  assert.equal(usage.headroom.notices, 0);
+  assert.equal(usage.nearLimit.includes('notices'), true);
+});
+test('offline restore leaves state intact on tmp write and rename failures', async t => {
+  const f = await fixture(t);
+  await f.broker.close();
+  const before = await fs.readFile(path.join(f.dataDir, 'state.json'), 'utf8');
+  const incoming = { version: 1, nextCursor: 1, rooms: [] };
+  const failingOpen = { ...fs, open: async (...args) => {
+    if (String(args[0]).endsWith('.tmp')) {
+      const failure = new Error('injected tmp failure');
+      failure.code = 'EIO';
+      throw failure;
+    }
+    return fs.open(...args);
+  } };
+  await assert.rejects(offlineRestore(f.dataDir, incoming, { fs: failingOpen }), error => error.code === 'EIO');
+  assert.equal(await fs.readFile(path.join(f.dataDir, 'state.json'), 'utf8'), before);
+  const failingRename = { ...fs, rename: async () => {
+    const failure = new Error('injected rename failure');
+    failure.code = 'EIO';
+    throw failure;
+  } };
+  await assert.rejects(offlineRestore(f.dataDir, incoming, { fs: failingRename }), error => error.code === 'EIO');
+  assert.equal(await fs.readFile(path.join(f.dataDir, 'state.json'), 'utf8'), before);
+  assert.deepEqual((await fs.readdir(f.dataDir)).filter(name => name.endsWith('.tmp')), []);
+});
+test('task blockers resolve canonical symlink identity while preserving refs', async t => {
+  const f = await fixture(t);
+  const real = await fs.realpath(f.project);
+  await f.register('a'); await f.register('b');
+  await fs.mkdir(path.join(f.project, 'target'));
+  await fs.writeFile(path.join(f.project, 'target', 'file.txt'), 'content');
+  await fs.symlink(path.join(f.project, 'target'), path.join(f.project, 'alias'),
+    process.platform === 'win32' ? 'junction' : 'dir');
+  await f.rpc({ op: 'claim', agentId: 'a', resources: ['target/file.txt'] });
+  const aliased = await f.rpc({ op: 'tasks', action: 'upsert', agentId: 'b', title: 'Aliased work',
+    blockedBy: ['alias/file.txt'] });
+  assert.equal(aliased.task.blocked, true);
+  assert.deepEqual(aliased.task.blocking,
+    [{ ref: 'alias/file.txt', kind: 'claim', scope: 'project', holder: 'a', state: 'held' }]);
+  assert.deepEqual(aliased.task.blockedBy, ['alias/file.txt']);
+  assert.equal((await f.request({ op: 'claim', agentId: 'b', resources: ['alias/file.txt'] })).error.code,
+    'CLAIM_CONFLICT');
+  await f.rpc({ op: 'release', agentId: 'a', resources: ['target/file.txt'] });
+  await f.rpc({ op: 'claim', agentId: 'a', resources: ['target'] });
+  const missing = await f.rpc({ op: 'tasks', action: 'upsert', agentId: 'b', title: 'Missing child',
+    blockedBy: ['alias/missing/deep/file.txt'] });
+  assert.equal(missing.task.blocked, true);
+  assert.deepEqual(missing.task.blocking,
+    [{ ref: 'alias/missing/deep/file.txt', kind: 'claim', scope: 'project', holder: 'a', state: 'held' }]);
+  assert.deepEqual(missing.task.blockedBy, ['alias/missing/deep/file.txt']);
+  const child = await f.rpc({ op: 'tasks', action: 'upsert', agentId: 'b', title: 'Child work',
+    blockedBy: ['target/file.txt'] });
+  assert.equal(child.task.blocked, true);
+  assert.equal(child.task.blocking[0].holder, 'a');
+  assert.deepEqual(child.task.blockedBy, ['target/file.txt']);
+  const dirRef = await f.rpc({ op: 'tasks', action: 'upsert', agentId: 'b', title: 'Dir work',
+    blockedBy: ['alias'] });
+  assert.equal(dirRef.task.blocked, true);
+  assert.equal(dirRef.task.blocking[0].holder, 'a');
+  assert.deepEqual(dirRef.task.blockedBy, ['alias']);
+  await f.rpc({ op: 'release', agentId: 'a', resources: ['target'] });
+  await f.rpc({ op: 'claim', agentId: 'a', resources: ['alias'] });
+  const opposite = await f.rpc({ op: 'tasks', action: 'upsert', agentId: 'b', title: 'Opposite work',
+    blockedBy: ['target/file.txt'] });
+  assert.equal(opposite.task.blocked, true);
+  assert.equal(opposite.task.blocking[0].holder, 'a');
+  assert.deepEqual(opposite.task.blockedBy, ['target/file.txt']);
+  assert.equal((await f.rpc({ op: 'agents' })).claims.find(c => c.resource === path.join(real, 'target')).agentId, 'a');
+  await f.rpc({ op: 'claim', agentId: 'a', resources: ['build'] });
+  const named = await f.rpc({ op: 'tasks', action: 'upsert', agentId: 'b', title: 'Named work',
+    blockedBy: ['build'] });
+  assert.equal(named.task.blocked, true);
+  assert.deepEqual(named.task.blocking,
+    [{ ref: 'build', kind: 'claim', scope: 'project', holder: 'a', state: 'held' }]);
+  const separate = await f.rpc({ op: 'tasks', action: 'upsert', agentId: 'b', title: 'Separate',
+    blockedBy: ['build/file'] });
+  assert.equal(separate.task.blocked, false);
+  assert.deepEqual(separate.task.blocking, [{ ref: 'build/file', kind: 'unknown', holder: null, state: null }]);
+  await f.rpc({ op: 'claim', agentId: 'a', scope: 'machine', resources: ['machine-res'] });
+  const machined = await f.rpc({ op: 'tasks', action: 'upsert', agentId: 'b', title: 'Machine work',
+    blockedBy: ['machine-res'] });
+  assert.equal(machined.task.blocked, true);
+  assert.deepEqual(machined.task.blocking,
+    [{ ref: 'machine-res', kind: 'claim', scope: 'machine', holder: 'a', state: 'held' }]);
+  const first = await f.rpc({ op: 'tasks', action: 'upsert', agentId: 'b', title: 'First', id: 'task-one' });
+  assert.equal(first.task.blocked, false);
+  const dependent = await f.rpc({ op: 'tasks', action: 'upsert', agentId: 'b', title: 'Dependent',
+    blockedBy: ['task-one'] });
+  assert.equal(dependent.task.blocked, true);
+  assert.deepEqual(dependent.task.blocking,
+    [{ ref: 'task-one', kind: 'task', holder: null, state: 'open' }]);
+  const listed = await f.rpc({ op: 'tasks', action: 'list', blocked: true });
+  assert.ok(listed.tasks.some(row => row.id === aliased.task.id && row.blocked === true));
+  assert.ok(listed.tasks.some(row => row.id === missing.task.id && row.blocked === true));
+});
+test('legacy handoff acceptance fails closed while decline resolves', async t => {
+  const f = await fixture(t);
+  const real = await fs.realpath(f.project);
+  await f.register('a'); await f.register('b');
+  await f.rpc({ op: 'claim', agentId: 'a', resources: ['x'] });
+  const resource = path.join(real, 'x');
+  await f.broker.close();
+  const file = path.join(f.dataDir, 'state.json');
+  const state = JSON.parse(await fs.readFile(file, 'utf8'));
+  const room = state.rooms.find(r => r.project === real);
+  const ts = new Date().toISOString();
+  room.handoffs = [{ id: 'legacy-1', from: 'a', to: 'b', resources: [resource],
+    reason: 'legacy offer', state: 'pending', requestedAt: ts }];
+  await fs.writeFile(file, JSON.stringify(state));
+  await f.restart();
+  const listed = await f.rpc({ op: 'handoffs' });
+  assert.equal(listed.handoffs.length, 1);
+  assert.equal(listed.handoffs[0].id, 'legacy-1');
+  assert.equal(listed.handoffs[0].state, 'pending');
+  assert.equal(listed.handoffs[0].offeredBy, undefined);
+  const refused = await f.request({ op: 'respondHandoff', agentId: 'b', id: 'legacy-1', accept: true });
+  assert.equal(refused.error.code, 'HANDOFF_STALE');
+  assert.equal(refused.status, 409);
+  assert.equal(refused.error.reason, 'legacy-unverifiable-direction');
+  assert.equal(refused.error.recovery, 'ask the parties to recreate the offer; the old record is preserved for audit');
+  assert.equal((await f.rpc({ op: 'agents' })).claims.find(c => c.resource === resource).agentId, 'a');
+  assert.equal((await f.rpc({ op: 'handoffs' })).handoffs.find(h => h.id === 'legacy-1').state, 'pending');
+  const declined = await f.rpc({ op: 'respondHandoff', agentId: 'b', id: 'legacy-1', accept: false });
+  assert.equal(declined.handoff.state, 'declined');
+  assert.equal(declined.handoff.id, 'legacy-1');
+  assert.equal((await f.rpc({ op: 'handoffs' })).handoffs.find(h => h.id === 'legacy-1').state, 'declined');
+  assert.equal((await f.rpc({ op: 'agents' })).claims.find(c => c.resource === resource).agentId, 'a');
+});
+test('upgrade from old ledger keeps legacy offers unverifiable', async t => {
+  const f = await fixture(t);
+  const real = await fs.realpath(f.project);
+  await f.register('a'); await f.register('b');
+  await f.rpc({ op: 'claim', agentId: 'a', resources: ['x'] });
+  await f.rpc({ op: 'claim', agentId: 'a', resources: ['y'] });
+  const x = path.join(real, 'x');
+  const y = path.join(real, 'y');
+  await f.broker.close();
+  const file = path.join(f.dataDir, 'state.json');
+  const state = JSON.parse(await fs.readFile(file, 'utf8'));
+  const room = state.rooms.find(r => r.project === real);
+  const ts = new Date().toISOString();
+  room.handoffs = [
+    { id: 'legacy-offer', from: 'a', to: 'b', resources: [x], reason: 'old offer', state: 'pending', requestedAt: ts },
+    { id: 'legacy-request', from: 'b', to: 'a', resources: [y], reason: 'old request', state: 'pending', requestedAt: ts }
+  ];
+  await fs.writeFile(file, JSON.stringify(state));
+  await f.restart();
+  await f.rpc({ op: 'release', agentId: 'a', resources: ['x'] });
+  await f.rpc({ op: 'claim', agentId: 'b', resources: ['x'] });
+  const reversal = await f.request({ op: 'respondHandoff', agentId: 'b', id: 'legacy-offer', accept: true });
+  assert.equal(reversal.error.code, 'HANDOFF_STALE');
+  assert.equal(reversal.status, 409);
+  assert.equal(reversal.error.reason, 'legacy-unverifiable-direction');
+  assert.equal(reversal.error.recovery, 'ask the parties to recreate the offer; the old record is preserved for audit');
+  assert.equal((await f.rpc({ op: 'agents' })).claims.find(c => c.resource === x).agentId, 'b');
+  assert.equal((await f.rpc({ op: 'handoffs' })).handoffs.find(h => h.id === 'legacy-offer').state, 'pending');
+  const requested = await f.request({ op: 'respondHandoff', agentId: 'a', id: 'legacy-request', accept: true });
+  assert.equal(requested.error.code, 'HANDOFF_STALE');
+  assert.equal(requested.status, 409);
+  assert.equal(requested.error.reason, 'legacy-unverifiable-direction');
+  assert.equal((await f.rpc({ op: 'agents' })).claims.find(c => c.resource === y).agentId, 'a');
+  assert.equal((await f.rpc({ op: 'handoffs' })).handoffs.find(h => h.id === 'legacy-request').state, 'pending');
+  await f.rpc({ op: 'claim', agentId: 'a', resources: ['fresh'] });
+  const fresh = path.join(real, 'fresh');
+  const offer = await f.rpc({ op: 'requestHandoff', agentId: 'a', to: 'b', resources: ['fresh'], reason: 'fresh offer' });
+  assert.equal(offer.handoff.offeredBy, 'a');
+  const accepted = await f.rpc({ op: 'respondHandoff', agentId: 'b', id: offer.handoff.id, accept: true });
+  assert.equal(accepted.handoff.state, 'accepted');
+  assert.equal(accepted.claims.find(c => c.resource === fresh).agentId, 'b');
+  await f.rpc({ op: 'claim', agentId: 'a', resources: ['need'] });
+  const need = path.join(real, 'need');
+  const req = await f.rpc({ op: 'requestHandoff', agentId: 'b', to: 'a', resources: ['need'], reason: 'fresh request' });
+  assert.equal(req.handoff.offeredBy, 'a');
+  const granted = await f.rpc({ op: 'respondHandoff', agentId: 'a', id: req.handoff.id, accept: true });
+  assert.equal(granted.handoff.state, 'accepted');
+  assert.equal(granted.claims.find(c => c.resource === need).agentId, 'b');
 });

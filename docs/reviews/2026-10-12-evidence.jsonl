@@ -1,0 +1,13 @@
+{"name":"offline-live-lease","outcome":"resolved","evidence":{"refused":true,"ledgerUnchanged":true}}
+{"name":"offline-dry-run-mutates","outcome":"open","evidence":{"reportedRestored":true,"returnedDryRun":null,"roomsBefore":1,"roomsAfter":0,"backupCreated":true}}
+{"name":"offline-wrapper-schema-ignored","outcome":"open","evidence":{"inputSchema":999,"reportedRestored":true}}
+{"name":"offline-fresh-directory-regression","outcome":"open","evidence":{"error":"agent-relay: dataDir must be a directory."}}
+{"name":"canonical-blockers-and-legacy-handoffs","outcome":"resolved","evidence":{"aliasBlocked":true,"legacyError":"HANDOFF_STALE"}}
+{"name":"export-overwrite-permissions","outcome":"resolved","evidence":{"mode":"600"}}
+{"name":"collection-trimming-no-continuation","outcome":"open","evidence":{"total":64,"shown":15,"hasMore":true,"nextOffset":null,"idReadReturnsSamePrefix":true,"schemaHasOffset":false}}
+{"name":"task-array-clearing","outcome":"resolved","evidence":{"blockedBy":[],"resources":[]}}
+{"name":"single-row-response-still-unbounded","outcome":"open","evidence":{"inboxBytes":155862,"receiptBytes":136641,"budget":65536,"notices":1024}}
+{"name":"valid-toml-forms-rejected","outcome":"open","evidence":{"rootInline":{"file":".codex/config.toml","runner":"codex","ok":false,"detail":"command not found: missing command in Codex relay binding"},"tripleQuotedCommand":{"file":".codex/config.toml","runner":"codex","ok":false,"detail":"command not found: missing command in Codex relay binding"},"stdlibTOMLParserAcceptedBoth":true,"pathsExist":true}}
+{"name":"close-during-readiness-report","outcome":"open","evidence":{"connectedAfterPeerClose":1,"connectedWriteCommittedBeforeClose":true,"writeResponseReleasedAfterClose":true}}
+{"name":"transport-age-invalidates-snapshot-etag","outcome":"open","evidence":{"statusWithMatchingPreviousTag":200,"etagChanged":true,"transportReportUnchanged":true,"ageBefore":716,"ageAfter":738}}
+{"name":"bounded-wake-admission","outcome":"resolved","evidence":{"promptMessages":2,"attemptMarkers":2,"omittedMessagesUnfenced":28}}

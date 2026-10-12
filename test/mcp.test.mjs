@@ -122,7 +122,7 @@ test('real SDK tools use pinned project/agent identity and exact broker fields',
   assert.equal(f.calls[0].op, 'register');
   assert.equal(f.calls[1].status, 'awaiting-attachment');
   assert.deepEqual(f.tools.tools.map(tool => tool.name),
-    ['relay_agents', 'relay_send', 'relay_inbox', 'relay_ack', 'relay_status', 'relay_claim', 'relay_release',
+    ['relay_read_page', 'relay_agents', 'relay_send', 'relay_inbox', 'relay_ack', 'relay_status', 'relay_claim', 'relay_release',
       'relay_leave', 'relay_fetch', 'relay_outbox', 'relay_receipt', 'relay_history', 'relay_bulletin_get',
       'relay_bulletin_ack', 'relay_handoff_request', 'relay_handoff_respond', 'relay_handoffs', 'relay_claim_narrow',
       'relay_tasks', 'relay_processes_list', 'relay_group_agents']);
@@ -157,10 +157,14 @@ test('real SDK tools use pinned project/agent identity and exact broker fields',
     ['relay_leave', {}, { op: 'leave', agentId: f.adapter.agentId }],
     ['relay_fetch', { messageId: 'm', out: '/tmp/fetch-out' },
       { op: 'fetch', agentId: f.adapter.agentId, messageId: 'm', out: '/tmp/fetch-out' }],
-    ['relay_receipt', { messageId: 'message-1' }, { op: 'receipt', messageId: 'message-1', recipientsLimit: 100 }],
+    ['relay_receipt', { messageId: 'message-1' }, { op: 'receipt', messageId: 'message-1', recipientsLimit: 100, pendingLimit: 100 }],
     ['relay_receipt', { messageId: 'message-1', recipientsLimit: 10, recipientsOffset: 5 },
-      { op: 'receipt', messageId: 'message-1', recipientsLimit: 10, recipientsOffset: 5 }],
-    ['relay_outbox', {}, { op: 'outbox', from: f.adapter.agentId, limit: 50 }],
+      { op: 'receipt', messageId: 'message-1', recipientsLimit: 10, recipientsOffset: 5, pendingLimit: 100 }],
+    ['relay_receipt', { messageId: 'message-1', pendingLimit: 10, pendingOffset: 5 },
+      { op: 'receipt', messageId: 'message-1', recipientsLimit: 100, pendingLimit: 10, pendingOffset: 5 }],
+    ['relay_outbox', {}, { op: 'outbox', from: f.adapter.agentId, limit: 50, recipientsLimit: 25, pendingLimit: 25 }],
+    ['relay_outbox', { recipientsLimit: 10, pendingLimit: 10 },
+      { op: 'outbox', from: f.adapter.agentId, limit: 50, recipientsLimit: 10, pendingLimit: 10 }],
     ['relay_history', { acked: true, threadOf: 'message-1' },
       { op: 'history', agentId: f.adapter.agentId, limit: 50, acked: true, threadOf: 'message-1' }],
     ['relay_history', { afterTs: '2026-01-01T00:00:00.000Z', beforeTs: '2026-12-31T00:00:00.000Z', before: 9 },
@@ -268,7 +272,9 @@ test('invalid/spoofed arguments and broker conflicts cannot look successful', as
     ['relay_handoff_respond', { id: 'h', accept: 'yes' }], ['relay_handoff_respond', { id: 'h' }],
     ['relay_claim_narrow', { resource: 'src' }], ['relay_claim_narrow', { resource: 'src', resources: [] }],
     ['relay_tasks', {}], ['relay_tasks', { action: 'remove' }], ['relay_tasks', { action: 'list', blocked: 'yes' }],
-    ['relay_tasks', { action: 'list', state: 'done' }], ['relay_tasks', { action: 'upsert', blockedBy: [] }],
+    ['relay_tasks', { action: 'list', state: 'done' }],
+    ['relay_tasks', { action: 'upsert', title: 'x', blockedBy: Array.from({ length: 65 }, (_, i) => `b-${i}`) }],
+    ['relay_tasks', { action: 'upsert', title: 'x', resources: Array.from({ length: 65 }, (_, i) => `r-${i}`) }],
     ['relay_processes_list', { owner: 'x', agentId: 'spoof' }],
     ['relay_group_agents', { groupId: '' }], ['relay_group_agents', { groupId: 'g', project: '/other' }],
     ['relay_history', { beforeTs: 42 }], ['relay_history', { before: -1 }],
@@ -446,7 +452,7 @@ test('optional Codex attachment tool pins callback identity without claiming cha
     attachments.push(input);
     return { attached: true, threadId: input.threadId };
   } });
-  assert.equal(f.tools.tools.length, 22);
+  assert.equal(f.tools.tools.length, 23);
   assert.equal(f.tools.tools.at(-1).name, 'relay_attach_codex');
   assert.deepEqual(f.tools.tools.at(-1).inputSchema.required, ['threadId']);
   assert.equal(f.tools.tools.at(-1).inputSchema.additionalProperties, false);
@@ -455,7 +461,9 @@ test('optional Codex attachment tool pins callback identity without claiming cha
   const before = f.calls.length;
   const response = await f.client.callTool({ name: 'relay_attach_codex', arguments: { threadId: 'current-thread' } });
   assert.ok(!response.isError);
-  assert.deepEqual(unpack(response), { attached: true, threadId: 'current-thread' });
+  const {byteSize, maxBytes, ...attached} = unpack(response);
+  assert.ok(byteSize <= maxBytes);
+  assert.deepEqual(attached, { attached: true, threadId: 'current-thread' });
   assert.deepEqual(attachments, [{ threadId: 'current-thread', agentId: 'codex-test-session', project: '/fixture/project' }]);
   assert.equal(f.calls.length, before, 'attachment callback owns attachment, not an extra broker status write');
   assert.equal(f.client.getServerCapabilities().experimental, undefined);
@@ -906,7 +914,7 @@ test('unread forwards directly and matches broker acknowledgement state', async 
   assert.deepEqual(omitted.messages.map(m => m.messageId), [second.messageId]);
 });
 
-test('512-recipient broadcast receipt stays bounded with full counts and continuation', async t => {
+test('800-recipient broadcast receipt stays bounded with full counts and resumable offsets', async t => {
   isolateEnv(t);
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-relay-mcp-receipt-'));
   const dataDir = path.join(root, 'data');
@@ -923,37 +931,92 @@ test('512-recipient broadcast receipt stays bounded with full counts and continu
   await client.connect(clientTransport);
   t.after(async () => { await adapter.close(); await client.close(); });
   const me = adapter.agentId;
-  for (let i = 0; i < 512; i++)
+  for (let i = 0; i < 800; i++)
     assert.equal((await brokerRpc(broker, project,
       { op: 'register', agentId: `fanout-${i}`, runner: 'test', sessionId: `s-${i}` })).ok, true);
   const sent = unpack(await client.callTool({ name: 'relay_send', arguments: { to: '*', body: 'broadcast', messageId: 'fanout-1' } }));
   assert.equal(sent.ok, true);
   const first = unpack(await client.callTool({ name: 'relay_receipt', arguments: { messageId: 'fanout-1' } }));
-  assert.equal(first.counts.recipients, 512);
-  assert.equal(first.recipientsTotal, 512);
+  assert.equal(first.counts.recipients, 800);
+  assert.equal(first.recipientsTotal, 800);
   assert.equal(first.recipients.length, 100);
   assert.equal(first.recipientsOffset, 0);
   assert.equal(first.nextRecipientsOffset, 100);
   assert.equal(first.hasMoreRecipients, true);
+  assert.equal(first.pendingTotal, 800);
+  assert.equal(first.pending.length, 100);
+  assert.equal(first.pendingOffset, 0);
+  assert.equal(first.nextPendingOffset, 100);
+  assert.equal(first.hasMorePending, true);
+  assert.equal(first.counts.pending + first.counts.missing + first.counts.acked + first.counts.accepted + first.counts.notified <= 800, true);
   assert.ok(Buffer.byteLength(JSON.stringify(first)) <= 64 * 1024);
   const explicit = unpack(await client.callTool({ name: 'relay_receipt', arguments: { messageId: 'fanout-1', recipientsLimit: 10, recipientsOffset: 5 } }));
   assert.equal(explicit.recipients.length, 10);
   assert.equal(explicit.recipientsOffset, 5);
-  assert.equal(explicit.recipientsTotal, 512);
-  assert.equal(explicit.counts.recipients, 512);
+  assert.equal(explicit.recipientsTotal, 800);
+  assert.equal(explicit.counts.recipients, 800);
+  assert.equal(explicit.pendingTotal, 800);
+  assert.ok(Buffer.byteLength(JSON.stringify(explicit)) <= 64 * 1024);
+  const pendingExplicit = unpack(await client.callTool({ name: 'relay_receipt', arguments: { messageId: 'fanout-1', pendingLimit: 10, pendingOffset: 5 } }));
+  assert.equal(pendingExplicit.pending.length, 10);
+  assert.equal(pendingExplicit.pendingOffset, 5);
+  assert.equal(pendingExplicit.pendingTotal, 800);
+  assert.equal(pendingExplicit.nextPendingOffset, 15);
+  assert.equal(pendingExplicit.hasMorePending, true);
+  assert.ok(Buffer.byteLength(JSON.stringify(pendingExplicit)) <= 64 * 1024);
+  const second = unpack(await client.callTool({ name: 'relay_receipt', arguments: { messageId: 'fanout-1', recipientsLimit: 100, recipientsOffset: 100, pendingLimit: 100, pendingOffset: 100 } }));
+  assert.equal(second.recipients.length, 100);
+  assert.equal(second.recipientsOffset, 100);
+  assert.equal(second.recipientsTotal, 800);
+  assert.equal(second.nextRecipientsOffset, 200);
+  assert.equal(second.hasMoreRecipients, true);
+  assert.equal(second.pending.length, 100);
+  assert.equal(second.pendingOffset, 100);
+  assert.equal(second.pendingTotal, 800);
+  assert.equal(second.nextPendingOffset, 200);
+  assert.equal(second.hasMorePending, true);
+  assert.ok(Buffer.byteLength(JSON.stringify(second)) <= 64 * 1024);
+  assert.notDeepEqual(second.recipients.map(r => r.agentId).sort(), first.recipients.map(r => r.agentId).sort());
   const seen = [];
   let offset = 0;
-  for (let guard = 0; guard < 10; guard++) {
+  for (let guard = 0; guard < 12; guard++) {
     const page = unpack(await client.callTool({ name: 'relay_receipt', arguments: { messageId: 'fanout-1', recipientsLimit: 100, recipientsOffset: offset } }));
-    assert.equal(page.counts.recipients, 512);
-    assert.equal(page.recipientsTotal, 512);
+    assert.equal(page.counts.recipients, 800);
+    assert.equal(page.recipientsTotal, 800);
     assert.ok(Buffer.byteLength(JSON.stringify(page)) <= 64 * 1024);
     for (const r of page.recipients) seen.push(r.agentId);
     if (!page.hasMoreRecipients) break;
     offset = page.nextRecipientsOffset;
   }
-  assert.equal(seen.length, 512);
-  assert.equal(new Set(seen).size, 512);
+  assert.equal(seen.length, 800);
+  assert.equal(new Set(seen).size, 800);
+  const pendingSeen = [];
+  let pendingOffset = 0;
+  for (let guard = 0; guard < 12; guard++) {
+    const page = unpack(await client.callTool({ name: 'relay_receipt', arguments: { messageId: 'fanout-1', pendingLimit: 100, pendingOffset } }));
+    assert.equal(page.pendingTotal, 800);
+    assert.ok(Buffer.byteLength(JSON.stringify(page)) <= 64 * 1024);
+    for (const r of page.pending) pendingSeen.push(r.agentId);
+    if (!page.hasMorePending) break;
+    pendingOffset = page.nextPendingOffset;
+  }
+  assert.equal(pendingSeen.length, 800);
+  assert.equal(new Set(pendingSeen).size, 800);
+  const outbox = unpack(await client.callTool({ name: 'relay_outbox', arguments: {} }));
+  assert.equal(outbox.messages.length, 1);
+  assert.equal(outbox.messages[0].recipients.length, 25);
+  assert.equal(outbox.messages[0].recipientsTotal, 800);
+  assert.equal(outbox.messages[0].pending.length, 25);
+  assert.equal(outbox.messages[0].pendingTotal, 800);
+  assert.equal(outbox.messages[0].counts.recipients, 800);
+  assert.ok(Buffer.byteLength(JSON.stringify(outbox)) <= 64 * 1024);
+  const outboxExplicit = unpack(await client.callTool({ name: 'relay_outbox', arguments: { recipientsLimit: 10, pendingLimit: 10 } }));
+  assert.equal(outboxExplicit.messages.length, 1);
+  assert.equal(outboxExplicit.messages[0].recipients.length, 10);
+  assert.equal(outboxExplicit.messages[0].recipientsTotal, 800);
+  assert.equal(outboxExplicit.messages[0].pending.length, 10);
+  assert.equal(outboxExplicit.messages[0].pendingTotal, 800);
+  assert.ok(Buffer.byteLength(JSON.stringify(outboxExplicit)) <= 64 * 1024);
 });
 
 test('large agent listing is bounded with continuation', async t => {
@@ -984,9 +1047,45 @@ test('large agent listing is bounded with continuation', async t => {
   const rest = unpack(await client.callTool({ name: 'relay_agents', arguments: { offset: 100 } }));
   assert.equal(rest.total, 151);
   assert.equal(rest.agents.length, 51);
+  assert.ok(Buffer.byteLength(JSON.stringify(rest)) <= 64 * 1024);
   const explicit = unpack(await client.callTool({ name: 'relay_agents', arguments: { limit: 10 } }));
   assert.equal(explicit.agents.length, 10);
   assert.equal(explicit.total, 151);
+  assert.ok(Buffer.byteLength(JSON.stringify(explicit)) <= 64 * 1024);
+});
+
+test('max-size task metadata stays bounded', async t => {
+  isolateEnv(t);
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-relay-mcp-task-bound-'));
+  const dataDir = path.join(root, 'data');
+  const project = path.join(root, 'project');
+  await Promise.all([dataDir, project].map(dir => fs.mkdir(dir)));
+  const broker = await createBroker({ dataDir });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  const [serverTransport, clientTransport] = InMemoryTransport.createLinkedPair();
+  const adapter = await createMcpAdapter({ project, runner: 'claude', sessionId: 'task-bound-me',
+    rpcImpl: async (target, fields) => brokerRpc(broker, target, fields),
+    waitImpl: async () => assert.fail('no watcher') });
+  const client = new Client({ name: 'task-bound', version: '1' });
+  await adapter.start(serverTransport);
+  await client.connect(clientTransport);
+  t.after(async () => { await adapter.close(); await client.close(); });
+  const bigVerification = 'v'.repeat(4096);
+  const bigResources = Array.from({ length: 10 }, (_, i) => `resource-${i}-` + 'r'.repeat(100));
+  const bigBlockedBy = Array.from({ length: 10 }, (_, i) => `blocker-${i}-` + 'b'.repeat(100));
+  const created = unpack(await client.callTool({ name: 'relay_tasks',
+    arguments: { action: 'upsert', title: 'Max metadata', verification: bigVerification, resources: bigResources, blockedBy: bigBlockedBy } }));
+  assert.equal(created.task.verification, bigVerification);
+  assert.ok(Buffer.byteLength(JSON.stringify(created)) <= 64 * 1024);
+  const listed = unpack(await client.callTool({ name: 'relay_tasks', arguments: { action: 'list' } }));
+  assert.ok(listed.tasks.some(row => row.id === created.task.id));
+  assert.ok(Buffer.byteLength(JSON.stringify(listed)) <= 64 * 1024);
+  const bulletin = unpack(await client.callTool({ name: 'relay_bulletin_get', arguments: {} }));
+  assert.ok(Buffer.byteLength(JSON.stringify(bulletin)) <= 64 * 1024);
+  const handoffs = unpack(await client.callTool({ name: 'relay_handoffs', arguments: {} }));
+  assert.ok(Buffer.byteLength(JSON.stringify(handoffs)) <= 64 * 1024);
+  const group = unpack(await client.callTool({ name: 'relay_group_agents', arguments: { groupId: 'g-task-bound' } }));
+  assert.ok(Buffer.byteLength(JSON.stringify(group)) <= 64 * 1024);
 });
 
 test('channel close reports disconnected transport', async t => {
@@ -1064,4 +1163,127 @@ test('transient transport report failure does not disable later reports', async 
   assert.ok(disconnectedReports.length >= 1);
   assert.ok(connectedReports.length >= 2);
   assert.ok(calls.some(c => c.op === 'status' && c.transport?.state === 'disconnected'));
+});
+
+test('task blocker and resource lists clear end to end against a real broker', async t => {
+  isolateEnv(t);
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-relay-mcp-clear-'));
+  const dataDir = path.join(root, 'data');
+  const project = path.join(root, 'project');
+  await Promise.all([dataDir, project].map(dir => fs.mkdir(dir)));
+  const broker = await createBroker({ dataDir });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  const [serverTransport, clientTransport] = InMemoryTransport.createLinkedPair();
+  const adapter = await createMcpAdapter({ project, runner: 'claude', sessionId: 'clear-me',
+    rpcImpl: async (target, fields) => brokerRpc(broker, target, fields),
+    waitImpl: async () => assert.fail('no watcher') });
+  const client = new Client({ name: 'clear', version: '1' });
+  await adapter.start(serverTransport);
+  await client.connect(clientTransport);
+  t.after(async () => { try { await adapter.close(); } catch {} try { await client.close(); } catch {} });
+  const claimed = unpack(await client.callTool({ name: 'relay_claim', arguments: { resources: ['clear-block.txt'] } }));
+  assert.ok(claimed.owned.some(row => row.agentId === adapter.agentId));
+  const created = unpack(await client.callTool({ name: 'relay_tasks',
+    arguments: { action: 'upsert', title: 'Clearable', blockedBy: ['clear-block.txt'], resources: ['clear-res.txt'] } }));
+  assert.deepEqual(created.task.blockedBy, ['clear-block.txt']);
+  assert.deepEqual(created.task.resources, ['clear-res.txt']);
+  assert.equal(created.task.blocked, true);
+  const cleared = unpack(await client.callTool({ name: 'relay_tasks',
+    arguments: { action: 'upsert', id: created.task.id, blockedBy: [], resources: [] } }));
+  assert.deepEqual(cleared.task.blockedBy, []);
+  assert.deepEqual(cleared.task.resources, []);
+  assert.equal(cleared.task.blocked, false);
+  const listed = unpack(await client.callTool({ name: 'relay_tasks', arguments: { action: 'list' } }));
+  const row = listed.tasks.find(entry => entry.id === created.task.id);
+  assert.deepEqual(row.blockedBy, []);
+  assert.deepEqual(row.resources, []);
+  assert.equal(row.blocked, false);
+  const badClaim = await client.callTool({ name: 'relay_claim', arguments: { resources: [] } });
+  assert.equal(badClaim.isError, true);
+  assert.match(unpack(badClaim).error, /Invalid resources array/);
+});
+
+test('peer transport close reports disconnected transport once', async t => {
+  isolateEnv(t);
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-relay-mcp-peer-close-'));
+  const dataDir = path.join(root, 'data');
+  const project = path.join(root, 'project');
+  await Promise.all([dataDir, project].map(dir => fs.mkdir(dir)));
+  const broker = await createBroker({ dataDir });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  let disconnects = 0;
+  const forward = async (target, fields) => {
+    if (fields.op === 'status' && fields.transport?.state === 'disconnected') disconnects += 1;
+    return brokerRpc(broker, target, fields);
+  };
+  const [serverTransport, clientTransport] = InMemoryTransport.createLinkedPair();
+  const adapter = await createMcpAdapter({ project, runner: 'claude', sessionId: 'peer-close-me', channel: true,
+    rpcImpl: forward,
+    waitImpl: async (target, agentId, after, { signal }) => new Promise((resolve, reject) => {
+      if (signal.aborted) return reject(new Error('aborted'));
+      signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+    }) });
+  const client = new Client({ name: 'peer-close', version: '1' });
+  await adapter.start(serverTransport);
+  await client.connect(clientTransport);
+  t.after(async () => { try { await adapter.close(); } catch {} try { await client.close(); } catch {} });
+  const me = adapter.agentId;
+  let connected = false;
+  for (let i = 0; i < 50; i++) {
+    const agents = await brokerRpc(broker, project, { op: 'agents', transport: 'connected' });
+    if (agents.agents.some(entry => entry.agentId === me)) { connected = true; break; }
+    await new Promise(r => setTimeout(r, 20));
+  }
+  assert.ok(connected);
+  await client.close();
+  let disconnected = false;
+  for (let i = 0; i < 50; i++) {
+    const agents = await brokerRpc(broker, project, { op: 'agents', transport: 'disconnected' });
+    if (agents.agents.some(entry => entry.agentId === me)) { disconnected = true; break; }
+    await new Promise(r => setTimeout(r, 20));
+  }
+  assert.ok(disconnected);
+  assert.ok(!(await brokerRpc(broker, project, { op: 'agents', transport: 'connected' })).agents.some(entry => entry.agentId === me));
+  await adapter.close();
+  assert.ok((await brokerRpc(broker, project, { op: 'agents', transport: 'disconnected' })).agents.some(entry => entry.agentId === me));
+  assert.equal(disconnects, 1);
+});
+
+test('explicit close reports disconnected transport once', async t => {
+  isolateEnv(t);
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-relay-mcp-explicit-close-'));
+  const dataDir = path.join(root, 'data');
+  const project = path.join(root, 'project');
+  await Promise.all([dataDir, project].map(dir => fs.mkdir(dir)));
+  const broker = await createBroker({ dataDir });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  let disconnects = 0;
+  const forward = async (target, fields) => {
+    if (fields.op === 'status' && fields.transport?.state === 'disconnected') disconnects += 1;
+    return brokerRpc(broker, target, fields);
+  };
+  const [serverTransport, clientTransport] = InMemoryTransport.createLinkedPair();
+  const adapter = await createMcpAdapter({ project, runner: 'claude', sessionId: 'explicit-close-me', channel: true,
+    rpcImpl: forward,
+    waitImpl: async (target, agentId, after, { signal }) => new Promise((resolve, reject) => {
+      if (signal.aborted) return reject(new Error('aborted'));
+      signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+    }) });
+  const client = new Client({ name: 'explicit-close', version: '1' });
+  await adapter.start(serverTransport);
+  await client.connect(clientTransport);
+  t.after(async () => { try { await adapter.close(); } catch {} try { await client.close(); } catch {} });
+  const me = adapter.agentId;
+  let connected = false;
+  for (let i = 0; i < 50; i++) {
+    const agents = await brokerRpc(broker, project, { op: 'agents', transport: 'connected' });
+    if (agents.agents.some(entry => entry.agentId === me)) { connected = true; break; }
+    await new Promise(r => setTimeout(r, 20));
+  }
+  assert.ok(connected);
+  await adapter.close();
+  await client.close();
+  assert.ok((await brokerRpc(broker, project, { op: 'agents', transport: 'disconnected' })).agents.some(entry => entry.agentId === me));
+  assert.ok(!(await brokerRpc(broker, project, { op: 'agents', transport: 'connected' })).agents.some(entry => entry.agentId === me));
+  assert.equal(disconnects, 1);
 });

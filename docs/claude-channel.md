@@ -12,7 +12,7 @@ Codex or another vendor's already-running agent: that client must call the tools
 or provide its own supported input bridge.
 
 When the launcher supplies the optional `attachCodex` callback, the adapter exposes
-an eighth tool, `relay_attach_codex`, taking only `threadId`. The agent reads its
+an additional tool, `relay_attach_codex`, taking only `threadId`. The agent reads its
 current `CODEX_THREAD_ID` from its own command environment and attaches that exact
 existing thread. The adapter pins the project and registered agent identity; tool
 arguments cannot change either. The launcher owns thread/project validation and
@@ -76,3 +76,9 @@ An isolated live channel initialized, registered and wrote a real notification o
 The test therefore proves transport activation, with acknowledgement/reply still
 unverified. No account, credentials, model or channel policy was changed to obtain
 a pass.
+
+Large MCP tool responses use the same lossless `relay_read_page` continuation
+contract described in [OpenCode large tool results](./opencode.md#large-tool-results).
+The 64 KiB limit includes continuation metadata. A message with omitted details
+must be retrieved before acknowledgement. MCP snapshots belong to the current
+adapter and are discarded on close.

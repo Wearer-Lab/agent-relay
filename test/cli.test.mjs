@@ -1,4 +1,4 @@
-import test from 'node:test';import assert from 'node:assert/strict';import path from 'node:path';import os from 'node:os';import {promises as fs} from 'node:fs';import {execFile,spawn} from 'node:child_process';import {promisify} from 'node:util';import {fileURLToPath} from 'node:url';
+import test from 'node:test';import assert from 'node:assert/strict';import path from 'node:path';import os from 'node:os';import {promises as fs} from 'node:fs';import {execFile,spawn} from 'node:child_process';import {promisify} from 'node:util';import {fileURLToPath} from 'node:url';import {createBroker} from '../lib/broker.mjs';
 const exec=promisify(execFile),cli=fileURLToPath(new URL('../bin/agent-relay.mjs',import.meta.url));
 test('real CLI starts one daemon under concurrent clients and configures/reuses an isolated project',async t=>{
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'relay-cli-')),project=path.join(root,'project'),dataDir=path.join(root,'data');await fs.mkdir(project);
@@ -155,11 +155,13 @@ test('offline restore round-trips with backup and enforces safety',async t=>{
  assert.equal((await run('stop')).stopped,true);
  const restored=await run('restore','--offline','--in',out);
  assert.equal(restored.restored,true);
- assert.ok(restored.backup);
+ assert.match(restored.backup,/^state\.backup-\d+\.json$/u);
  assert.equal(restored.rooms,1);
  assert.equal(restored.messages,1);
  assert.deepEqual(restored.missingAttachments,[]);
  assert.deepEqual(restored.corruptAttachments,[]);
+ assert.equal(restored.bytes,Buffer.byteLength(JSON.stringify(JSON.parse(await fs.readFile(out,'utf8')).state)));
+ assert.equal((await fs.stat(path.join(dataDir,restored.backup))).mode&0o777,0o600);
  const names=(await fs.readdir(dataDir)).filter(f=>f.startsWith('state.backup-'));
  assert.equal(names.length,1);
  assert.equal((await fs.stat(path.join(dataDir,names[0]))).mode&0o777,0o600);
@@ -179,6 +181,57 @@ test('offline restore round-trips with backup and enforces safety',async t=>{
  assert.equal(allowed.restored,true);
  assert.equal(allowed.missingAttachments.length,1);
  assert.equal(allowed.missingAttachments[0].sha256,'a'.repeat(64));
+ assert.deepEqual(allowed.corruptAttachments,[]);
+ assert.equal(allowed.rooms,1);
+ assert.equal(allowed.messages,1);
+ assert.equal(typeof allowed.bytes,'number');
+ assert.match(allowed.backup,/^state\.backup-\d+\.json$/u);
+ assert.equal((await fs.stat(path.join(dataDir,allowed.backup))).mode&0o777,0o600);
+ assert.equal((await fs.readdir(dataDir)).filter(f=>f.startsWith('state.backup-')).length,2);
+});
+test('offline restore refuses live lease without discovery',async t=>{
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'relay-cli-offline-lease-')),project=path.join(root,'project'),dataDir=path.join(root,'data');await fs.mkdir(project);await fs.mkdir(dataDir,{recursive:true});
+ const run=async(...args)=>JSON.parse((await exec(process.execPath,[cli,...args,'--project',project,'--data-dir',dataDir],{timeout:20000})).stdout);
+ const broker=await createBroker({dataDir});
+ t.after(async()=>{try{await broker.close();}catch{}await fs.rm(root,{recursive:true,force:true});});
+ assert.deepEqual((await fs.readdir(dataDir)).filter(f=>f==='broker.json'),[]);
+ assert.ok((await fs.stat(path.join(dataDir,'writer.lock'))).isFile());
+ const incoming={version:1,nextCursor:1,rooms:[]};
+ const importFile=path.join(root,'incoming.json');
+ await fs.writeFile(importFile,JSON.stringify({schemaVersion:1,state:incoming}));
+ const before=await fs.readFile(path.join(dataDir,'state.json'),'utf8').catch(()=>null);
+ await assert.rejects(run('restore','--offline','--in',importFile),/live broker|Another live/i);
+ assert.deepEqual((await fs.readdir(dataDir)).filter(f=>f.startsWith('state.backup-')),[]);
+ if(before!==null)assert.equal(await fs.readFile(path.join(dataDir,'state.json'),'utf8'),before);
+ await broker.close();
+ const restored=await run('restore','--offline','--in',importFile);
+ assert.equal(restored.restored,true);
+ assert.equal(restored.rooms,0);
+ assert.equal(restored.messages,0);
+});
+test('offline restore refuses oversized import before backup',async t=>{
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'relay-cli-offline-huge-')),project=path.join(root,'project'),dataDir=path.join(root,'data');await fs.mkdir(project);
+ t.after(async()=>{try{const {pid}=JSON.parse(await fs.readFile(path.join(dataDir,'broker.json'),'utf8'));process.kill(pid,'SIGTERM');for(let i=0;i<50;i++){try{process.kill(pid,0);await new Promise(r=>setTimeout(r,20));}catch{break;}}}catch{}await fs.rm(root,{recursive:true,force:true});});
+ const run=async(...args)=>JSON.parse((await exec(process.execPath,[cli,...args,'--project',project,'--data-dir',dataDir],{timeout:60000})).stdout);
+ await run('join','--as','a','--runner','codex');
+ const out=path.join(root,'export.json');
+ await run('export','--out',out);
+ assert.equal((await run('stop')).stopped,true);
+ const payload=JSON.parse(await fs.readFile(out,'utf8'));
+ const base=payload.state??payload;
+ const baseBytes=Buffer.byteLength(JSON.stringify(base));
+ const limit=64*1024*1024;
+ const needed=limit+1-baseBytes-9;
+ assert.ok(needed>0);
+ const incoming={...base,pad:'x'.repeat(needed)};
+ assert.equal(Buffer.byteLength(JSON.stringify(incoming)),limit+1);
+ const huge=path.join(root,'huge.json');
+ await fs.writeFile(huge,JSON.stringify({schemaVersion:1,state:incoming}));
+ const before=await fs.readFile(path.join(dataDir,'state.json'),'utf8');
+ const listedBefore=(await fs.readdir(dataDir)).sort();
+ await assert.rejects(run('restore','--offline','--in',huge),/storage bound|STORE_LIMIT|exceeds/i);
+ assert.equal(await fs.readFile(path.join(dataDir,'state.json'),'utf8'),before);
+ assert.deepEqual((await fs.readdir(dataDir)).sort(),listedBefore);
 });
 test('bulletin ack passes explicit version and hash through',async t=>{
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'relay-cli-bulletin-')),project=path.join(root,'project'),dataDir=path.join(root,'data');await fs.mkdir(project);
@@ -214,8 +267,8 @@ test('export uses private permissions atomically and refuses symlinks',async t=>
  await fs.writeFile(perm,'{}');
  await fs.chmod(perm,0o644);
  const overwrote=await run('export','--out',perm);
- assert.equal((await fs.stat(perm)).mode&0o777,0o644);
- assert.equal(overwrote.mode,'644');
+ assert.equal((await fs.stat(perm)).mode&0o777,0o600);
+ assert.equal(overwrote.mode,'600');
  assert.equal(overwrote.overwrote,true);
 });
 test('real CLI diagnoses an unreachable Codex endpoint without launching anything',async t=>{

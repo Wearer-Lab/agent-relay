@@ -6,16 +6,24 @@ import {fileURLToPath} from 'node:url';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 const exec=promisify(execFile),root=fileURLToPath(new URL('../',import.meta.url));
+const PUBLIC_DOCS=['docs/broker-notes.md','docs/ci-workflow.md','docs/claude-channel.md','docs/dashboard.md','docs/opencode.md','docs/process-ownership.md','docs/publishing.md','docs/validation.md'];
 const tmp=await fs.mkdtemp(path.join(os.tmpdir(),'relay-release-'));
 const npm=process.platform==='win32'?'npm.cmd':'npm',npmCli=process.env.npm_execpath;
 const run=async(args,cwd=root)=>exec(npmCli?process.execPath:npm,npmCli?[npmCli,...args]:args,{cwd,env:{...process.env,npm_config_cache:path.join(tmp,'cache')},timeout:120000,maxBuffer:4*1024*1024});
 try{
  const pkg=JSON.parse(await fs.readFile(path.join(root,'package.json'),'utf8'));
+ const shrinkwrap=JSON.parse(await fs.readFile(path.join(root,'npm-shrinkwrap.json'),'utf8'));
+ const lock=JSON.parse(await fs.readFile(path.join(root,'package-lock.json'),'utf8'));
+ assert.deepEqual(lock,shrinkwrap,'Development and published dependency locks must agree');
+ assert.equal(shrinkwrap.version,pkg.version);
+ assert.deepEqual(shrinkwrap.packages[''].dependencies,pkg.dependencies);
  const [packed]=JSON.parse((await run(['pack','--json','--ignore-scripts','--pack-destination',tmp])).stdout);
- for(const file of packed.files){
-  assert.ok(/^(bin\/|lib\/|docs\/[^/]+\.md$|README\.md$|LICENSE$|package\.json$|npm-shrinkwrap\.json$)/.test(file.path),`Unexpected published file: ${file.path}`);
- }
- for(const required of ['bin/agent-relay.mjs','lib/setup.mjs','lib/dashboard.mjs','lib/observability.mjs','lib/dashboard/index.html','lib/dashboard/dashboard.css','lib/dashboard/dashboard.js','lib/dashboard/theme.js','npm-shrinkwrap.json'])assert.ok(packed.files.some(f=>f.path===required),`Missing ${required}`);
+  for(const file of packed.files){
+   assert.ok(/^(bin\/|lib\/|docs\/[^/]+\.md$|README\.md$|LICENSE$|package\.json$|npm-shrinkwrap\.json$)/.test(file.path),`Unexpected published file: ${file.path}`);
+  }
+  for(const file of packed.files.filter(f=>/^docs\/[^/]+\.md$/.test(f.path)))assert.ok(PUBLIC_DOCS.includes(file.path),`Unexpected published doc: ${file.path}`);
+  for(const doc of PUBLIC_DOCS)assert.ok(packed.files.some(f=>f.path===doc),`Missing public doc ${doc}`);
+ for(const required of ['bin/agent-relay.mjs','lib/setup.mjs','lib/tool-pages.mjs','lib/dashboard.mjs','lib/observability.mjs','lib/dashboard/index.html','lib/dashboard/dashboard.css','lib/dashboard/dashboard.js','lib/dashboard/theme.js','npm-shrinkwrap.json'])assert.ok(packed.files.some(f=>f.path===required),`Missing ${required}`);
  // Validate the extracted artifact, rather than loading the source checkout.
  await exec('tar',['-xzf',path.join(tmp,packed.filename),'-C',tmp]);
  const cli=path.join(tmp,'package','bin','agent-relay.mjs');

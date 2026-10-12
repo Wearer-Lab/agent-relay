@@ -1,0 +1,22 @@
+{"name":"machine-task-blocking","evidence":{"upsert":[{"ref":"build","kind":"claim","scope":"machine","holder":"a","state":"held"}],"list":[{"ref":"build","kind":"unknown","holder":null,"state":null}],"blockedFilterCount":0}}
+{"name":"parent-claim-not-in-task-blockers","evidence":{"taskBlocked":false,"claimError":"CLAIM_CONFLICT"}}
+{"name":"handoff-direction-reverses","evidence":{"offeredFrom":"a","offeredTo":"b","accepting":"b","resultOwner":"a"}}
+{"name":"bulletin-ack-race","evidence":{"readVersion":1,"submittedVersion":1,"acknowledgedVersion":2}}
+{"name":"restore-does-not-verify-attachments","evidence":{"valid":true,"missingAttachments":[],"fetchError":{"code":"ATTACHMENT_ERROR","message":"Attachment hash or size mismatch"}}}
+{"name":"missing-reconciliation-counts-delivered","evidence":{"arrived":false,"receiptState":"notified","pendingCount":0}}
+{"name":"export-file-permissions","evidence":{"umask":"022","mode":"644"}}
+{"name":"retirement-strands-claims","evidence":{"releaseError":"UNKNOWN_AGENT","rejoinError":"RETIRED","stillHeld":true}}
+{"name":"unread-filter-inverted","evidence":{"unreadTrueIncludesAcknowledged":true}}
+{"name":"byte-page-cursors","evidence":{"inbox":{"lastShown":8,"cursor":12,"omitted":{"count":4,"resumeCursor":8}},"history":{"lastShown":7,"nextCursor":12,"done":true,"omitted":{"count":5,"resumeCursor":7}},"outbox":{"lastShownCursor":null,"nextCursor":24,"omitted":{"count":5,"resumeCursor":0}}}}
+{"name":"large-export-cannot-restore","evidence":{"restoreRequestBytes":197716,"status":413,"error":"REQUEST_TOO_LARGE"}}
+{"name":"setup-diagnoses-wrong-table","evidence":{"file":".codex/config.toml","runner":"codex","ok":false,"detail":"command not found: /definitely/missing/other"}}
+{"name":"opencode-context-bounds-and-receipts","evidence":{"bytes":96137,"advertisedBytes":32768,"shown":6,"contextMarkers":30,"omittedButMarked":24}}
+{"name":"codex-first-post-disconnect-message","evidence":{"reconnections":0,"status":{"kind":"delivery-failure","messageId":"c1","agentId":"codex-fixture","ts":"2026-10-11T20:52:46.226Z","errorCategory":"other","delivery":"failed","submission":null,"attempt":1,"detail":"Codex connection closed","suggestion":"unexpected control endpoint failure; verify the owner session is running or attach with the documented explicit loopback WebSocket URL (ws://127.0.0.1:PORT)","reconciliation":{"marker":"codex-attempted","accepted":false,"hint":"Inspect the owner session for this message before any authorized retry; do not resend automatically."}},"attempted":true,"accepted":false}}
+{"name":"usage-bound-scope","evidence":{"agents":{"stored":4,"left":1,"active":3,"retainedLimit":8192,"activeLimit":4096},"claims":{"used":4,"project":3,"machine":1,"limit":4096},"rooms":{"count":2,"limit":256}}}
+{"name":"bulletin-ack-churn-bound","evidence":{"activeAgents":1,"retainedAgents":4097,"status":503,"error":"STORE_IO"}}
+{"name":"opencode-notice-budget","evidence":{"recipients":512,"existingMarkers":1536,"fourthStageStatus":409,"error":"NOTICE_LIMIT"}}
+{"name":"single-message-page-exceeds-budget","evidence":{"messages":1,"byteSize":155242,"maxBytes":65536,"omitted":null}}
+{"name":"mcp-close-keeps-connected","evidence":{"connectedAfterClose":[{"id":"generic-channel","transport":{"adapter":"mcp-watch","state":"connected","ts":"2026-10-11T20:52:46.389Z","source":"adapter-report"}}]}}
+{"name":"stop-trusts-unrelated-pid","evidence":{"reportedStopped":true,"ownedUnrelatedChildSignal":"SIGTERM","actualBrokerStillHealthy":true}}
+{"name":"partial-capability-combination","evidence":{"advertised":["attachments"],"unadvertisedSummarySubmitted":"unsupported summary"}}
+{"name":"restore-removes-waiter-room","evidence":{"restoreStatus":404,"restoreError":"UNKNOWN_ROOM","durableRooms":0,"uncaughtTimerError":{"code":"UNKNOWN_ROOM","message":"Register an agent in this project first."}}}

@@ -87,7 +87,7 @@ Startup discovery locking alone does not supply this writer guarantee.
 
 Bounds: 128 KiB HTTP JSON, 16 KiB message body, 128-byte IDs, 256 rooms, 4096 active
 agents per room with 8192 retained identities per room, 64 resources per input, 4096
-claims per room, a derived transport-notice allowance of max(1024, 3 per recipient)
+claims per room, a derived transport-notice allowance of max(1024, 6 per recipient)
 per message, 10000 total messages and 64 MiB history. There is no history eviction:
 reaching a bound fails visibly instead of discarding unacked work. The broker has no
 shell execution or tool dispatcher.
@@ -133,3 +133,11 @@ Node/CLI paths, and the live broker's protocol version when one answers; it
 cannot identify the build of an already running broker. The Codex bridge's
 `initialize` clientInfo (`agent-relay/0.1.0`) is Codex-protocol metadata that
 must stay stable for protocol matching; it is not the relay package version.
+
+Offline restore accepts both raw state and export envelopes, validates an envelope's
+`schemaVersion`, and takes the same writer lease as a broker before replacement.
+`restore --offline --dry-run` validates without backups or ledger/token writes;
+with a missing destination it does not create a directory. An actual import creates
+a missing destination with mode 0700 and writes state with mode 0600. Dry-run
+reports missing/corrupt attachments as `valid: false`; actual incomplete imports
+require `--allow-incomplete`. Stop the broker before offline maintenance.

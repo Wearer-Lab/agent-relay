@@ -1,0 +1,22 @@
+{
+  "base": "9646712f292bf0326b6e1a96e1885574717bd67d",
+  "files": {
+    "bin/agent-relay.mjs": "a93f2d745a02ede15fc082c061250e3f4da3a76a1deeba863b0ddb00cc761801",
+    "docs/broker-notes.md": "216e3ca33c7ca03c2525875fb415ff5889c29524ef3c43006e7adeb1b5865b71",
+    "docs/publishing.md": "503bfa49847de5b097f3c60cde6aabe5f090e30c83781c581a15bc504fd4036e",
+    "docs/validation.md": "76e034b4154185cfc53fb36c8d3f795f6cb530c3d703dedcb53a6ecdad87c809",
+    "lib/broker.mjs": "7831679b4c133b3146310777bcff7c769fe0751c97795a91bfb433c1c8c1c591",
+    "lib/codex.mjs": "7dbc7887dc0ed4e271c57206ba1c5f02a4ddb8e0765491f47128c6617792beb1",
+    "lib/mcp.mjs": "7140408a03495946c535685255c48633b79ef2a8899b85cc72422c498f371a06",
+    "lib/observability.mjs": "6b28ad9c23abf83209423a16e933c2482399b6c52cd55f421089ca48c98c937a",
+    "lib/opencode-plugin.mjs": "6ea4f9d875a5ebacaa9e7aaaa6625161e7afdac0ccc7f8056cc643ea1b25c20b",
+    "lib/setup.mjs": "6de857124a6338ce84452d2c5e281fd59c2c17d5974b3afc01258b30b82b8d92",
+    "scripts/release-check.mjs": "f0a84fa268fc37495e4261cfc4e5f95566c38bda4f0cef9c77b7eccc41652cfc",
+    "test/broker.test.mjs": "39ce10e92b19b5a7ffad9dc04468757c32c3bee58badf004c148357941a69067",
+    "test/cli.test.mjs": "27af7d9508b4ec67cf4cca6c27acaf1797f1abcb0c079b99febb8dda8aadec6d",
+    "test/codex.test.mjs": "5d95c593fa60bb94eca49a3649e319ecc66950b2e567d5f52b46b47655433d64",
+    "test/mcp.test.mjs": "449314f93b46b1071bffbdcb3e043734b1e79dfbea9340046f865a760ee87230",
+    "test/opencode-plugin.test.mjs": "890e7b09a7244a86c6e30e06e0d14e874be0af6aee22e3c62dbd886f76617b1f",
+    "test/setup.test.mjs": "4b73d0bf042d3a79f891075f4641897bdd1b48185cb7c0f94b1db2ffbfc2739a"
+  }
+}

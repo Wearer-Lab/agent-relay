@@ -1,0 +1,18 @@
+{"name":"machine-and-parent-blockers","outcome":"resolved","evidence":{"machineListed":true,"parentBlocked":true}}
+{"name":"symlink-task-blocker","outcome":"open","evidence":{"taskBlocked":false,"claimError":"CLAIM_CONFLICT"}}
+{"name":"legacy-handoff-reversal","outcome":"open","evidence":{"freshOfferError":"HANDOFF_STALE","legacyOfferResultOwner":"a"}}
+{"name":"bulletin-binding-and-retire-preflight","outcome":"resolved","evidence":{"ackedVersion":1,"current":2,"retireError":"RETIRE_BLOCKED"}}
+{"name":"restore-active-waiter","outcome":"resolved","evidence":{"restored":true,"laterRegister":true}}
+{"name":"offline-restore-bypasses-live-lease","outcome":"open","evidence":{"reportedRestored":true,"liveLeasePresent":true,"diskRoomsImmediately":0,"liveAgentsStillInMemory":1,"roomsAfterNextBrokerWrite":1}}
+{"name":"large-offline-import","outcome":"resolved","evidence":{"bytes":196577,"restoredMessages":24,"coldStartAccepted":true}}
+{"name":"offline-restore-exceeds-store-bound","outcome":"open","evidence":{"reportedRestored":true,"writtenBytes":67108914,"startupError":"Relay state exceeds its storage bound."}}
+{"name":"unread-and-byte-cursors","outcome":"resolved","evidence":{"unreadIncludesAcked":false,"historyNextCursor":7,"historyDone":false,"outboxResume":19}}
+{"name":"task-tool-cannot-clear-arrays","outcome":"open","evidence":{"toolError":"Invalid blockedBy array","directBrokerClearSucceeded":true}}
+{"name":"existing-export-permissions","outcome":"open","evidence":{"resultMode":"644","actualMode":"644"}}
+{"name":"remaining-tool-byte-overruns","outcome":"open","evidence":{"receiptBytes":147687,"receiptRecipients":1,"unpagedPending":800,"outboxMessages":1,"outboxBytes":173722,"budget":65536}}
+{"name":"inline-toml-diagnostics-fail-open","outcome":"open","evidence":{"validCommandMissingCLI":{"file":".codex/config.toml","runner":"codex","ok":true,"detail":"configured"},"missingCommandArgsFirst":{"file":".codex/config.toml","runner":"codex","ok":true,"detail":"configured with another CLI copy: /opt/homebrew/Cellar/node/26.5.0_1/bin/node"}}}
+{"name":"mcp-peer-close-keeps-connected","outcome":"open","evidence":{"connectedAfterPeerClose":1}}
+{"name":"codex-first-reconnect","outcome":"resolved","evidence":{"reconnects":1,"accepted":true}}
+{"name":"opencode-context-fixes","outcome":"resolved","evidence":{"bytes":32279,"shown":2,"contextMarkers":2}}
+{"name":"omitted-wake-messages-fenced","outcome":"open","evidence":{"includedInPrompt":2,"wakeAttemptMarkers":30,"omittedButFenced":28}}
+{"name":"notice-headroom-chooses-wrong-message","outcome":"open","evidence":{"reportedHeadroom":300,"warned":false,"fullMessageError":"NOTICE_LIMIT","derivedAllowance512":3072}}

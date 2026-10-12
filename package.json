@@ -1,6 +1,6 @@
 {
   "name": "@wearer-haitch/agent-relay",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Local project-scoped coordination and notifications for coding agents",
   "type": "module",
   "bin": {
@@ -16,10 +16,11 @@
     "prepublishOnly": "npm run release:check"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.31.0",
-    "@opencode-ai/plugin": "1.18.34",
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "@opencode-ai/plugin": "1.19.0",
     "cross-spawn": "7.0.6",
     "jsonc-parser": "3.3.1",
+    "smol-toml": "1.9.1",
     "ws": "8.22.0"
   },
   "files": [

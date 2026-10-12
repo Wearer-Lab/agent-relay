@@ -85,7 +85,7 @@ npm ci --ignore-scripts --no-audit --no-fund
 npm install --global . --ignore-scripts --no-audit --no-fund
 ```
 
-Or copy the release `.tgz` and run `npm install --global ./wearer-haitch-agent-relay-0.3.0.tgz`. Run `agent-relay setup` in each destination project so paths point to its new installation. Do not transfer broker tokens or private message history with the package.
+Or copy the release `.tgz` and run `npm install --global ./wearer-haitch-agent-relay-0.3.1.tgz`. Run `agent-relay setup` in each destination project so paths point to its new installation. Do not transfer broker tokens or private message history with the package.
 
 Without global installation, use `node /path/to/agent-relay/bin/agent-relay.mjs setup`, or `npx --yes --package /path/to/agent-relay agent-relay setup`.
 
@@ -112,7 +112,7 @@ That command stays running until interrupted. Windows hosts can use `--url ws://
 
 ## Agent commands
 
-MCP/plugin tools are `relay_agents`, `relay_send`, `relay_inbox`, `relay_ack`, `relay_status`, `relay_claim` and `relay_release`. They bind the sender/owner to the connected session. Generic runners can use the CLI:
+MCP/plugin tools are `relay_agents`, `relay_send`, `relay_inbox`, `relay_ack`, `relay_status`, `relay_claim` and `relay_release`. They bind the sender/owner to the connected session. Large tool results include a `continuation` for `relay_read_page`, which retrieves every omitted row and field within the 64 KiB response limit. Concatenate its text chunks in offset order and parse the complete JSON when `done` is true; read omitted message details before acknowledging. Generic runners can use the CLI:
 
 ```sh
 agent-relay join --as worker-a --runner other

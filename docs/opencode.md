@@ -82,3 +82,24 @@ real relay tool calls; OpenCode executed the acknowledgement and correctly joine
 reply through the plugin and broker. This verifies the runtime/adapter path without
 owner credentials, production sessions or external model inference. Busy-runtime
 and cloud-model semantic coverage remain unverified.
+
+## Large tool results
+
+Every tool response is limited to 64 KiB including metadata. An oversized response
+includes `continuation: {tool: "relay_read_page", token, offset: 0, ...}`.
+Call `relay_read_page` with that token and offset, append each returned `text`
+chunk, and resume at `nextOffset` until `done` is true. Parse the concatenated
+text as JSON to recover the full original response, including trimmed tasks,
+handoffs, processes, claims, group agents, bulletin acknowledgements and message
+transport markers. The snapshot's SHA-256 is included for verification.
+
+A compact preview may omit rows or an entire oversized record. Read the snapshot
+before acknowledging a message whose details were omitted. Retrieval never
+acknowledges a message. Broker recipient and agent offsets remain available for
+subsequent broker pages; a continuation recovers only the original returned page.
+
+Snapshots are private to the current adapter/session, expire after five minutes,
+and are bounded to 16 snapshots and 64 MiB per adapter. Old snapshots are evicted
+when the budget is reached. Repeat the original read if a token expires or is
+evicted. Closing a session clears its snapshots. Retrieval can be retried at the
+same offset without advancing or changing the retained data.

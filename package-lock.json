@@ -1,18 +1,19 @@
 {
   "name": "@wearer-haitch/agent-relay",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "lockfileVersion": 3,
   "requires": true,
   "packages": {
     "": {
       "name": "@wearer-haitch/agent-relay",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "license": "MIT",
       "dependencies": {
-        "@modelcontextprotocol/sdk": "1.31.0",
-        "@opencode-ai/plugin": "1.18.34",
+        "@modelcontextprotocol/sdk": "1.32.1",
+        "@opencode-ai/plugin": "1.19.0",
         "cross-spawn": "7.0.6",
         "jsonc-parser": "3.3.1",
+        "smol-toml": "1.9.1",
         "ws": "8.22.0"
       },
       "bin": {
@@ -47,9 +48,9 @@
       }
     },
     "node_modules/@modelcontextprotocol/sdk": {
-      "version": "1.31.0",
-      "resolved": "https://registry.npmjs.org/@modelcontextprotocol/sdk/-/sdk-1.31.0.tgz",
-      "integrity": "sha512-UvTMgnNlnIBO/22ob2RcVGDlcvOslQs8T59+FTGdA0L27a39fdGF/EDETNtDVK4DZGpwomlsYpRdA8UXcVL/pw==",
+      "version": "1.32.1",
+      "resolved": "https://registry.npmjs.org/@modelcontextprotocol/sdk/-/sdk-1.32.1.tgz",
+      "integrity": "sha512-2DdE+SJDtzLEEWzY1ZjY7Q+VcPhcV1KisD3zI4u0XZyktsjHum1mwbMI+JaulUBi2OZk+KJAi2uPXzxichPkdw==",
       "license": "MIT",
       "dependencies": {
         "@hono/node-server": "^1.19.9 || ^2.0.5",
@@ -165,13 +166,13 @@
       ]
     },
     "node_modules/@opencode-ai/plugin": {
-      "version": "1.18.34",
-      "resolved": "https://registry.npmjs.org/@opencode-ai/plugin/-/plugin-1.18.34.tgz",
-      "integrity": "sha512-bC1EBL/QJ6LpC7liKZXr5JA+oa9qDAwTzpEgPxPsx1pbIUdhKOqg3/yoPEQgoa4YdO3hsgCWNFmbDE/DeOl/Ug==",
+      "version": "1.19.0",
+      "resolved": "https://registry.npmjs.org/@opencode-ai/plugin/-/plugin-1.19.0.tgz",
+      "integrity": "sha512-DgtiRekVKeHIQuDD7OndZrQlJ+V8pK/cUuksfB+OPTekmLD8beYT+zX8gMax94s9xhKxEGFhSunjr3V1rkCDEA==",
       "license": "MIT",
       "dependencies": {
         "@ai-sdk/provider": "3.0.8",
-        "@opencode-ai/sdk": "1.18.34",
+        "@opencode-ai/sdk": "1.19.0",
         "effect": "4.0.0-beta.83",
         "zod": "4.1.8"
       },
@@ -202,9 +203,9 @@
       }
     },
     "node_modules/@opencode-ai/sdk": {
-      "version": "1.18.34",
-      "resolved": "https://registry.npmjs.org/@opencode-ai/sdk/-/sdk-1.18.34.tgz",
-      "integrity": "sha512-R9QWUpcngtdQ6FCixz7NC6n1WsSho6CEuRUzYHz/CzZcp3miSklDzXkm0oDwXVCnuEu+ANoeM0f6RDp51kOMzQ==",
+      "version": "1.19.0",
+      "resolved": "https://registry.npmjs.org/@opencode-ai/sdk/-/sdk-1.19.0.tgz",
+      "integrity": "sha512-lDFYTD6qxzq1mfwxF6Kq1DAs6rEwF4xoZ2I3G1sB7hAZ8Yb28JurtSmmcK7ZzZ8Z4qBUYbZimHJ6DM4JFq5amw==",
       "license": "MIT",
       "dependencies": {
         "cross-spawn": "7.0.6"
@@ -1394,6 +1395,18 @@
       },
       "funding": {
         "url": "https://github.com/sponsors/ljharb"
+      }
+    },
+    "node_modules/smol-toml": {
+      "version": "1.9.1",
+      "resolved": "https://registry.npmjs.org/smol-toml/-/smol-toml-1.9.1.tgz",
+      "integrity": "sha512-j7WyPdf0CJoutMzMoPLF/bVXHtKZIT9Rb4eGeEbWw8X2t5oirjPgpL+OpaENZrILYaXqYwnVH+qgUwVbl+pUJQ==",
+      "license": "BSD-3-Clause",
+      "engines": {
+        "node": ">= 18"
+      },
+      "funding": {
+        "url": "https://github.com/sponsors/cyyynthia"
       }
     },
     "node_modules/statuses": {

@@ -1,0 +1,13 @@
+{"name":"offline-live-lease","outcome":"resolved","evidence":{"refused":true,"ledgerUnchanged":true}}
+{"name":"offline-dry-run-mutates","outcome":"resolved","evidence":{"dryRun":true,"ledgerUnchanged":true,"noBackup":true}}
+{"name":"offline-wrapper-schema-ignored","outcome":"resolved","evidence":{"unsupportedSchemaRejected":true,"ledgerUnchanged":true}}
+{"name":"offline-fresh-directory-regression","outcome":"resolved","evidence":{"restored":true,"directoryMode":"0700","stateMode":"0600","dryRunDoesNotCreateDirectory":true}}
+{"name":"canonical-blockers-and-legacy-handoffs","outcome":"resolved","evidence":{"aliasBlocked":true,"legacyError":"HANDOFF_STALE"}}
+{"name":"export-overwrite-permissions","outcome":"resolved","evidence":{"mode":"600"}}
+{"name":"collection-trimming-no-continuation","outcome":"resolved","evidence":{"total":64,"shown":14,"recovered":64}}
+{"name":"task-array-clearing","outcome":"resolved","evidence":{"blockedBy":[],"resources":[]}}
+{"name":"single-row-response-still-unbounded","outcome":"resolved","evidence":{"inboxBytes":493,"receiptBytes":493,"budget":65536,"recoveredNotices":1024}}
+{"name":"valid-toml-forms-rejected","outcome":"resolved","evidence":{"rootInline":{"file":".codex/config.toml","runner":"codex","ok":true,"detail":"configured"},"tripleQuotedCommand":{"file":".codex/config.toml","runner":"codex","ok":true,"detail":"configured"},"validTOMLFixtures":true,"pathsExist":true}}
+{"name":"close-during-readiness-report","outcome":"resolved","evidence":{"connectedAfterPeerClose":0,"connectedWriteCommittedBeforeClose":true,"writeResponseReleasedAfterClose":true}}
+{"name":"transport-age-invalidates-snapshot-etag","outcome":"resolved","evidence":{"statusWithMatchingPreviousTag":304,"etagUnchanged":true}}
+{"name":"bounded-wake-admission","outcome":"resolved","evidence":{"promptMessages":2,"attemptMarkers":2,"omittedMessagesUnfenced":28}}

@@ -143,9 +143,9 @@ test('existing inbox is recovered; failed acknowledgement retains context; self 
   assert.equal(h.prompts.length, 0);
 });
 
-test('twenty-one standard tools bind sender and resource owner to context session and refuse cross-project calls', async t => {
+test('twenty-two standard tools bind sender and resource owner to context session and refuse cross-project calls', async t => {
   const h = harness(), hooks = await plugin(h); t.after(() => hooks.dispose()); await busy(hooks);
-  assert.equal(Object.keys(hooks.tool).length, 21);
+  assert.equal(Object.keys(hooks.tool).length, 22);
   for (const definition of Object.values(hooks.tool)) assert.ok(z.object(definition.args));
   await hooks.tool.relay_send.execute({ to: 'codex:existing', body: 'Safe coordination', from: 'forged', op: 'forged' }, toolContext());
   await hooks.tool.relay_claim.execute({ resources: ['build'] }, toolContext());
@@ -323,7 +323,7 @@ test('bulk acknowledgement moves only handled pending rows to acknowledged', asy
 });
 test('r24 coordination tools forward exact broker fields with context identity and refuse cross-project calls', async t => {
   const h = harness(), hooks = await plugin(h); t.after(() => hooks.dispose()); await busy(hooks);
-  assert.equal(Object.keys(hooks.tool).length, 21);
+  assert.equal(Object.keys(hooks.tool).length, 22);
   for (const definition of Object.values(hooks.tool)) assert.ok(z.object(definition.args));
   const schemas = Object.fromEntries(Object.entries(hooks.tool).map(([name, definition]) => [name, z.object(definition.args)]));
   schemas.relay_bulletin_get.parse({});
@@ -830,4 +830,347 @@ test('legacy broker rejecting transport keeps working without loops', async t =>
   const offline = calls.filter(x => x.op === 'status' && x.status === 'offline');
   assert.equal(offline.length, 1);
   assert.equal('transport' in offline[0], false);
+});
+
+test('wake admits only bounded rows and defers omitted rows to a later idle', async t => {
+  const rows = Array.from({ length: 30 }, (_, i) => message('wake-' + i, { body: 'payload-' + i + '-' + 'x'.repeat(2000), cursor: i + 1 }));
+  const h = harness({ initial: rows }), hooks = await plugin(h); t.after(() => hooks.dispose());
+  await busy(hooks);
+  await idle(hooks);
+  await flush();
+  assert.equal(h.prompts.length, 1);
+  const text = h.prompts[0].body.parts[0].text;
+  const shown = text.split('\n').filter(line => line.startsWith('{')).map(line => JSON.parse(line).messageId);
+  assert.ok(shown.length > 0);
+  assert.ok(shown.length < 30);
+  const markers = h.calls.filter(x => x.op === 'notified' && x.adapter === 'opencode-wake-attempted').map(x => x.messageId);
+  assert.deepEqual(new Set(markers), new Set(shown));
+  const omitted = rows.map(row => row.messageId).filter(value => !shown.includes(value));
+  assert.ok(omitted.length > 0);
+  for (const value of omitted) assert.ok(!markers.includes(value));
+  for (const value of shown) await hooks.tool.relay_ack.execute({ messageId: value }, toolContext());
+  await idle(hooks);
+  await flush();
+  assert.equal(h.prompts.length, 2);
+  const secondText = h.prompts[1].body.parts[0].text;
+  const shownSecond = secondText.split('\n').filter(line => line.startsWith('{')).map(line => JSON.parse(line).messageId);
+  assert.ok(shownSecond.length > 0);
+  assert.ok(shownSecond.some(value => omitted.includes(value)));
+  const markersAfter = h.calls.filter(x => x.op === 'notified' && x.adapter === 'opencode-wake-attempted').map(x => x.messageId);
+  for (const value of shownSecond) assert.ok(markersAfter.includes(value));
+  assert.deepEqual(new Set(markersAfter), new Set([...shown, ...shownSecond]));
+});
+
+test('task empty lists clear through broker while empty claim stays rejected', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-relay-opencode-tasks-clear-'));
+  const dataDir = path.join(root, 'data');
+  const project = path.join(root, 'project');
+  await Promise.all([dataDir, project].map(dir => fs.mkdir(dir, { recursive: true })));
+  const broker = await createBroker({ dataDir });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  async function brokerRpc(target, fields) {
+    const response = await fetch(broker.url + '/rpc', { method: 'POST',
+      headers: { authorization: 'Bearer ' + broker.token, 'content-type': 'application/json' },
+      body: JSON.stringify({ project: target, ...fields }) });
+    return response.json();
+  }
+  function realTransport() {
+    return {
+      async rpc(target, fields) { return brokerRpc(target, fields); },
+      wait(target, agentId, after, { signal }) {
+        return new Promise((resolve, reject) => {
+          signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+        });
+      },
+    };
+  }
+  const session = 'ses_tasks_clear';
+  const context = { client: harness().client, directory: project, worktree: project };
+  const hooks = await AgentRelayPlugin(context, { transport: realTransport() });
+  t.after(async () => { await hooks.dispose(); });
+  const toolCtx = extra => ({ sessionID: session, directory: project, worktree: project, abort: new AbortController().signal, ...extra });
+  const schemas = Object.fromEntries(Object.entries(hooks.tool).map(([name, definition]) => [name, z.object(definition.args)]));
+  schemas.relay_tasks.parse({ action: 'upsert', title: 'Work', blockedBy: [], resources: [] });
+  assert.throws(() => schemas.relay_claim.parse({ resources: [] }));
+  assert.throws(() => schemas.relay_handoff_request.parse({ resources: [], reason: 'move' }));
+  await hooks.tool.relay_claim.execute({ resources: ['clear-block.txt'] }, toolCtx());
+  const created = JSON.parse(await hooks.tool.relay_tasks.execute({ action: 'upsert', id: 't-clear', title: 'Clearable',
+    blockedBy: ['clear-block.txt'], resources: ['clear-res.txt'] }, toolCtx()));
+  assert.deepEqual(created.task.blockedBy, ['clear-block.txt']);
+  assert.deepEqual(created.task.resources, ['clear-res.txt']);
+  assert.equal(created.task.blocked, true);
+  const cleared = JSON.parse(await hooks.tool.relay_tasks.execute({ action: 'upsert', id: 't-clear', blockedBy: [], resources: [] }, toolCtx()));
+  assert.deepEqual(cleared.task.blockedBy, []);
+  assert.deepEqual(cleared.task.resources, []);
+  assert.equal(cleared.task.blocked, false);
+  const listed = JSON.parse(await hooks.tool.relay_tasks.execute({ action: 'list' }, toolCtx()));
+  const row = listed.tasks.find(entry => entry.id === 't-clear');
+  assert.deepEqual(row.blockedBy, []);
+  assert.deepEqual(row.resources, []);
+  assert.equal(row.blocked, false);
+});
+
+test('800-recipient broadcast receipt stays bounded with full counts and resumable offsets', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-relay-opencode-receipt-'));
+  const dataDir = path.join(root, 'data');
+  const project = path.join(root, 'project');
+  await Promise.all([dataDir, project].map(dir => fs.mkdir(dir, { recursive: true })));
+  const broker = await createBroker({ dataDir });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  async function brokerRpc(target, fields) {
+    const response = await fetch(broker.url + '/rpc', { method: 'POST',
+      headers: { authorization: 'Bearer ' + broker.token, 'content-type': 'application/json' },
+      body: JSON.stringify({ project: target, ...fields }) });
+    return response.json();
+  }
+  const rpcCalls = [];
+  function realTransport() {
+    return {
+      async rpc(target, fields) { rpcCalls.push({ ...fields }); return brokerRpc(target, fields); },
+      wait(target, agentId, after, { signal }) {
+        return new Promise((resolve, reject) => {
+          signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+        });
+      },
+    };
+  }
+  const session = 'ses_receipt_bound';
+  const context = { client: harness().client, directory: project, worktree: project };
+  const hooks = await AgentRelayPlugin(context, { transport: realTransport() });
+  t.after(async () => { await hooks.dispose(); });
+  const toolCtx = extra => ({ sessionID: session, directory: project, worktree: project, abort: new AbortController().signal, ...extra });
+  for (let i = 0; i < 800; i++)
+    assert.equal((await brokerRpc(project, { op: 'register', agentId: `fanout-${i}`, runner: 'test', sessionId: `s-${i}` })).ok, true);
+  const sent = JSON.parse(await hooks.tool.relay_send.execute({ to: '*', body: 'broadcast', messageId: 'fanout-1' }, toolCtx()));
+  assert.equal(sent.ok, true);
+  const firstRaw = await hooks.tool.relay_receipt.execute({ messageId: 'fanout-1' }, toolCtx());
+  assert.ok(Buffer.byteLength(firstRaw) <= 64 * 1024, `receipt default bounded, got ${Buffer.byteLength(firstRaw)}`);
+  const first = JSON.parse(firstRaw);
+  const receiptCall = rpcCalls.find(x => x.op === 'receipt' && x.messageId === 'fanout-1');
+  assert.equal(receiptCall.recipientsLimit, 100);
+  assert.equal(receiptCall.pendingLimit, 100);
+  assert.equal(first.counts.recipients, 800);
+  assert.equal(first.recipientsTotal, 800);
+  assert.equal(first.recipients.length, 100);
+  assert.equal(first.recipientsOffset, 0);
+  assert.equal(first.nextRecipientsOffset, 100);
+  assert.equal(first.hasMoreRecipients, true);
+  assert.equal(first.pendingTotal, 800);
+  assert.equal(first.pending.length, 100);
+  assert.equal(first.pendingOffset, 0);
+  assert.equal(first.nextPendingOffset, 100);
+  assert.equal(first.hasMorePending, true);
+  assert.ok(first.counts.pending + first.counts.missing + first.counts.acked + first.counts.accepted + first.counts.notified <= 800);
+  const explicitRaw = await hooks.tool.relay_receipt.execute({ messageId: 'fanout-1', recipientsLimit: 10, recipientsOffset: 5 }, toolCtx());
+  assert.ok(Buffer.byteLength(explicitRaw) <= 64 * 1024);
+  const explicit = JSON.parse(explicitRaw);
+  assert.equal(explicit.recipients.length, 10);
+  assert.equal(explicit.recipientsOffset, 5);
+  assert.equal(explicit.recipientsTotal, 800);
+  assert.equal(explicit.counts.recipients, 800);
+  assert.equal(explicit.pendingTotal, 800);
+  const lastReceipt = rpcCalls.filter(x => x.op === 'receipt').at(-1);
+  assert.equal(lastReceipt.recipientsLimit, 10);
+  assert.equal(lastReceipt.recipientsOffset, 5);
+  const pendingExplicitRaw = await hooks.tool.relay_receipt.execute({ messageId: 'fanout-1', pendingLimit: 10, pendingOffset: 5 }, toolCtx());
+  assert.ok(Buffer.byteLength(pendingExplicitRaw) <= 64 * 1024);
+  const pendingExplicit = JSON.parse(pendingExplicitRaw);
+  assert.equal(pendingExplicit.pending.length, 10);
+  assert.equal(pendingExplicit.pendingOffset, 5);
+  assert.equal(pendingExplicit.pendingTotal, 800);
+  assert.equal(pendingExplicit.nextPendingOffset, 15);
+  assert.equal(pendingExplicit.hasMorePending, true);
+  const secondRaw = await hooks.tool.relay_receipt.execute(
+    { messageId: 'fanout-1', recipientsLimit: 100, recipientsOffset: 100, pendingLimit: 100, pendingOffset: 100 }, toolCtx());
+  assert.ok(Buffer.byteLength(secondRaw) <= 64 * 1024);
+  const second = JSON.parse(secondRaw);
+  assert.equal(second.recipients.length, 100);
+  assert.equal(second.recipientsOffset, 100);
+  assert.equal(second.recipientsTotal, 800);
+  assert.equal(second.nextRecipientsOffset, 200);
+  assert.equal(second.hasMoreRecipients, true);
+  assert.equal(second.pending.length, 100);
+  assert.equal(second.pendingOffset, 100);
+  assert.equal(second.pendingTotal, 800);
+  assert.equal(second.nextPendingOffset, 200);
+  assert.equal(second.hasMorePending, true);
+  assert.notDeepEqual(second.recipients.map(r => r.agentId).sort(), first.recipients.map(r => r.agentId).sort());
+  const seen = [];
+  let offset = 0;
+  for (let guard = 0; guard < 12; guard++) {
+    const pageRaw = await hooks.tool.relay_receipt.execute({ messageId: 'fanout-1', recipientsLimit: 100, recipientsOffset: offset }, toolCtx());
+    assert.ok(Buffer.byteLength(pageRaw) <= 64 * 1024);
+    const page = JSON.parse(pageRaw);
+    assert.equal(page.counts.recipients, 800);
+    assert.equal(page.recipientsTotal, 800);
+    for (const r of page.recipients) seen.push(r.agentId);
+    if (!page.hasMoreRecipients) break;
+    offset = page.nextRecipientsOffset;
+  }
+  assert.equal(seen.length, 800);
+  assert.equal(new Set(seen).size, 800);
+  const pendingSeen = [];
+  let pendingOffset = 0;
+  for (let guard = 0; guard < 12; guard++) {
+    const pageRaw = await hooks.tool.relay_receipt.execute({ messageId: 'fanout-1', pendingLimit: 100, pendingOffset }, toolCtx());
+    assert.ok(Buffer.byteLength(pageRaw) <= 64 * 1024);
+    const page = JSON.parse(pageRaw);
+    assert.equal(page.pendingTotal, 800);
+    for (const r of page.pending) pendingSeen.push(r.agentId);
+    if (!page.hasMorePending) break;
+    pendingOffset = page.nextPendingOffset;
+  }
+  assert.equal(pendingSeen.length, 800);
+  assert.equal(new Set(pendingSeen).size, 800);
+  const outboxRaw = await hooks.tool.relay_outbox.execute({}, toolCtx());
+  assert.ok(Buffer.byteLength(outboxRaw) <= 64 * 1024, `outbox bounded, got ${Buffer.byteLength(outboxRaw)}`);
+  const outbox = JSON.parse(outboxRaw);
+  assert.equal(outbox.messages.length, 1);
+  assert.equal(outbox.messages[0].recipients.length, 25);
+  assert.equal(outbox.messages[0].recipientsTotal, 800);
+  assert.equal(outbox.messages[0].pending.length, 25);
+  assert.equal(outbox.messages[0].pendingTotal, 800);
+  assert.equal(outbox.messages[0].counts.recipients, 800);
+  assert.equal(outbox.done, true);
+  const outboxCall = rpcCalls.find(x => x.op === 'outbox');
+  assert.equal(outboxCall.recipientsLimit, 25);
+  assert.equal(outboxCall.pendingLimit, 25);
+  const outboxExplicitRaw = await hooks.tool.relay_outbox.execute({ recipientsLimit: 10, pendingLimit: 10 }, toolCtx());
+  assert.ok(Buffer.byteLength(outboxExplicitRaw) <= 64 * 1024);
+  const outboxExplicit = JSON.parse(outboxExplicitRaw);
+  assert.equal(outboxExplicit.messages.length, 1);
+  assert.equal(outboxExplicit.messages[0].recipients.length, 10);
+  assert.equal(outboxExplicit.messages[0].recipientsTotal, 800);
+  assert.equal(outboxExplicit.messages[0].pending.length, 10);
+  assert.equal(outboxExplicit.messages[0].pendingTotal, 800);
+  const lastOutbox = rpcCalls.filter(x => x.op === 'outbox').at(-1);
+  assert.equal(lastOutbox.recipientsLimit, 10);
+  assert.equal(lastOutbox.pendingLimit, 10);
+});
+
+test('large agent listing is bounded with continuation', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-relay-opencode-agents-'));
+  const dataDir = path.join(root, 'data');
+  const project = path.join(root, 'project');
+  await Promise.all([dataDir, project].map(dir => fs.mkdir(dir, { recursive: true })));
+  const broker = await createBroker({ dataDir });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  async function brokerRpc(target, fields) {
+    const response = await fetch(broker.url + '/rpc', { method: 'POST',
+      headers: { authorization: 'Bearer ' + broker.token, 'content-type': 'application/json' },
+      body: JSON.stringify({ project: target, ...fields }) });
+    return response.json();
+  }
+  function realTransport() {
+    return {
+      async rpc(target, fields) { return brokerRpc(target, fields); },
+      wait(target, agentId, after, { signal }) {
+        return new Promise((resolve, reject) => {
+          signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+        });
+      },
+    };
+  }
+  const session = 'ses_agents_bound';
+  const context = { client: harness().client, directory: project, worktree: project };
+  const hooks = await AgentRelayPlugin(context, { transport: realTransport() });
+  t.after(async () => { await hooks.dispose(); });
+  const toolCtx = extra => ({ sessionID: session, directory: project, worktree: project, abort: new AbortController().signal, ...extra });
+  for (let i = 0; i < 150; i++)
+    assert.equal((await brokerRpc(project, { op: 'register', agentId: `listed-${i}`, runner: 'test', sessionId: `s-${i}` })).ok, true);
+  const firstRaw = await hooks.tool.relay_agents.execute({}, toolCtx());
+  assert.ok(Buffer.byteLength(firstRaw) <= 64 * 1024, `agents default bounded, got ${Buffer.byteLength(firstRaw)}`);
+  const first = JSON.parse(firstRaw);
+  assert.equal(first.total, 151);
+  assert.equal(first.agents.length, 100);
+  assert.equal(first.nextOffset, 100);
+  assert.equal(first.hasMore, true);
+  const restRaw = await hooks.tool.relay_agents.execute({ offset: 100 }, toolCtx());
+  assert.ok(Buffer.byteLength(restRaw) <= 64 * 1024);
+  const rest = JSON.parse(restRaw);
+  assert.equal(rest.total, 151);
+  assert.equal(rest.agents.length, 51);
+  const explicitRaw = await hooks.tool.relay_agents.execute({ limit: 10 }, toolCtx());
+  assert.ok(Buffer.byteLength(explicitRaw) <= 64 * 1024);
+  const explicit = JSON.parse(explicitRaw);
+  assert.equal(explicit.agents.length, 10);
+  assert.equal(explicit.total, 151);
+});
+
+test('max-size task metadata stays bounded', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-relay-opencode-task-bound-'));
+  const dataDir = path.join(root, 'data');
+  const project = path.join(root, 'project');
+  await Promise.all([dataDir, project].map(dir => fs.mkdir(dir, { recursive: true })));
+  const broker = await createBroker({ dataDir });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  async function brokerRpc(target, fields) {
+    const response = await fetch(broker.url + '/rpc', { method: 'POST',
+      headers: { authorization: 'Bearer ' + broker.token, 'content-type': 'application/json' },
+      body: JSON.stringify({ project: target, ...fields }) });
+    return response.json();
+  }
+  function realTransport() {
+    return {
+      async rpc(target, fields) { return brokerRpc(target, fields); },
+      wait(target, agentId, after, { signal }) {
+        return new Promise((resolve, reject) => {
+          signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+        });
+      },
+    };
+  }
+  const session = 'ses_task_bound';
+  const context = { client: harness().client, directory: project, worktree: project };
+  const hooks = await AgentRelayPlugin(context, { transport: realTransport() });
+  t.after(async () => { await hooks.dispose(); });
+  const toolCtx = extra => ({ sessionID: session, directory: project, worktree: project, abort: new AbortController().signal, ...extra });
+  const bigVerification = 'v'.repeat(4096);
+  const bigResources = Array.from({ length: 10 }, (_, i) => `resource-${i}-` + 'r'.repeat(100));
+  const bigBlockedBy = Array.from({ length: 10 }, (_, i) => `blocker-${i}-` + 'b'.repeat(100));
+  const createdRaw = await hooks.tool.relay_tasks.execute({ action: 'upsert', title: 'Max metadata',
+    verification: bigVerification, resources: bigResources, blockedBy: bigBlockedBy }, toolCtx());
+  assert.ok(Buffer.byteLength(createdRaw) <= 64 * 1024, `task upsert bounded, got ${Buffer.byteLength(createdRaw)}`);
+  const created = JSON.parse(createdRaw);
+  assert.equal(created.task.verification, bigVerification);
+  const listedRaw = await hooks.tool.relay_tasks.execute({ action: 'list' }, toolCtx());
+  assert.ok(Buffer.byteLength(listedRaw) <= 64 * 1024, `task list bounded, got ${Buffer.byteLength(listedRaw)}`);
+  const listed = JSON.parse(listedRaw);
+  assert.ok(listed.tasks.some(row => row.id === created.task.id));
+  const bulletinRaw = await hooks.tool.relay_bulletin_get.execute({}, toolCtx());
+  assert.ok(Buffer.byteLength(bulletinRaw) <= 64 * 1024);
+  const handoffsRaw = await hooks.tool.relay_handoffs.execute({}, toolCtx());
+  assert.ok(Buffer.byteLength(handoffsRaw) <= 64 * 1024);
+  const processesRaw = await hooks.tool.relay_processes_list.execute({}, toolCtx());
+  assert.ok(Buffer.byteLength(processesRaw) <= 64 * 1024);
+  const groupRaw = await hooks.tool.relay_group_agents.execute({ groupId: 'g-task-bound' }, toolCtx());
+  assert.ok(Buffer.byteLength(groupRaw) <= 64 * 1024);
+});
+
+test('OpenCode continuation retrieves all trimmed task rows and oversized marker details with session isolation', async t => {
+  const h = harness(), rpc = h.transport.rpc.bind(h.transport);
+  const rows = Array.from({length: 64}, (_, i) => ({id: 'large-task-' + i, verification: '漢😀'.repeat(1200)}));
+  const huge = {ok: true, messages: [message('large-marker', {body: '\u0000'.repeat(16384),
+    notified: Array.from({length: 1024}, (_, i) => ({agentId: id, adapter: 'stage-' + i, at: 'x'.repeat(80)}))})]};
+  h.transport.rpc = async (project, fields) => fields.op === 'tasks' ? {ok: true, tasks: structuredClone(rows)}
+    : fields.op === 'inbox' ? structuredClone(huge) : rpc(project, fields);
+  const hooks = await plugin(h); t.after(() => hooks.dispose());
+  for (const [name, args, expected] of [['relay_tasks', {action: 'list'}, {ok: true, tasks: rows}],
+    ['relay_inbox', {}, huge]]) {
+    const raw = await hooks.tool[name].execute(args, toolContext()), first = JSON.parse(raw);
+    assert.ok(Buffer.byteLength(raw) <= 65536);
+    assert.ok(first.continuation);
+    assert.throws(() => hooks.tool.relay_read_page.execute({token: first.continuation.token}, toolContext({sessionID: 'ses_foreign'})), /Unknown or expired/);
+    assert.throws(() => hooks.tool.relay_read_page.execute({token: first.continuation.token}, toolContext({directory: '/different'})), /different project/);
+    let text = '', offset = 0;
+    for (;;) {
+      const chunkRaw = await hooks.tool.relay_read_page.execute({token: first.continuation.token, offset}, toolContext());
+      assert.ok(Buffer.byteLength(chunkRaw) <= 65536);
+      const chunk = JSON.parse(chunkRaw); text += chunk.text;
+      if (chunk.done) break;
+      assert.ok(chunk.nextOffset > offset); offset = chunk.nextOffset;
+    }
+    assert.deepEqual(JSON.parse(text), expected);
+  }
+  assert.ok(!h.calls.some(row => row.op === 'ack'), 'continuation does not acknowledge unread details');
 });
