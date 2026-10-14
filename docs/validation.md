@@ -7,7 +7,7 @@ npm ci --ignore-scripts --no-audit --no-fund
 npm run release:check
 ```
 
-The current automated suite has **237 passing tests for 0.3.1** on macOS. The optional
+The current automated suite has **237 passing tests for 0.3.1** on macOS. 0.3.2 adds two Windows page-file gate tests and has not been rerun on macOS. The optional
 [`docs/ci-workflow.md`](./ci-workflow.md) template runs the suite on macOS,
 Linux, and Windows with Node.js 20 and 22. Automatic GitHub Actions is not
 enabled in this repository; activating it requires permission to push workflow
