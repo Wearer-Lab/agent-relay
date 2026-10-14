@@ -1,4 +1,4 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {machineGate,parseDfAvailableKb,parseSysctlSwapGb,parseSysctlLoad,parseProcMeminfoSwapGb,windowsDriveOf,parseWindowsNumber} from '../lib/gate.mjs';
+import test from 'node:test';import assert from 'node:assert/strict';import {machineGate,parseDfAvailableKb,parseSysctlSwapGb,parseSysctlLoad,parseProcMeminfoSwapGb,windowsDriveOf,parseWindowsNumber,parseWindowsPageFileUsageGb} from '../lib/gate.mjs';
 const at=()=>Date.parse('2026-10-11T00:00:00.000Z');
 const dfRow=(available)=>`Filesystem 1024-blocks Used Available Capacity Mounted on\n/dev/disk 20000000 15000000 ${available} 75% /\n`;
 const darwinRun=(swapusage,loadavg,available)=>async(command,args)=>({stdout:command==='df'?dfRow(available):args[1]==='vm.swapusage'?swapusage:loadavg});
@@ -28,7 +28,7 @@ test('permissive insufficient evidence is never a measured pass',async()=>{
  const result=await machineGate({platform:'win32',run:async()=>{throw Error('powershell missing');},now:at});
  assert.equal(result.ok,true);assert.notEqual(result.assessed,'pass');assert.equal(result.assessed,'insufficient-evidence');
  assert.deepEqual(result.coverage,{swap:'unknown',load:'unknown',disk:'unknown'});
- assert.deepEqual(result.unknown,['swap: powershell Win32_OperatingSystem failed: powershell missing','load: powershell ProcessorQueueLength failed: powershell missing','free disk: powershell Win32_LogicalDisk C: failed: powershell missing']);
+ assert.deepEqual(result.unknown,['swap: powershell Win32_PageFileUsage failed: powershell missing','load: powershell ProcessorQueueLength failed: powershell missing','free disk: powershell Win32_LogicalDisk C: failed: powershell missing']);
  assert.equal(result.measurements.freeGb.error,'powershell Win32_LogicalDisk C: failed: powershell missing');
 });
 test('strict mode refuses with structured reason when a required measurement is unknown',async()=>{
@@ -43,7 +43,7 @@ test('strict mode refuses with structured reason when a required measurement is 
 });
 test('windows gate measures the selected drive and never fabricates values',async()=>{
  const calls=[];
- const run=async(command,args)=>{calls.push([command,...args]);const script=args.at(-1);if(script.includes('Win32_OperatingSystem'))return {stdout:'2097152\r\n'};if(script.includes('ProcessorQueueLength'))return {stdout:'2\n'};if(script.includes('Win32_LogicalDisk'))return {stdout:' 5368709120000 \r\n'};throw Error('unexpected probe');};
+ const run=async(command,args)=>{calls.push([command,...args]);const script=args.at(-1);if(script.includes('Win32_PageFileUsage'))return {stdout:'2048\r\n'};if(script.includes('ProcessorQueueLength'))return {stdout:'2\n'};if(script.includes('Win32_LogicalDisk'))return {stdout:' 5368709120000 \r\n'};throw Error('unexpected probe');};
  const result=await machineGate({platform:'win32',path:'D:\\work\\project',run,now:at});
  assert.equal(result.swapGb,2);assert.equal(result.load,2);assert.equal(result.freeGb,5000);assert.equal(result.ok,true);assert.equal(result.assessed,'pass');
  assert.deepEqual(result.unknown,[]);assert.deepEqual(result.coverage,{swap:'measured',load:'measured',disk:'measured'});
@@ -61,6 +61,24 @@ test('pure parsers read fixture output without running probes',()=>{
  assert.equal(parseProcMeminfoSwapGb('SwapTotal: 2097152 kB\nSwapFree: 1048576 kB\nMemTotal: 8000000 kB\n'),1);assert.equal(parseProcMeminfoSwapGb('MemTotal: 8000000 kB\n'),null);
  assert.equal(parseWindowsNumber(' 5368709120000 \r\n'),5368709120000);assert.equal(parseWindowsNumber(''),null);assert.equal(parseWindowsNumber('nope'),null);
  assert.equal(windowsDriveOf('E:/x'),'E:');
+});
+test('windows page file parser sums CurrentUsage MB across page files',()=>{
+ assert.equal(parseWindowsPageFileUsageGb('5311\r\n'),5311/1024);
+ assert.equal(parseWindowsPageFileUsageGb('1024\r\n2048\r\n'),3);
+ assert.equal(parseWindowsPageFileUsageGb(' 512 \n\n 512 \n'),1);
+ assert.equal(parseWindowsPageFileUsageGb('0\r\n'),0);
+ assert.equal(parseWindowsPageFileUsageGb(''),null);assert.equal(parseWindowsPageFileUsageGb('  \r\n'),null);
+ assert.equal(parseWindowsPageFileUsageGb('1024\r\nnope\r\n'),null);assert.equal(parseWindowsPageFileUsageGb('-5'),null);
+});
+const pageFileRun=pageFile=>async(command,args)=>{const script=args.at(-1);if(script.includes('Win32_PageFileUsage'))return {stdout:pageFile};if(script.includes('ProcessorQueueLength'))return {stdout:'0'};return {stdout:'5368709120000'};};
+test('windows swap is page file use, not commit charge beyond physical memory',async()=>{
+ const run=async(command,args)=>{const script=args.at(-1);if(script.includes('Win32_PageFileUsage'))return {stdout:'5311\r\n'};if(script.includes('Win32_OperatingSystem'))throw Error('commit charge probe must not run');if(script.includes('ProcessorQueueLength'))return {stdout:'0\n'};return {stdout:'5368709120000'};};
+ const result=await machineGate({platform:'win32',run,now:at});
+ assert.equal(result.swapGb,5311/1024);assert.equal(result.measurements.swapGb.source,'powershell Win32_PageFileUsage');assert.equal(result.ok,true);assert.equal(result.assessed,'pass');
+ const empty=await machineGate({platform:'win32',run:pageFileRun(''),now:at});
+ assert.equal(empty.swapGb,null);assert.equal(empty.coverage.swap,'unknown');assert.equal(empty.measurements.swapGb.error,'powershell Win32_PageFileUsage returned no usable value');
+ const heavy=await machineGate({platform:'win32',run:pageFileRun('4096\r\n6144\r\n'),now:at,maxSwapGb:8});
+ assert.equal(heavy.swapGb,10);assert.equal(heavy.ok,false);assert.deepEqual(heavy.reasons,['Swap 10.00 GB exceeds 8 GB']);
 });
 test('legacy callers keep ok, unknown, reasons and raw measurements',async()=>{
  const refusal=await machineGate({platform:'darwin',run:darwinRun('total = 4.00G used = 1024.00M free = 3.00G','{ 1.00 1.00 1.00 }',String(1024*1024)),now:at});

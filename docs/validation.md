@@ -78,7 +78,8 @@ Notes kept deliberately separate from the matrix:
 - Machine measurement (the `gate` preflight) reads swap, load, and free disk with
   read-only OS probes: macOS uses `sysctl vm.swapusage`/`vm.loadavg` with an
   `os.loadavg` fallback plus `df -Pk`; Linux uses `/proc/meminfo` plus `df -Pk`;
-  Windows uses PowerShell `Win32_OperatingSystem` for swap,
+  Windows uses PowerShell `Win32_PageFileUsage.CurrentUsage` (MB, summed across page
+  files) for swap in use,
   `Win32_PerfFormattedData_PerfOS_System.ProcessorQueueLength` for load, and
   `Win32_LogicalDisk` free space for the selected drive. The default permissive
   gate passes with unknown measurements unless a measured value breaches its
