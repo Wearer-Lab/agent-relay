@@ -1,6 +1,6 @@
 {
   "name": "@wearer-haitch/agent-relay",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "Local project-scoped coordination and notifications for coding agents",
   "type": "module",
   "bin": {
@@ -28,6 +28,7 @@
     "lib",
     "docs/*.md",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE",
     "npm-shrinkwrap.json"
   ],
@@ -42,13 +43,14 @@
   ],
   "publishConfig": {
     "access": "public",
-    "registry": "https://registry.npmjs.org/"
+    "registry": "https://registry.npmjs.org/",
+    "provenance": true
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Wearer-Lab/agent-relay.git"
   },
-  "homepage": "https://github.com/Wearer-Lab/agent-relay#readme",
+  "homepage": "https://wearer-lab.github.io/agent-relay/",
   "bugs": {
     "url": "https://github.com/Wearer-Lab/agent-relay/issues"
   }
