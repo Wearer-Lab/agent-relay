@@ -133,7 +133,7 @@ try{
  const rootInline=`mcp_servers = { "agent-relay" = { command = ${JSON.stringify(process.execPath)}, args = [${JSON.stringify(cli)}] } }\n`;
  await fs.writeFile(config,rootInline);
  const diagnosis=(await diagnoseSetup(cfg.project)).bindings.find(b=>b.runner==='codex');assert.equal(diagnosis.ok,true);
- const multiline=`[mcp_servers.agent-relay]\ncommand = """${process.execPath}"""\nargs = [${JSON.stringify(cli)}]\n`;
+ const multiline=`[mcp_servers.agent-relay]\ncommand = """${process.execPath.replace(/\\/g,'\\\\')}"""\nargs = [${JSON.stringify(cli)}]\n`;
  await fs.writeFile(config,multiline);
  const triple=(await diagnoseSetup(cfg.project)).bindings.find(b=>b.runner==='codex');assert.equal(triple.ok,true);
  record('valid-toml-forms-rejected','resolved',{rootInline:diagnosis,tripleQuotedCommand:triple,validTOMLFixtures:true,pathsExist:true});

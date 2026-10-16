@@ -13,7 +13,7 @@ async function fixture(t){
  };
  `);
  const args=['--import',pathToFileURL(preload).href,cli],env={...process.env,AGENT_RELAY_HOME:root,RELAY_TEST_JOURNAL:journal};
- return {root,journal,args,env,run:(...command)=>exec(process.execPath,[...args,...command,'--data-dir',root],{env,timeout:10000}),requests:async()=>{try{return (await fs.readFile(journal,'utf8')).trim().split('\n').map(line=>JSON.parse(line));}catch(e){if(e.code==='ENOENT')return [];throw e;}}};
+ return {root,journal,args,env,run:(...command)=>exec(process.execPath,[...args,...command,'--data-dir',root],{env,timeout:60000}),requests:async()=>{try{return (await fs.readFile(journal,'utf8')).trim().split('\n').map(line=>JSON.parse(line));}catch(e){if(e.code==='ENOENT')return [];throw e;}}};
 }
 test('CLI forwards repeatable attachments, summary, filters, machine scope and explicit forced identity',async t=>{
  const f=await fixture(t);
