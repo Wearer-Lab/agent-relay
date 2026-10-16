@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+<style>
+.bg{fill:#e7e0cc}.ln{stroke:#b26200}.fl{fill:#b26200}
+@media (prefers-color-scheme:dark){.bg{fill:#070c0b}.ln{stroke:#ffb240}.fl{fill:#ffb240}}
+</style>
+<rect class="bg" width="32" height="32" rx="6"/>
+<circle class="ln" cx="16" cy="16" r="11.5" fill="none" stroke-width="1.8"/>
+<circle class="ln" cx="16" cy="16" r="6" fill="none" stroke-width="1" opacity=".55"/>
+<path class="fl" d="M16 16 L16 4.5 A11.5 11.5 0 0 1 26 10.3 Z" opacity=".38"/>
+<path class="ln" d="M16 16 L26 10.3" stroke-width="2" stroke-linecap="round"/>
+<circle class="fl" cx="20.6" cy="20.2" r="2"/>
+<circle class="fl" cx="11" cy="12.2" r="1.3" opacity=".75"/>
+</svg>
