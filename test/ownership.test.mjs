@@ -42,7 +42,7 @@ async function world(t, { worktrees = ['feature', 'bugfix'], broker: withBroker 
   const dataDir = path.join(root, 'data');
   await fs.mkdir(dataDir);
   const broker = withBroker ? await createBroker({ dataDir, ...(staleMinutes === undefined ? {} : { staleMinutes }) }) : null;
-  t.after(async () => { await broker?.close(); await fs.rm(root, { recursive: true, force: true }); });
+  t.after(async () => { await broker?.close(); await fs.rm(root, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 }); });
   async function request(fields, room = repo) {
     const response = await fetch(`${broker.url}/rpc`, { method: 'POST',
       headers: { authorization: `Bearer ${broker.token}`, 'content-type': 'application/json' },
@@ -75,7 +75,7 @@ gitTest('git helpers report branch, detached HEAD, worktrees, branches and fail 
     [[w.repo, 'main', false, false, false], [w.trees.feature, null, true, false, false]]);
   assert.equal(await listWorktrees(w.root), null);
   assert.equal(await listWorktrees(''), null);
-  await fs.rm(w.trees.feature, { recursive: true, force: true });
+  await fs.rm(w.trees.feature, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 });
   assert.equal((await listWorktrees(w.repo)).find(row => row.path.endsWith('wt-feature')).prunable, true);
   await git(w.repo, 'branch', 'topic');
   const branches = await listBranches(w.repo);
@@ -367,7 +367,7 @@ gitTest('capabilities advertise the new features and the client gates the new op
   const caps = await w.call({ op: 'capabilities' });
   for (const feature of ['branch-claims', 'ownership', 'git-context']) assert.ok(caps.features.includes(feature), feature);
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'relay-own-gate-'));
-  t.after(() => fs.rm(dir, { recursive: true, force: true }));
+  t.after(() => fs.rm(dir, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 }));
   await fs.writeFile(path.join(dir, 'broker.json'), JSON.stringify({ pid: process.pid, url: 'http://127.0.0.1:12399', token: 'fixture' }));
   const previous = globalThis.fetch;
   t.after(() => { globalThis.fetch = previous; });
@@ -449,7 +449,7 @@ gitTest('MCP adapter exposes relay_ownership and relay_branch and auto-reports g
 });
 
 gitTest('OpenCode plugin exposes relay_ownership and relay_branch and auto-reports git context best effort', async t => {
-  const directory = '/tmp/relay-own-project';
+  const directory = path.resolve('/tmp/relay-own-project');
   const sessionID = 'ses_own';
   const calls = [];
   const transport = {

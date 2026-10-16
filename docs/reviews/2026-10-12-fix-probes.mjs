@@ -83,8 +83,8 @@ try{
  const created=await offline.run(['restore','--offline','--in',incoming],fresh);
  assert.equal(created.restored,true);assert.deepEqual(JSON.parse(await fs.readFile(path.join(fresh,'state.json'),'utf8')),empty);
  if(process.platform!=='win32'){
-  assert.equal((await fs.stat(fresh)).mode&0o777,0o700);
-  assert.equal((await fs.stat(path.join(fresh,'state.json'))).mode&0o777,0o600);
+  if(process.platform!=='win32')assert.equal((await fs.stat(fresh)).mode&0o777,0o700);
+  if(process.platform!=='win32')assert.equal((await fs.stat(path.join(fresh,'state.json'))).mode&0o777,0o600);
  }
  record('offline-fresh-directory-regression','resolved',{restored:true,directoryMode:'0700',stateMode:'0600',dryRunDoesNotCreateDirectory:true});
 
@@ -98,7 +98,7 @@ try{
  const legacy=await f.call({op:'respondHandoff',agentId:'b',id:'legacy',accept:true});assert.equal(legacy.error.code,'HANDOFF_STALE');
  record('canonical-blockers-and-legacy-handoffs','resolved',{aliasBlocked:true,legacyError:legacy.error.code});
  await f.discovery();const exportFile=path.join(root,'permissive.json');await fs.writeFile(exportFile,'old',{mode:0o644});await fs.chmod(exportFile,0o644);
- const exported=await f.run(['export','--out',exportFile]);assert.equal((await fs.stat(exportFile)).mode&0o777,0o600);
+ const exported=await f.run(['export','--out',exportFile]);if(process.platform!=='win32')assert.equal((await fs.stat(exportFile)).mode&0o777,0o600);
  record('export-overwrite-permissions','resolved',{mode:exported.mode});
 
  const tasks=await fixture('task-pages',project=>({version:1,nextCursor:1,rooms:[{project,agents:[agent('owner')],messages:[],claims:[],cursor:0,
@@ -170,4 +170,4 @@ try{
   assert.deepEqual(attempts.map(x=>x.messageId),shown);
   record('bounded-wake-admission','resolved',{promptMessages:shown.length,attemptMarkers:attempts.length,omittedMessagesUnfenced:30-attempts.length});
  }finally{await plugin.dispose();}
-}finally{for(const broker of brokers)await broker.close();await fs.rm(root,{recursive:true,force:true});}
+}finally{for(const broker of brokers)await broker.close();await fs.rm(root,{recursive:true,force:true,maxRetries:15,retryDelay:200});}

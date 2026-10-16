@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs/promises';import os from 'node:os';import path from 'node:path';import {rpc} from '../lib/client.mjs';
 test('extended CLI fields never reach a legacy broker that would ignore them',async t=>{
- const dir=await fs.mkdtemp(path.join(os.tmpdir(),'relay-capability-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'relay-capability-'));t.after(()=>fs.rm(dir,{recursive:true,force:true,maxRetries:15,retryDelay:200}));
  await fs.writeFile(path.join(dir,'broker.json'),JSON.stringify({pid:process.pid,url:'http://127.0.0.1:12345',token:'fixture'}));
  const previous=globalThis.fetch,calls=[];t.after(()=>{globalThis.fetch=previous;});
  globalThis.fetch=async(url,opts)=>{
@@ -12,7 +12,7 @@ test('extended CLI fields never reach a legacy broker that would ignore them',as
  await rpc('/tmp',{op:'claim',agentId:'a',resources:['native']},{dataDir:dir});assert.deepEqual(calls,['capabilities','claim']);
 });
 test('combined options require every feature before submission',async t=>{
- const dir=await fs.mkdtemp(path.join(os.tmpdir(),'relay-capability-matrix-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'relay-capability-matrix-'));t.after(()=>fs.rm(dir,{recursive:true,force:true,maxRetries:15,retryDelay:200}));
  await fs.writeFile(path.join(dir,'broker.json'),JSON.stringify({pid:process.pid,url:'http://127.0.0.1:12346',token:'fixture'}));
  const previous=globalThis.fetch;t.after(()=>{globalThis.fetch=previous;});
  const cases=[
@@ -68,7 +68,7 @@ test('combined options require every feature before submission',async t=>{
  }
 });
 test('legacy broker without capabilities refuses combined send',async t=>{
- const dir=await fs.mkdtemp(path.join(os.tmpdir(),'relay-capability-legacy-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'relay-capability-legacy-'));t.after(()=>fs.rm(dir,{recursive:true,force:true,maxRetries:15,retryDelay:200}));
  await fs.writeFile(path.join(dir,'broker.json'),JSON.stringify({pid:process.pid,url:'http://127.0.0.1:12347',token:'fixture'}));
  const previous=globalThis.fetch,calls=[];t.after(()=>{globalThis.fetch=previous;});
  globalThis.fetch=async(url,opts)=>{

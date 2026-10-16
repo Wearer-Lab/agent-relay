@@ -374,7 +374,7 @@ test('AGENT_RELAY_TEST_ROOM keeps smoke-test registrations and messages out of t
   await Promise.all([dataDir, realRoom, testRoom].map(dir => fs.mkdir(dir)));
   isolateEnv(t, { AGENT_RELAY_TEST_ROOM: testRoom });
   const broker = await createBroker({ dataDir });
-  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 }); });
   assert.equal((await brokerRpc(broker, realRoom,
     { op: 'register', agentId: 'real-agent', runner: 'test', sessionId: 'real-session' })).ok, true);
   assert.equal((await brokerRpc(broker, testRoom,
@@ -429,7 +429,7 @@ test('MCP resource schema bound equals the broker input bound', async t => {
   const project = path.join(root, 'project');
   await Promise.all([dataDir, project].map(dir => fs.mkdir(dir)));
   const broker = await createBroker({ dataDir });
-  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 }); });
   assert.equal((await brokerRpc(broker, project,
     { op: 'register', agentId: 'bound-probe', runner: 'test', sessionId: 'bound-session' })).ok, true);
   const resources = count => Array.from({ length: count }, (_, i) => `resource-${i}`);
@@ -508,7 +508,7 @@ test('new tools work end to end against a real broker with bounded backlog pages
   const project = path.join(root, 'project');
   await Promise.all([dataDir, project].map(dir => fs.mkdir(dir)));
   const broker = await createBroker({ dataDir });
-  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 }); });
   assert.equal((await brokerRpc(broker, project,
     { op: 'register', agentId: 'mcp-peer', runner: 'test', sessionId: 'peer-session' })).ok, true);
   const [serverTransport, clientTransport] = InMemoryTransport.createLinkedPair();
@@ -563,7 +563,7 @@ test('new coordination tools work end to end against a real broker', async t => 
   const project = path.join(root, 'project');
   await Promise.all([dataDir, project].map(dir => fs.mkdir(dir)));
   const broker = await createBroker({ dataDir });
-  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 }); });
   const forward = async (target, fields) => brokerRpc(broker, target, fields);
   const neverWatch = async () => assert.fail('this test never opens a watcher');
   const [serverA, clientA] = InMemoryTransport.createLinkedPair();
@@ -717,7 +717,7 @@ test('count-limited inbox/history/outbox pages resume to every row exactly once'
   const project = path.join(root, 'project');
   await Promise.all([dataDir, project].map(dir => fs.mkdir(dir)));
   const broker = await createBroker({ dataDir });
-  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 }); });
   assert.equal((await brokerRpc(broker, project,
     { op: 'register', agentId: 'count-peer', runner: 'test', sessionId: 'peer' })).ok, true);
   const [serverTransport, clientTransport] = InMemoryTransport.createLinkedPair();
@@ -790,7 +790,7 @@ test('byte-limited inbox/history/outbox pages keep consistent continuation', asy
   const project = path.join(root, 'project');
   await Promise.all([dataDir, project].map(dir => fs.mkdir(dir)));
   const broker = await createBroker({ dataDir });
-  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 }); });
   assert.equal((await brokerRpc(broker, project,
     { op: 'register', agentId: 'byte-peer', runner: 'test', sessionId: 'peer' })).ok, true);
   const [serverTransport, clientTransport] = InMemoryTransport.createLinkedPair();
@@ -885,7 +885,7 @@ test('unread forwards directly and matches broker acknowledgement state', async 
   const project = path.join(root, 'project');
   await Promise.all([dataDir, project].map(dir => fs.mkdir(dir)));
   const broker = await createBroker({ dataDir });
-  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 }); });
   assert.equal((await brokerRpc(broker, project,
     { op: 'register', agentId: 'unread-peer', runner: 'test', sessionId: 'peer' })).ok, true);
   const [serverTransport, clientTransport] = InMemoryTransport.createLinkedPair();
@@ -921,7 +921,7 @@ test('800-recipient broadcast receipt stays bounded with full counts and resumab
   const project = path.join(root, 'project');
   await Promise.all([dataDir, project].map(dir => fs.mkdir(dir)));
   const broker = await createBroker({ dataDir });
-  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 }); });
   const [serverTransport, clientTransport] = InMemoryTransport.createLinkedPair();
   const adapter = await createMcpAdapter({ project, runner: 'claude', sessionId: 'receipt-me',
     rpcImpl: async (target, fields) => brokerRpc(broker, target, fields),
@@ -1026,7 +1026,7 @@ test('large agent listing is bounded with continuation', async t => {
   const project = path.join(root, 'project');
   await Promise.all([dataDir, project].map(dir => fs.mkdir(dir)));
   const broker = await createBroker({ dataDir });
-  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 }); });
   const [serverTransport, clientTransport] = InMemoryTransport.createLinkedPair();
   const adapter = await createMcpAdapter({ project, runner: 'claude', sessionId: 'agents-me',
     rpcImpl: async (target, fields) => brokerRpc(broker, target, fields),
@@ -1061,7 +1061,7 @@ test('max-size task metadata stays bounded', async t => {
   const project = path.join(root, 'project');
   await Promise.all([dataDir, project].map(dir => fs.mkdir(dir)));
   const broker = await createBroker({ dataDir });
-  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 }); });
   const [serverTransport, clientTransport] = InMemoryTransport.createLinkedPair();
   const adapter = await createMcpAdapter({ project, runner: 'claude', sessionId: 'task-bound-me',
     rpcImpl: async (target, fields) => brokerRpc(broker, target, fields),
@@ -1095,7 +1095,7 @@ test('channel close reports disconnected transport', async t => {
   const project = path.join(root, 'project');
   await Promise.all([dataDir, project].map(dir => fs.mkdir(dir)));
   const broker = await createBroker({ dataDir });
-  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 }); });
   const [serverTransport, clientTransport] = InMemoryTransport.createLinkedPair();
   const adapter = await createMcpAdapter({ project, runner: 'claude', sessionId: 'close-me', channel: true,
     rpcImpl: async (target, fields) => brokerRpc(broker, target, fields),
@@ -1172,7 +1172,7 @@ test('task blocker and resource lists clear end to end against a real broker', a
   const project = path.join(root, 'project');
   await Promise.all([dataDir, project].map(dir => fs.mkdir(dir)));
   const broker = await createBroker({ dataDir });
-  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 }); });
   const [serverTransport, clientTransport] = InMemoryTransport.createLinkedPair();
   const adapter = await createMcpAdapter({ project, runner: 'claude', sessionId: 'clear-me',
     rpcImpl: async (target, fields) => brokerRpc(broker, target, fields),
@@ -1210,7 +1210,7 @@ test('peer transport close reports disconnected transport once', async t => {
   const project = path.join(root, 'project');
   await Promise.all([dataDir, project].map(dir => fs.mkdir(dir)));
   const broker = await createBroker({ dataDir });
-  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 }); });
   let disconnects = 0;
   const forward = async (target, fields) => {
     if (fields.op === 'status' && fields.transport?.state === 'disconnected') disconnects += 1;
@@ -1256,7 +1256,7 @@ test('explicit close reports disconnected transport once', async t => {
   const project = path.join(root, 'project');
   await Promise.all([dataDir, project].map(dir => fs.mkdir(dir)));
   const broker = await createBroker({ dataDir });
-  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 }); });
   let disconnects = 0;
   const forward = async (target, fields) => {
     if (fields.op === 'status' && fields.transport?.state === 'disconnected') disconnects += 1;

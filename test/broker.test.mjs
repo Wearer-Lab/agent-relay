@@ -16,7 +16,7 @@ async function fixture(t) {
   const other = path.join(root, 'other');
   await Promise.all([dataDir, project, other].map(dir => fs.mkdir(dir)));
   let broker = await createBroker({ dataDir });
-  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 }); });
   async function request(fields, room = project, options = {}) {
     const response = await fetch(broker.url + '/rpc', {
       method: 'POST', headers: { authorization: 'Bearer ' + broker.token, 'content-type': 'application/json' },
@@ -1876,7 +1876,7 @@ test('offline restore accepts state just below 64 MiB', async t => {
   assert.match(result.backup, /^state\.backup-\d+\.json$/u);
   assert.equal(Buffer.byteLength(await fs.readFile(path.join(f.dataDir, 'state.json'), 'utf8')), MAX_STORE - 1);
   assert.equal(await fs.readFile(path.join(f.dataDir, result.backup), 'utf8'), before);
-  assert.equal((await fs.stat(path.join(f.dataDir, result.backup))).mode & 0o777, 0o600);
+  if(process.platform!=='win32')assert.equal((await fs.stat(path.join(f.dataDir, result.backup))).mode & 0o777, 0o600);
 });
 test('offline restore accepts state exactly at 64 MiB', async t => {
   const f = await fixture(t);
@@ -2045,8 +2045,8 @@ test('offline restore backs up prior state with private mode and returns shape',
   assert.equal(result.bytes, Buffer.byteLength(JSON.stringify(incoming)));
   assert.match(result.backup, /^state\.backup-\d+\.json$/u);
   assert.equal(await fs.readFile(path.join(f.dataDir, result.backup), 'utf8'), before);
-  assert.equal((await fs.stat(path.join(f.dataDir, result.backup))).mode & 0o777, 0o600);
-  assert.equal((await fs.stat(path.join(f.dataDir, 'state.json'))).mode & 0o777, 0o600);
+  if(process.platform!=='win32')assert.equal((await fs.stat(path.join(f.dataDir, result.backup))).mode & 0o777, 0o600);
+  if(process.platform!=='win32')assert.equal((await fs.stat(path.join(f.dataDir, 'state.json'))).mode & 0o777, 0o600);
   assert.deepEqual((await fs.readdir(f.dataDir)).filter(name => name.endsWith('.tmp')), []);
   await f.restart();
   assert.deepEqual((await f.rpc({ op: 'history' })).messages, []);
@@ -2054,7 +2054,7 @@ test('offline restore backs up prior state with private mode and returns shape',
 test('offline restore with no prior state returns null backup', async t => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-relay-offline-fresh-'));
   t.after(async () => {
-    await fs.rm(root, { recursive: true, force: true });
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 });
   });
   const dataDir = path.join(root, 'data');
   await fs.mkdir(dataDir);

@@ -6,6 +6,7 @@ import path from 'node:path';
 import {EventEmitter} from 'node:events';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
+import {fileURLToPath} from 'node:url';
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
 import {createBroker,validateStore} from '../lib/broker.mjs';
@@ -40,7 +41,7 @@ async function fixture(t,{repo=false,worktrees=['feature'],options={pruneAfterMi
  const serverFactory=callback=>{handler=callback;const server=new EventEmitter();server.listen=(port,host,ready)=>queueMicrotask(ready);server.address=()=>({port:0});server.close=done=>done?.();return server;};
  const open=()=>createBroker({dataDir,serverFactory,...current});
  broker=await open();
- t.after(async()=>{await broker.close();await fs.rm(root,{recursive:true,force:true});});
+ t.after(async()=>{await broker.close();await fs.rm(root,{recursive:true,force:true,maxRetries:15,retryDelay:200});});
  async function request(fields,room=project){
   let status,result;const response=new EventEmitter();response.writeHead=code=>{status=code;};response.end=body=>{result=JSON.parse(body);};
   const incoming={method:'POST',url:'/rpc',headers:{authorization:'Bearer '+broker.token},async *[Symbol.asyncIterator](){yield Buffer.from(JSON.stringify({project:room,...fields}));}};
@@ -453,7 +454,7 @@ test('OpenCode relay_status needs no status, so a git-only report is possible, a
 // ---- Client capability gating for every new op and field ---------------------------------------------------------------------
 
 test('the client refuses every new op, action and field unless the broker advertises its feature',async t=>{
- const dir=await fs.mkdtemp(path.join(os.tmpdir(),'relay-review-gate-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'relay-review-gate-'));t.after(()=>fs.rm(dir,{recursive:true,force:true,maxRetries:15,retryDelay:200}));
  await fs.writeFile(path.join(dir,'broker.json'),JSON.stringify({pid:process.pid,url:'http://127.0.0.1:12399',token:'fixture'}));
  const previous=globalThis.fetch;t.after(()=>{globalThis.fetch=previous;});
  const cases=[
@@ -530,7 +531,7 @@ test('CLI help lists every command once and every work and branch subcommand onc
  const source=await fs.readFile(new URL('../bin/agent-relay.mjs',import.meta.url),'utf8');
  const main=source.slice(source.indexOf('async function main()'));
  const commands=[...new Set([...main.matchAll(/^\s*case '([a-z-]+)':/gmu)].map(match=>match[1]))].filter(name=>name!=='help');
- const {stdout}=await run(process.execPath,[new URL('../bin/agent-relay.mjs',import.meta.url).pathname,'help']);
+ const {stdout}=await run(process.execPath,[fileURLToPath(new URL('../bin/agent-relay.mjs',import.meta.url)),'help']);
  const lines=stdout.split('\n').filter(line=>/^ {2}agent-relay /u.test(line));
  const counts=new Map();
  for(const line of lines){const name=line.trim().split(/\s+/u)[1];counts.set(name,(counts.get(name)??0)+1);}
