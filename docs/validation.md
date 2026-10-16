@@ -7,11 +7,13 @@ npm ci --ignore-scripts --no-audit --no-fund
 npm run release:check
 ```
 
-The current automated suite has **237 passing tests for 0.3.1** on macOS. 0.3.2 adds two Windows page-file gate tests and has not been rerun on macOS. The optional
-[`docs/ci-workflow.md`](./ci-workflow.md) template runs the suite on macOS,
-Linux, and Windows with Node.js 20 and 22. Automatic GitHub Actions is not
-enabled in this repository; activating it requires permission to push workflow
-files.
+The current automated suite has **358 passing tests for 0.4.0** on macOS and Linux. The
+CI (`.github/workflows/ci.yml`, see [CI workflow](./ci-workflow.md)) runs the release checks on macOS,
+Linux, and Windows with Node.js 20 and 22 for every pull request and push to `main`.
+On Windows the suite currently has 25 failing tests caused by POSIX-only test
+assumptions (file-mode assertions, bare-path `--import`, `/tmp` literals), so that
+step reports without blocking; the packed Windows installation is still required to pass.
+CI results are not recorded in the matrix below, which lists live runner behavior only.
 
 The suite covers project isolation, durable message delivery, acknowledgements,
 replies, cooperative claims, restart retention, writer ownership, authentication,
@@ -61,12 +63,12 @@ environment, so support is not established.
 | explicit acknowledgement | macOS | OpenCode | live-verified (scripted local provider) |
 | nonempty reply | macOS | OpenCode | live-verified (scripted local provider joins reply; model understanding unverified) |
 | basic messaging | macOS | other MCP/CLI agents | automated (tool/transport tests) |
-| basic messaging | Linux | any | not-verified (CI template exists but GitHub Actions is not enabled) |
+| basic messaging | Linux | any | not-verified (CI runs the automated suite only, not live runners) |
 | adapter activation | Linux | any | not-verified |
 | context insertion | Linux | any | not-verified |
 | explicit acknowledgement | Linux | any | not-verified |
 | nonempty reply | Linux | any | not-verified |
-| basic messaging | Windows | any | not-verified (CI template exists but GitHub Actions is not enabled) |
+| basic messaging | Windows | any | not-verified (CI runs the automated suite only, not live runners) |
 | adapter activation | Windows | Codex | not-verified — default control attachment is known-broken (probe fails `EACCES`); the explicit `--url ws://127.0.0.1:PORT` path is documented but unverified |
 | adapter activation | Windows | Claude Code / OpenCode | not-verified |
 | context insertion | Windows | any | not-verified |

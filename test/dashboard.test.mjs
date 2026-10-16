@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {runInNewContext} from 'node:vm';
+import {createContext,runInContext} from 'node:vm';
 import {createDashboardHandler} from '../lib/dashboard.mjs';
 import {projectSummaries,roomSnapshot} from '../lib/observability.mjs';
 
@@ -95,15 +95,16 @@ test('observer feature-detects broker history paging and falls back to the label
 });
 
 const dashboardSource=await readFile(new URL('../lib/dashboard/dashboard.js',import.meta.url),'utf8');
+const modelSource=await readFile(new URL('../lib/dashboard/model.js',import.meta.url),'utf8');
 const textOf=el=>(el.textContent??'')+(el.children??[]).map(textOf).join('');
 const findAll=(root,pred)=>{const out=[];const walk=n=>{for(const child of n.children??[]){if(pred(child))out.push(child);walk(child);}};walk(root);return out;};
 const findButton=(root,label)=>findAll(root,el=>el.tag==='button'&&el.textContent===label)[0];
 const plain=value=>JSON.parse(JSON.stringify(value));
-function boot({projects,snapshot,history}={}){
+function boot({projects,snapshot,history,work,ownership,usage,search='?view=log'}={}){
  const elements=new Map();
  const make=tag=>{
   const el={tag,children:[],parent:null,dataset:{},listeners:{},textContent:'',className:'',type:'',value:'',checked:false,hidden:false,disabled:false,title:'',dateTime:'',open:false,scrollTop:0,scrolled:false,
-   classList:{toggle(){}},
+   classList:{toggle(){},add(){},remove(){},contains:()=>false},style:{setProperty(){}},focus(){},
    addEventListener(event,callback){el.listeners[event]=callback;},
    setAttribute(name,value){(el.attributes??={})[name]=value;},
    append(...nodes){for(const n of nodes){const items=n&&n.isFragment?n.children.splice(0):[n];for(const item of items){item.parent=el;el.children.push(item);}}},
@@ -126,10 +127,12 @@ function boot({projects,snapshot,history}={}){
   if(url.startsWith('/api/projects'))return response(projects??{rooms:[],preferredProject:''});
   if(url.startsWith('/api/snapshot'))return response(typeof snapshot==='function'?snapshot(url):snapshot??{project:'',agents:[],claims:[],messages:[],totalMessages:0,pendingDeliveries:0,pendingByAgent:{},cursor:0});
   if(url.startsWith('/api/history'))return response(typeof history==='function'?history(url):history??{available:false,messages:[],nextCursor:null,done:true});
+  const feeds={work,ownership,usage};
+  for(const key of Object.keys(feeds))if(url.startsWith('/api/'+key)&&feeds[key]!==undefined)return response(typeof feeds[key]==='function'?feeds[key](url):feeds[key]);
   return response({error:'Not found.'},404);
  };
- const sandbox={document,location:{hash:'#dashboard-test-secret',pathname:'/'},history:{replaceState(){}},sessionStorage:{getItem:()=>null,setItem(){}},fetch,AbortSignal:{timeout:()=>({})},Option,setInterval:()=>0,queueMicrotask,setTimeout,clearTimeout};
- runInNewContext(dashboardSource,sandbox);
+ const sandbox={document,location:{hash:'#dashboard-test-secret',pathname:'/',search},URLSearchParams,history:{replaceState(){}},sessionStorage:{getItem:()=>null,setItem(){}},fetch,AbortSignal:{timeout:()=>({})},Option,setInterval:()=>0,queueMicrotask,setTimeout,clearTimeout};
+ createContext(sandbox);runInContext(modelSource,sandbox);runInContext(dashboardSource,sandbox);
  const flush=async()=>{for(let i=0;i<30;i++)await Promise.resolve();await new Promise(resolve=>setImmediate(resolve));await new Promise(resolve=>setImmediate(resolve));};
  return {elements,sandbox,fetchLog,flush,$:id=>elements.get(id)};
 }
@@ -292,6 +295,6 @@ test('real dashboard serves packaged assets and discovers two broker rooms throu
  const view=await (await fetch(link.origin+'/api/snapshot?project='+encodeURIComponent(beta.project),{headers})).json();assert.equal(view.agents[0].agentId,'b');
  const history=await (await fetch(link.origin+'/api/history?project='+encodeURIComponent(beta.project)+'&before=5&limit=5',{headers})).json();
  assert.equal(typeof history.available,'boolean');
- for(const file of ['/','/dashboard.js','/dashboard.css','/theme.js']){const response=await fetch(link.origin+file);assert.equal(response.status,200);assert.ok((await response.text()).length>100);}
+ for(const file of ['/','/dashboard.js','/dashboard.css','/theme.js','/model.js','/?view=plan']){const response=await fetch(link.origin+file);assert.equal(response.status,200);assert.ok((await response.text()).length>100);}
  assert.equal(await fs.readFile(path.join(dataDir,'state.json'),'utf8'),before);
 });

@@ -1,0 +1,41 @@
+name: Bug report
+description: Something in Agent Relay does not behave as documented
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `agent-relay --version`
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform and Node.js version
+      placeholder: macOS 15, Node 22.11
+    validations:
+      required: true
+  - type: dropdown
+    id: runner
+    attributes:
+      label: Runner
+      options: [Codex, Claude Code, OpenCode, Other MCP/CLI agent, Dashboard only, None]
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: Output of `agent-relay doctor`. Remove tokens and private paths first.
+      render: shell

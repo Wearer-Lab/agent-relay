@@ -1,0 +1,8 @@
+[DEPLOY-RESULT.md](/Users/sergekadjo/Tools/agent-relay/DEPLOY-RESULT.md) is written and uncommitted.
+
+- Pushed commit `6fe371d` and tag v0.2.0; [GitHub release](https://github.com/Wearer-Lab/agent-relay/releases/tag/v0.2.0) created.
+- Validation passed with the documented dry-run workaround.
+- Broker replaced: PID 3640 → 14882, version 0.2.0. Messages preserved: 195 → 195.
+- Backup retained; worktree and branch removed.
+
+npm login succeeded, but publication requested browser authentication, so I stopped. Registry remains at 0.1.0. Owner action: run `npm publish --otp=<code>` from the main checkout. Credentials were untouched.

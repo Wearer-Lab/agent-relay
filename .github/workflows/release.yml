@@ -1,0 +1,103 @@
+name: Release
+# Push a tag that matches package.json (for example v0.4.0) to publish that
+# exact packed archive to npm with provenance and attach it to a GitHub
+# release. Re-running the workflow is safe: published versions are skipped and
+# an existing release only gets its archive refreshed.
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to release (for example v0.4.0)
+        required: true
+permissions:
+  contents: write   # create the GitHub release
+  id-token: write   # npm trusted publishing and provenance
+concurrency:
+  group: release
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: npm
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.TAG }}
+          fetch-depth: 0
+          persist-credentials: false
+      # No dependency cache here: a release must not restore mutable state.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      # Trusted publishing (OIDC) needs npm 11.5.1 or later; Node 22 ships npm 10.
+      - name: Install npm 11.5.1 or later
+        run: |
+          npm install --global 'npm@^11.5.1'
+          npm --version
+      - name: Tag must match package.json and main
+        run: |
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Tag $TAG is not vMAJOR.MINOR.PATCH"; exit 1
+          fi
+          version="$(node -p "require('./package.json').version")"
+          if [ "v$version" != "$TAG" ]; then
+            echo "::error::Tag $TAG does not match package.json version $version"; exit 1
+          fi
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "::error::Tag $TAG is not on main; merge the release commit first"; exit 1
+          fi
+          {
+            echo "VERSION=$version"
+            if [[ "$version" == *-* ]]; then echo "NPM_TAG=next"; echo "PRERELEASE=--prerelease"
+            else echo "NPM_TAG=latest"; echo "PRERELEASE="; fi
+          } >> "$GITHUB_ENV"
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run release:check
+      - name: Pack the reviewed archive
+        run: |
+          file="$(npm pack --ignore-scripts --json --pack-destination "$RUNNER_TEMP" | node -p "JSON.parse(require('fs').readFileSync(0,'utf8'))[0].filename")"
+          echo "ARCHIVE=$RUNNER_TEMP/$file" >> "$GITHUB_ENV"
+      - name: Check whether this version is already on npm
+        id: published
+        run: |
+          if out="$(npm view "@wearer-haitch/agent-relay@$VERSION" dist.integrity 2>&1)"; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            local_sum="sha512-$(openssl dgst -sha512 -binary "$ARCHIVE" | openssl base64 -A)"
+            [ "$out" = "$local_sum" ] || echo "::warning::npm already has $VERSION with different contents than this archive; it will not be republished"
+          elif grep -q 'E404' <<<"$out"; then
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::Could not query the npm registry"; echo "$out"; exit 1
+          fi
+      # Trusted publishing needs no secret. If NPM_TOKEN exists it is used as a fallback.
+      - name: Use the NPM_TOKEN fallback when set
+        if: steps.published.outputs.exists == 'false'
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -n "$NPM_TOKEN" ]; then echo "NODE_AUTH_TOKEN=$NPM_TOKEN" >> "$GITHUB_ENV"; fi
+      - name: Publish to npm
+        if: steps.published.outputs.exists == 'false'
+        run: npm publish "$ARCHIVE" --access public --provenance --tag "$NPM_TAG"
+      - name: Wait for the registry to serve the version
+        run: |
+          for i in 1 2 3 4 5 6; do
+            npm view "@wearer-haitch/agent-relay@$VERSION" version && exit 0
+            sleep 10
+          done
+          echo "::error::npm does not list $VERSION yet"; exit 1
+      - name: Create or update the GitHub release
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ARCHIVE" --clobber
+          else
+            gh release create "$TAG" "$ARCHIVE" --title "$TAG" --generate-notes --verify-tag $PRERELEASE
+          fi
