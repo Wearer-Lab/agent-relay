@@ -96,6 +96,21 @@ await call({op:'claim',agentId:'vector-4',resources:['test/work-tree.test.mjs']}
 for(const [id,title,owner] of [['T-1','Tree action on tasks op','atlas-7'],['T-2','Roll-up progress','atlas-7'],['T-3','Surface in the dashboard','nimbus-2']])await soft({op:'tasks',action:'upsert',agentId:owner,id,title,owner});
 await soft({op:'tasks',action:'complete',agentId:'atlas-7',id:'T-1'});
 
+if(!flags.has('--mock')){
+ // Real git worktrees, branch claims and an imported roadmap exercise the merged broker ops end to end.
+ const {execFileSync}=await import('node:child_process');
+ const git=(args,cwd=project)=>{try{return execFileSync('git',args,{cwd,stdio:['ignore','pipe','ignore']}).toString();}catch{return null;}};
+ if(git(['init','-q','-b','main'])!==null){
+  for(const args of [['config','user.email','fixture@example.invalid'],['config','user.name','Fixture'],['commit','-q','--allow-empty','-m','init'],['branch','feat/tower'],['branch','feat/work-tree'],['branch','release/0.4'],['worktree','add','-q',path.join(root,'tower-wt'),'feat/tower']])git(args);
+  const wt=path.join(root,'tower-wt');
+  await soft({op:'register',agentId:'nimbus-wt',runner:'claude'},wt);
+  await soft({op:'branches',action:'claim',agentId:'nimbus-2',branch:'feat/tower',note:'dashboard redesign'});
+  await soft({op:'branches',action:'claim',agentId:'vector-4',branch:'feat/work-tree',note:'stalled'});
+  await soft({op:'branches',action:'claim',agentId:'kestrel-9',branch:'feat/gone',note:'deleted upstream'});
+ }
+ const roadmap=['# Relay 0.4','Owner: atlas-7','## Phase 1: Registry hygiene','### Live broadcast','- [x] Liveness window','- [x] Dormant direct delivery','- [ ] Prune sweep','  - [ ] Dry-run report','  - [x] Obligation guard','## Phase 2: Ownership','Branch: feat/tower','### Branch claims','- [x] Repo-scoped claims','- [ ] Ownership flags','### Dashboard','- [ ] Runways view','- [ ] Flight plan view','## Phase 3: Launch','### Release','- [ ] Landing page','- [ ] npm provenance'].join('\n');
+ await soft({op:'tasks',action:'import',agentId:'atlas-7',markdown:roadmap});
+}
 dashboard=await startDashboard({project,dataDir,port,decorate:flags.has('--mock')?mock:undefined});
 console.log(`Agent Relay dashboard fixture${flags.has('--mock')?' (with synthetic work, ownership and registry data)':''}:\n${dashboard.url}\nPress Ctrl+C to stop.`);
 if(flags.has('--open'))await openDashboard(dashboard.url);

@@ -6,7 +6,7 @@ import {fileURLToPath} from 'node:url';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 const exec=promisify(execFile),root=fileURLToPath(new URL('../',import.meta.url));
-const PUBLIC_DOCS=['docs/broker-notes.md','docs/ci-workflow.md','docs/claude-channel.md','docs/dashboard.md','docs/opencode.md','docs/process-ownership.md','docs/publishing.md','docs/validation.md','docs/work-items.md'];
+const PUBLIC_DOCS=['docs/branches.md','docs/broker-notes.md','docs/ci-workflow.md','docs/claude-channel.md','docs/dashboard.md','docs/opencode.md','docs/process-ownership.md','docs/publishing.md','docs/registry.md','docs/validation.md','docs/work-items.md','docs/work-items.md'];
 const tmp=await fs.mkdtemp(path.join(os.tmpdir(),'relay-release-'));
 const npm=process.platform==='win32'?'npm.cmd':'npm',npmCli=process.env.npm_execpath;
 const run=async(args,cwd=root)=>exec(npmCli?process.execPath:npm,npmCli?[npmCli,...args]:args,{cwd,env:{...process.env,npm_config_cache:path.join(tmp,'cache')},timeout:120000,maxBuffer:4*1024*1024});
@@ -31,7 +31,7 @@ try{
  // is a separate registry/dependency-resolution check in the publishing guide.
  await fs.symlink(path.join(root,'node_modules'),path.join(tmp,'package','node_modules'),process.platform==='win32'?'junction':'dir');
  const version=await exec(process.execPath,[cli,'--version']);assert.equal(version.stdout.trim(),pkg.version);
- for(const script of ['dashboard.js','theme.js'])await exec(process.execPath,['--check',path.join(tmp,'package','lib','dashboard',script)]);
+ for(const script of ['dashboard.js','theme.js','model.js'])await exec(process.execPath,['--check',path.join(tmp,'package','lib','dashboard',script)]);
  const help=await exec(process.execPath,[cli,'--help']);assert.ok(help.stdout.includes('npx --yes @wearer-haitch/agent-relay launch'));
  console.log(`Verified ${packed.filename}: ${packed.files.length} files, ${(packed.size/1024).toFixed(1)} KiB, CLI help/version pass.`);
 }finally{await fs.rm(tmp,{recursive:true,force:true});}
