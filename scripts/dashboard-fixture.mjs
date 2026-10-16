@@ -1,5 +1,6 @@
 // Preview helper: starts a throwaway broker, fills it with a small fleet, and serves the read-only dashboard on loopback.
-//   node scripts/dashboard-fixture.mjs [--mock] [--port N] [--open] [--keep]
+//   node scripts/dashboard-fixture.mjs [--mock | --no-git | --empty] [--port N] [--open] [--keep]
+// --no-git keeps the fleet but leaves the project outside any git repository; --empty makes a brand-new room (no agents, messages, claims, work or branches).
 // --mock overlays synthetic roadmap, branch-ownership, registry and liveness data, for brokers that cannot report them yet.
 // Everything lives in a temporary directory that is removed on exit (unless --keep).
 import fs from 'node:fs/promises';import os from 'node:os';import path from 'node:path';
@@ -15,8 +16,8 @@ function tree(){
  const roll=node=>{
   if(!node.children.length){node.progress={done:node.status==='done'?1:0,total:node.status==='cancelled'?0:1,percent:node.status==='done'?100:0};return node.progress;}
   const sum={done:0,total:0};for(const child of node.children){const p=roll(child);sum.done+=p.done;sum.total+=p.total;}
-  node.progress={...sum,percent:sum.total?Math.round(sum.done/sum.total*100):0};
-  node.status=node.progress.percent===100?'done':sum.done||node.children.some(c=>c.status==='in-progress')?'in-progress':node.status;return node.progress;
+  // Like the real broker, containers keep the status they were given ('todo' by default); the dashboard derives what to show.
+  node.progress={...sum,percent:sum.total?Math.round(sum.done/sum.total*100):0};return node.progress;
  };
  const roadmap={id:'RM-1',title:'Relay 0.4 launch',kind:'roadmap',status:'in-progress',state:'open',owner:'atlas-7',priority:1,labels:['launch'],branch:null,artifacts:[],blocked:false,blocking:[],createdAt:'2026-09-20T09:00:00Z',updatedAt:'2026-10-14T09:00:00Z',children:[
   {...leaf('Foundations','todo',{kind:'phase',id:'PH-1',owner:'atlas-7'}),children:[
@@ -35,7 +36,8 @@ function tree(){
     leaf('Flight plan tree and lanes','in-progress',{owner:'nimbus-2',branch:'feat/tower'}),
     leaf('Runways board','todo',{owner:'nimbus-2',branch:'feat/tower'}),
     leaf('Strips and radio log','todo',{owner:'harbor-1',branch:'feat/tower'}),
-    leaf('Retired mockups','cancelled',{owner:'quill-3'})]}]},
+    leaf('Retired mockups','cancelled',{owner:'quill-3'}),
+    leaf('Redesign the tower overview with registry hygiene, an attention board and live traffic strips for every long-named branch','in-progress',{owner:longAgent,branch:long,labels:['dashboard','a-label-that-is-unreasonably-long-to-test-wrapping']})]}]},
   {...leaf('Release','todo',{kind:'phase',id:'PH-3'}),children:[
    leaf('Publish npm package','todo',{owner:'quill-3',branch:'release/0.4',priority:2,labels:['release']}),
    leaf('Landing page','todo',{owner:'quill-3',branch:'feat/site',labels:['release','docs']})]}]};
@@ -43,16 +45,19 @@ function tree(){
  const counts={byKind:{},byStatus:{}};const count=node=>{counts.byKind[node.kind]=(counts.byKind[node.kind]??0)+1;counts.byStatus[node.status]=(counts.byStatus[node.status]??0)+1;node.children.forEach(count);};count(roadmap);
  return {available:true,roots:[roadmap],counts};
 }
+// Deliberately long names: the layout must wrap them, never overflow, even at phone width.
+const long='feature/DASH-4821-redesign-the-tower-overview-with-registry-hygiene-attention-board-and-live-traffic',longAgent='orchestrator-claude-opus-worktree-agent-with-a-remarkably-long-identifier-0042';
 function ownership(project){
  const minutesAgo=m=>new Date(Date.now()-m*60000).toISOString();
  const live=(agentId,l=true)=>({agentId,project,live:l,source:l?'claim':'commit'});
- return {available:true,repo:project,rooms:[project],generatedAt:new Date().toISOString(),branches:[
+ return {available:true,git:true,repo:project+'/.git',rooms:[project],generatedAt:new Date().toISOString(),branches:[
   {name:'main',head:'9f3c2a1b7',upstream:'origin/main',committedAt:minutesAgo(90),worktrees:[{path:project,project}],claim:null,agents:[],tasks:[],artifacts:[],flags:[]},
-  {name:'feat/tower',head:'a41be09c2',upstream:null,committedAt:minutesAgo(4),worktrees:[{path:project+'/.wt/tower',project}],claim:{agentId:'nimbus-2',project,claimedAt:minutesAgo(130),note:'dashboard redesign',live:true,stale:false},agents:[live('nimbus-2'),live('harbor-1')],tasks:[{id:'T-9',title:'Tower overview',state:'open',owner:'nimbus-2'},{id:'T-10',title:'Flight plan tree and lanes',state:'open',owner:'nimbus-2'}],artifacts:['docs/dashboard.md'],flags:['contested']},
+  {name:'feat/tower',head:'a41be09c2',upstream:null,committedAt:minutesAgo(4),worktrees:[{path:project+'/.wt/tower',project},{path:project+'/.wt/tower-review',project:null}],claim:{agentId:'nimbus-2',project,claimedAt:minutesAgo(130),note:'dashboard redesign',live:true,stale:false},agents:[live('nimbus-2'),live('harbor-1')],tasks:[{id:'T-9',title:'Tower overview',state:'open',owner:'nimbus-2'},{id:'T-10',title:'Flight plan tree and lanes',state:'open',owner:'nimbus-2'}],artifacts:['docs/dashboard.md'],flags:['contested']},
   {name:'feat/ownership',head:'77d0e5f31',upstream:'origin/feat/ownership',committedAt:minutesAgo(46),worktrees:[],claim:{agentId:'kestrel-9',project,claimedAt:minutesAgo(300),note:'branch map',live:true,stale:false},agents:[live('kestrel-9')],tasks:[{id:'T-6',title:'Flag contested and orphaned',state:'open',owner:'kestrel-9'}],artifacts:[],flags:[]},
   {name:'feat/work-tree',head:'1be8a77d0',upstream:'origin/feat/work-tree',committedAt:minutesAgo(2600),worktrees:[],claim:{agentId:'vector-4',project,claimedAt:minutesAgo(2900),note:'stalled',live:false,stale:true},agents:[live('vector-4',false)],tasks:[{id:'T-3',title:'Legacy list fallback',state:'open',owner:'vector-4'}],artifacts:[],flags:['orphaned']},
   {name:'release/0.4',head:'00ac91e55',upstream:null,committedAt:minutesAgo(900),worktrees:[],claim:null,agents:[],tasks:[{id:'T-12',title:'Publish npm package',state:'open',owner:'quill-3'}],artifacts:[],flags:['unclaimed']},
   {name:'feat/site',head:null,upstream:null,committedAt:null,worktrees:[],claim:null,agents:[live('quill-3')],tasks:[{id:'T-13',title:'Landing page',state:'open',owner:'quill-3'}],artifacts:[],flags:['missing']},
+  {name:long,head:'5d1c0ffee',upstream:'origin/'+long,committedAt:minutesAgo(25),worktrees:[{path:project+'/.wt/a-very-long-worktree-folder-name-for-the-tower-overview-redesign',project:null}],claim:{agentId:longAgent,project,claimedAt:minutesAgo(40),note:'a long claim note that keeps going to prove nothing escapes its card on a narrow screen',live:true,stale:false},agents:[live(longAgent)],tasks:[{id:'T-30',title:'Redesign the tower overview with registry hygiene, an attention board and live traffic strips',state:'open',owner:longAgent}],artifacts:[],flags:['orphaned','unclaimed']},
   {name:'spike/radar-sweep',head:'c20d4488a',upstream:null,committedAt:minutesAgo(12000),worktrees:[],claim:null,agents:[],tasks:[],artifacts:[],flags:['unclaimed']}],
   unassigned:{agents:[{agentId:'harbor-1',project,live:true,source:'status'}],tasks:[{id:'T-20',title:'Triage backlog',state:'open',owner:null}]}};
 }
@@ -63,6 +68,7 @@ function mock(observer){
   async getSnapshot(project){
    const real=await observer.getSnapshot(project);
    const extra=Array.from({length:44},(_,i)=>({agentId:`${['glint','ember','sable','orbit','fjord'][i%5]}-${100+i}`,runner:['codex','claude','opencode'][i%3],status:'idle',frozen:false,task:null,updatedAt:new Date(Date.now()-(3+i*4)*3600000).toISOString(),live:false,left:false}));
+   extra.unshift({agentId:longAgent,runner:'claude',status:'working',frozen:false,task:'Redesigning the tower overview with registry hygiene, an attention board and live traffic strips, then reconciling every long identifier at phone width',updatedAt:new Date(Date.now()-90000).toISOString(),live:true,left:false});
    const agents=[...real.agents.map(a=>({...a,live:live.has(a.agentId),readiness:{...a.readiness,transport:{state:live.has(a.agentId)?'connected':'unknown',adapter:a.runner,ts:new Date().toISOString(),source:'adapter-report'},push:{ready:live.has(a.agentId)}}})),...extra];
    return {...real,agents,registry:{stored:1410,live:live.size,dormant:1262,retired:96,ephemeral:27,prunable:388}};
   },
@@ -80,6 +86,9 @@ const call=async(fields,room=project)=>{
 };
 const soft=async(fields,room)=>{try{return await call(fields,room);}catch(error){console.warn(`(skipped ${fields.op}${fields.action?':'+fields.action:''}: ${error.message})`);}};
 const fleet=[['atlas-7','claude','Reviewing broker op wiring'],['nimbus-2','claude','Redesigning the tower dashboard'],['vector-4','codex','Waiting on review for the legacy fallback'],['kestrel-9','opencode','Mapping branch ownership'],['harbor-1','codex',null],['quill-3','claude','Drafting release notes']];
+const empty=flags.has('--empty');
+if(empty){await call({op:'register',agentId:'scout-1',runner:'codex'});await call({op:'leave',agentId:'scout-1'});}
+else{
 for(const [agentId,runner,task] of fleet){await call({op:'register',agentId,runner});await call({op:'status',agentId,status:task?'working':'idle',task});}
 await call({op:'register',agentId:'dock-1',runner:'codex'},other);
 const say=(from,to,body,extra={})=>call({op:'send',from,to,body,...extra});
@@ -95,8 +104,9 @@ await call({op:'claim',agentId:'atlas-7',resources:['lib/broker.mjs']});
 await call({op:'claim',agentId:'vector-4',resources:['test/work-tree.test.mjs']});
 for(const [id,title,owner] of [['T-1','Tree action on tasks op','atlas-7'],['T-2','Roll-up progress','atlas-7'],['T-3','Surface in the dashboard','nimbus-2']])await soft({op:'tasks',action:'upsert',agentId:owner,id,title,owner});
 await soft({op:'tasks',action:'complete',agentId:'atlas-7',id:'T-1'});
+}
 
-if(!flags.has('--mock')){
+if(!flags.has('--mock')&&!flags.has('--no-git')&&!empty){
  // Real git worktrees, branch claims and an imported roadmap exercise the merged broker ops end to end.
  const {execFileSync}=await import('node:child_process');
  const git=(args,cwd=project)=>{try{return execFileSync('git',args,{cwd,stdio:['ignore','pipe','ignore']}).toString();}catch{return null;}};

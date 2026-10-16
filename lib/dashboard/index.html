@@ -39,11 +39,17 @@
 
 <section id="view-tower" class="view" data-view="tower" aria-labelledby="h-tower">
 <header class="view-head rise"><div><p class="kicker">Overview</p><h1 id="h-tower">Tower</h1></div><p id="project" class="project">Waiting for the project…</p></header>
+<section id="welcome" class="panel welcome" aria-labelledby="h-welcome" hidden>
+<div class="panel-head"><h2 id="h-welcome">Quiet frequency</h2></div>
+<p class="lede" id="welcome-lede"></p>
+<ol class="steps"><li><span>Start a runner in the project</span><code>agent-relay launch claude</code></li><li><span>Or only configure the runners</span><code>agent-relay setup</code></li></ol>
+<p class="note">The runner registers itself, so it appears as a strip. Messages, claims, branches and roadmap items show up here as agents create them.</p>
+</section>
 <div class="gauges" id="gauges">
 <button type="button" class="gauge rise" data-go="strips" data-fk="g-live"><span class="g-label">On the air</span><strong id="agents-count">—</strong><span class="g-sub" id="agents-sub">live agents</span></button>
 <button type="button" class="gauge rise" data-go="log" data-fk="g-pending"><span class="g-label">Awaiting ack</span><strong id="pending-count">—</strong><span class="g-sub">pending deliveries</span></button>
 <button type="button" class="gauge rise" data-go="claims" data-fk="g-claims"><span class="g-label">Claims</span><strong id="claims-count">—</strong><span class="g-sub" id="claims-sub">files and resources</span></button>
-<button type="button" class="gauge rise" data-go="runways" data-fk="g-conflicts"><span class="g-label">Branch conflicts</span><strong id="conflicts-count">—</strong><span class="g-sub" id="conflicts-sub">ownership map</span></button>
+<button type="button" class="gauge rise" data-go="runways" data-fk="g-conflicts"><span class="g-label">Branch flags</span><strong id="conflicts-count">—</strong><span class="g-sub" id="conflicts-sub">ownership map</span></button>
 <button type="button" class="gauge rise gauge-ring" data-go="plan" data-fk="g-plan"><span class="g-label">Flight plan</span><strong id="plan-count">—</strong><span class="g-sub" id="plan-sub">roadmap progress</span><span class="ring" id="plan-ring" aria-hidden="true"></span></button>
 <button type="button" class="gauge rise" data-go="log" data-fk="g-messages"><span class="g-label">Transmissions</span><strong id="messages-count">—</strong><span class="g-sub">retained messages</span></button>
 </div>
