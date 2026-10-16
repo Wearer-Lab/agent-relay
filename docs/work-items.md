@@ -21,7 +21,7 @@ feature and reports that nothing was submitted.
 | `priority` | `p0` to `p3`. |
 | `labels` | Up to 16 labels of up to 48 bytes. |
 | `order` | Safe integer for sibling ordering (smaller first, then creation time). |
-| `branch` | A valid git branch name. |
+| `branch` | A valid git branch name (a leading `refs/heads/` is stripped, matching branch claims). |
 | `artifacts` | Up to 32 report folder paths or URLs, up to 1 KiB each. |
 | `dueAt` | ISO timestamp (normalized to UTC). |
 | `startedAt`, `completedAt` | Set automatically by status transitions. |
@@ -40,6 +40,20 @@ status derive it: `complete` is `done`, otherwise `todo`.
 `startedAt` is stamped the first time an item enters `in-progress`;
 `completedAt` when it enters `done` or `cancelled`, and it is cleared when the
 item is reopened.
+
+### Derived status of parents
+
+Items that have children and no stored `status` report a **derived** status in every view (`list`, `tree`,
+`import` plans, `ownership` task rows, `usage` counts), and the view also carries it as `derivedStatus`. It
+rolls up the leaf descendants: `done` when every non-cancelled leaf is done, `cancelled` when every leaf is
+cancelled, `in-progress` when any leaf is `in-progress`, `review` or `done`, `blocked` when a direct child
+reports `blocked` and nothing is in progress, otherwise `todo`. An explicit status on a middle item that is
+`in-progress` or `review` also counts as started work for its ancestors. A stored `status` always wins for the
+reported `status` (`derivedStatus` still shows the roll-up). Derived values are display-only and are never
+written to the ledger or to `state`; `list --status` and `tree` counts use the reported status.
+
+Markdown import therefore leaves headings (roadmap, phase, epic) without a `status` unless the document has a
+`Status:` line; only checklist items default to `todo`.
 
 ### Blocking
 
@@ -75,7 +89,10 @@ fields are accepted on `upsert`; new filters on `list`.
   anything; a real import returns the created and updated task views and the
   IDs left unchanged. Imports are atomic.
 
-The ledger holds up to 4096 items per project (`TASK_LIMIT` beyond that).
+The ledger holds up to 4096 items per project (`TASK_LIMIT` beyond that). `usage` reports
+`workItems: {total, open, byKind, byStatus, limit}` (reported statuses) next to `tasks`, whose headroom and
+`nearLimit` entry cover the bound. An open owned item keeps its owner from being pruned, from leaving idle
+and from retiring without `relinquish`.
 
 ## Markdown import
 

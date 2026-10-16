@@ -20,7 +20,7 @@ Stored in `state.branchClaims`, bounded by the same limit as path claims (4096):
 
 The holder is the pair (project, agentId): the same agent ID in a different room is a different holder. `meta` reuses the claim provenance keys (`baseCommit`, `patchHash`, `resultingCommit`, `verification`). `validateStore` requires the holder to exist in that project's room, branch names to be bounded strings without control characters (at most 256 bytes), and one claim per repo and branch. State without `branchClaims` loads unchanged.
 
-Branch names are used as given; a leading `refs/heads/` is stripped.
+Branch names are used as given except that a leading `refs/heads/` is stripped and the result is trimmed (so ` x` after the prefix is `x`). Work items (the `branch` field and `work list --branch`) use the same bare form.
 
 ### Broker op `branches`
 
@@ -31,7 +31,7 @@ Branch names are used as given; a leading `refs/heads/` is stripped.
 | `forceRelease` | `agentId` (human ID), `branch`, `reason` | `{released:[claim], claims, receipt}`. Appended to `state.releaseLog` as `{as, at, project, scope:'branch', repo, reason, released}`. `UNKNOWN_CLAIM` (404) when nothing is claimed, so a typo leaves no audit entry. |
 | `list` | `staleMinutes?` | `{repo, git, claims}` with holder liveness on each claim. |
 
-Holder liveness: `holder` is `active`, `stale` (not connected and not seen within `staleMinutes`), `left`, `retired` or `missing`. `live` is true only for `active`; `stale` is its negation.
+Holder liveness: `holder` is `active`, `stale` (not connected and not seen within `staleMinutes`), `left`, `retired` or `missing`. `live` is true only for `active`; `stale` is its negation. The classification is `liveness()` in `lib/registry.mjs`, the same definition behind live broadcast, registry counts and prune; ownership only supplies `staleMinutes` as the window.
 
 A holder that leaves keeps its claims; they show as `orphaned` until released or force-released. Retiring a holder is blocked by branch claims (below).
 
@@ -51,14 +51,14 @@ The MCP adapter (on start) and the OpenCode plugin (after registration) report `
     "worktrees": [{ "path", "project" }],
     "claim": { "agentId", "project", "claimedAt", "note", "live", "stale", "holder" },
     "agents": [{ "agentId", "project", "live", "source": "worktree|reported" }],
-    "tasks": [{ "id", "title", "state", "owner", "project" }],
+    "tasks": [{ "id", "title", "kind", "status", "state", "owner", "project" }],
     "artifacts": ["…"], "flags": ["orphaned|contested|unclaimed|missing"] }],
   "totalBranches": 12, "truncated": false,
   "unassigned": { "claims": [], "worktrees": [] }, "generatedAt": "…" }
 ```
 
 * `agents` are non-left agents of the repo's rooms. `live` means transport connected or seen within `staleMinutes`. An agent is placed by its room's checkout (`source: "worktree"`). If it reported a different branch from outside that checkout, the report places it (`source: "reported"`). A report made from the room's own worktree never overrides what that checkout has now.
-* `tasks` are tasks from those rooms whose `branch` field is the branch or whose `resources` include `branch:<name>`. `artifacts` are the strings in those tasks' `artifacts` field. Both fields are read defensively and are optional.
+* `tasks` carry the work-item `kind` and the reported `status` (derived for parents without a stored status, see work-items.md). They are tasks from those rooms whose `branch` field is the branch or whose `resources` include `branch:<name>`. `artifacts` are the strings in those tasks' `artifacts` field. Both fields are read defensively and are optional.
 * `worktrees` lists linked checkouts of the branch; `project` is the registered room for that worktree or `null`. Bare and prunable worktrees are ignored.
 
 Flags:
@@ -76,7 +76,7 @@ Git is advisory: every helper (`gitContext`, `listWorktrees`, `listBranches` in 
 
 ## Retire interplay
 
-`retire` counts branch claims as obligations. Without `relinquish:true` it fails with `RETIRE_BLOCKED` and `branchClaims:[branch…]` beside the existing `claims`, `machineClaims`, `handoffs` and `processes`. With `relinquish:true` the receipt reports them under `stranded.branchClaims`; they stay held by the retired identity (shown `orphaned`, holder `retired`) until `branch force-release`.
+`retire` counts branch claims (and open owned work items) as obligations. Without `relinquish:true` it fails with `RETIRE_BLOCKED` and `branchClaims:[branch…]` and `tasks:[id…]` beside the existing `claims`, `machineClaims`, `handoffs` and `processes`. With `relinquish:true` the receipt reports them under `stranded.branchClaims`; they stay held by the retired identity (shown `orphaned`, holder `retired`) until `branch force-release`.
 
 ## Surfaces
 

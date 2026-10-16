@@ -9,7 +9,9 @@ durable inboxes. Broker features: `live-broadcast`, `dormant-delivery`, `ephemer
 
 An agent is **live** when it has not left and either its transport is `connected` or it was last
 seen (`updatedAt`) within the window. Long polls (`wait`) and every authenticated operation refresh
-`updatedAt`. The window is 120 minutes unless a request says otherwise.
+`updatedAt`. The window is 120 minutes unless a request says otherwise. This is the only liveness
+definition: `isLive` / `liveness` in `lib/registry.mjs`. The ownership view reuses it with the
+`staleMinutes` threshold as the window (inclusive: an agent seen exactly `staleMinutes` ago is live).
 
 Identity states:
 
@@ -52,22 +54,26 @@ Pass `ephemeral: false` to `createMcpAdapter` to opt out. An older broker withou
 feature still gets a plain registration.
 
 When the adapter closes (or the CLI's stdin ends) an ephemeral agent calls `leave` with `ifIdle: true`.
-The broker leaves only if the agent holds no project or machine claims, pending handoffs (from or to),
-process records, or open owned tasks. Otherwise it answers `{left:false, kept:true, obligations}` and the
-adapter just reports its transport disconnected.
+The broker leaves only if the agent holds no project or machine claims, branch claims, pending handoffs
+(from or to), process records, or open owned work items (any non-terminal status). Otherwise it answers
+`{left:false, kept:true, obligations}` and the adapter just reports its transport disconnected.
+`obligations` is `{claims, machineClaims, branchClaims, handoffs, processes, tasks}`. The same set guards
+`prune`, the automatic sweep and `retire` (`RETIRE_BLOCKED` and `stranded` carry all six lists, tasks
+included), so no path can strand work another path would have protected.
 
 ## Stable worker names
 
 `AGENT_RELAY_AGENT_ID` (and `--as` on `agent-relay mcp`) sets the agent ID, so pooled jobs reuse
 `codex-worker-3` instead of minting an identity per thread. The session ID is still recorded.
-Precedence: explicit `agentId`/`--as`, then `AGENT_RELAY_AGENT_ID`, then `<runner>-<session>`.
+Precedence: explicit `agentId`/`--as`, then `AGENT_RELAY_AGENT_ID`, then `<runner>-<session>` (the
+`agent-relay mcp` command derives `<runner>:<session>` itself, the form Codex and Claude launches use).
 
 ## Pruning
 
-Op `prune` `{idleMinutes = 1440, ephemeralIdleMinutes = 15, dryRun = true, includeTest = false}`
+Op `prune` `{idleMinutes = the broker's pruneAfterMinutes (1440 when the sweep is off), ephemeralIdleMinutes = 15, dryRun = true, includeTest = false}`
 marks agents dormant (`left: true`, keeping `updatedAt` as the last-seen time) when they are
 not left or retired, idle at least the threshold, transport not connected, and hold no obligations
-(project claims, machine claims, pending handoffs, process records, open owned tasks). Ephemeral agents
+(project claims, machine claims, branch claims, pending handoffs, process records, open owned work items). Ephemeral agents
 use the shorter of the two thresholds (`ephemeralIdleMinutes: 0` disables the shorter threshold).
 Test-marked agents are skipped unless `includeTest` is true.
 
@@ -89,7 +95,11 @@ prune does not rewrite the ledger. The daemon accepts `--prune-after-minutes N` 
 `--ephemeral-prune-minutes N` (env `AGENT_RELAY_PRUNE_AFTER_MINUTES`, `AGENT_RELAY_EPHEMERAL_PRUNE_MINUTES`).
 
 A pruned agent that is still running (for example an idle non-channel session that was never connected)
-will get `UNKNOWN_AGENT` on its next call until it registers again.
+gets `UNKNOWN_AGENT` on its next call. The MCP adapter and the OpenCode plugin handle that themselves:
+the first `UNKNOWN_AGENT` for a call that is not `register` triggers one re-registration (which reactivates
+the dormant identity) and one retry; the channel watcher does the same and reports readiness again. A
+session that called `relay_leave` is never revived, and a genuinely unknown recipient still fails (after at
+most one extra registration). Raw CLI users re-run `join`.
 
 ## Counts and snapshots
 

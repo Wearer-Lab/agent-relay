@@ -200,7 +200,8 @@ test('tree rolls progress up over leaves, excludes cancelled leaves and sorts si
   assert.deepEqual(byId.r.progress, { done: 2, total: 5, percent: 40 });
   assert.equal(byId.t2.status, 'in-progress'); assert.equal(byId.t2.kind, 'task'); assert.ok(Array.isArray(byId.t2.blocking));
   assert.deepEqual(counts.byKind, { roadmap: 1, phase: 4, epic: 2, task: 3, todo: 2 });
-  assert.deepEqual(counts.byStatus, { todo: 7, 'in-progress': 1, blocked: 0, review: 0, done: 2, cancelled: 2 });
+  // Parents report a derived status: r, p1 and e1 are in-progress via t2/d1, p2 is cancelled (only a cancelled leaf), p0 and p3 stay todo.
+  assert.deepEqual(counts.byStatus, { todo: 3, 'in-progress': 4, blocked: 0, review: 0, done: 2, cancelled: 3 });
   // Subtree, kind and includeDone views.
   const sub = await f.rpc({ op: 'tasks', action: 'tree', rootId: 'p1' });
   assert.deepEqual(sub.roots.map(node => node.id), ['p1']); assert.equal(sub.counts.byKind.roadmap, 0);
@@ -217,9 +218,9 @@ test('tree rolls progress up over leaves, excludes cancelled leaves and sorts si
   await f.fails({ action: 'tree', kind: 'saga' }, 'INVALID_INPUT');
   assert.deepEqual((await f.rpc({ op: 'tasks', action: 'tree' }, f.other)).roots, []);
   const text = renderTree({ roots, counts });
-  assert.match(text, /^\[ \] roadmap: R /u);
+  assert.match(text, /^\[~\] roadmap: R /u);
   assert.match(text, /\[~\] task: T2 .*50% 1\/2 .*in-progress/u);
-  assert.match(text, /^ {4}\[ \] epic: E1/mu);
+  assert.match(text, /^ {4}\[~\] epic: E1/mu);
   assert.equal(renderTree({ roots: [] }), '(no work items)');
 });
 
@@ -271,8 +272,8 @@ test('list filters by kind, status, parent, branch and label alongside the legac
   const ids = async fields => (await f.rpc({ op: 'tasks', action: 'list', ...fields })).tasks.map(row => row.id).sort();
   assert.deepEqual(await ids({ kind: 'task' }), ['legacy', 't1', 't2']);
   assert.deepEqual(await ids({ kind: 'epic' }), ['e']);
-  assert.deepEqual(await ids({ status: 'in-progress' }), ['t1']);
-  assert.deepEqual(await ids({ status: 'todo' }), ['e', 'legacy', 't2']);
+  assert.deepEqual(await ids({ status: 'todo' }), ['legacy', 't2']); // e is in-progress through t1
+  assert.deepEqual(await ids({ status: 'in-progress' }), ['e', 't1']);
   assert.deepEqual(await ids({ parentId: 'e' }), ['t1', 't2']);
   assert.deepEqual(await ids({ parentId: null }), ['e', 'legacy']);
   assert.deepEqual(await ids({ branch: 'feat/two' }), ['t2']);
@@ -655,7 +656,7 @@ test('real CLI manages work items with add, set, move, tree --pretty, import and
   assert.deepEqual((await run('work', 'tree', '--kind', 'epic')).roots.map(node => node.id), ['epic']);
   assert.equal((await run('work', 'tree', '--root', 'epic', '--hide-done')).roots[0].children.length, 0);
   const pretty = await raw('work', 'tree', '--pretty');
-  assert.match(pretty, /roadmap: Plan .*100%/u); assert.match(pretty, /^ {2}\[ \] epic: Epic/mu); assert.match(pretty, /@serge/u);
+  assert.match(pretty, /roadmap: Plan .*100%/u); assert.match(pretty, /^ {2}\[x\] epic: Epic/mu); assert.match(pretty, /@serge/u);
   assert.equal((await run('work', 'list', '--kind', 'task')).tasks.length, 1);
   assert.equal((await run('work', 'list', '--parent', 'root')).tasks.length, 1);
   assert.equal((await run('work', 'list', '--label', 'x')).tasks[0].id, 'epic');
