@@ -29,7 +29,7 @@ message, claims a resource, changes a status, or acknowledges anything.
 | --- | --- | --- |
 | `1` | **Tower** | Fleet health at a glance: agents on the air versus identities stored, pending acknowledgements, claims, branch conflicts, roadmap progress, a registry hygiene bar, a "needs attention" board and the latest transmissions. |
 | `2` | **Plan** (flight plan) | The roadmap tree (roadmap, phase, epic, task, todo) with rolled-up progress, a lanes (kanban) layout, and filters for status, owner, branch, label and text. |
-| `3` | **Runways** | Branch ownership: who holds each branch, which agents and tasks are attached, and prominent `contested`, `missing`, `orphaned` and `unclaimed` flags. |
+| `3` | **Runways** | Branch ownership: who holds each branch, which agents and tasks are attached, which worktrees check it out, and prominent `contested`, `missing`, `orphaned` and `unclaimed` flags. The header names the repository (its folder, never `.git`) with the full path on hover. |
 | `4` | **Strips** | Every agent as a strip: live, idle or dormant, reported status and task, transport, pending acknowledgements and claims. A switch shows only live agents. |
 | `5` | **Radio** | The conversation: threads, per-recipient receipts, search, an unacknowledged filter and paging back through older history. |
 | `6` | **Claims** | Claimed files and shared resources, with stale holders marked. |
@@ -45,6 +45,40 @@ its full canonical path so projects with the same folder name can be
 distinguished. Rooms appear when an agent registers, rather than merely when
 setup writes configuration. Saved rooms persist and remain readable if a
 project moves or its directory is removed.
+
+### Reading the Tower and the plan
+
+- **Branch flags** counts the branches that carry any flag. Its caption lists
+  every flag kind that occurs with its count, most serious first (for example
+  `1 contested · 1 missing · 2 orphaned · 3 unclaimed`), and says
+  `all branches clear` when none do. The number matches the count on the
+  Runways rail item. Outside a git repository the card reads `not a git
+  repository`.
+- **Worktrees** on a runway list each checkout once, by folder name. A
+  `this room` chip marks the checkout of the room you are viewing, and a chip
+  says whether any room is registered for that checkout (`room registered` or
+  `no room`). The full path is in the tooltip.
+- **Status of parents.** A roadmap, phase, epic or task that contains other
+  items keeps the status it was given, which is `todo` unless someone set it, so
+  that field alone says nothing about progress. The plan therefore shows the
+  broker's `derivedStatus` when the tree node has one, and otherwise derives the
+  status from the children: all done is `done`, any progress or a child in
+  progress, review or blocked is `in progress`, otherwise `to do`. A derived
+  status has a dashed border and a tooltip; a status that was set explicitly
+  (for example `blocked` on an epic) is always shown as set. Filtering by status
+  matches what the chip shows.
+
+### Empty and unusual rooms
+
+- A broker with no rooms, and a room where no agent has checked in, open with a
+  short orientation card instead of a wall of zeros.
+- A project outside any git repository has an explanatory Runways view (claims
+  that cannot be placed stay listed under Unassigned) and an inactive branch
+  card.
+- A repository with no branches, a flight plan with no items (with the import
+  command to start one) and a branch map the broker truncated each say so.
+- Long branch names, agent ids, labels and paths wrap rather than overflow, down
+  to 375 pixels wide.
 
 ## Registry hygiene
 
@@ -111,9 +145,15 @@ Fonts are local stacks only (nothing is downloaded): a condensed display face,
 a monospaced face for callsigns and data, and a serif for message prose. Load
 animations run once per view and never replay on polling. They, and every
 transition, are disabled when the system asks for reduced motion. Everything
-is keyboard accessible, and the layout works down to 375 pixels wide: the view
-switcher becomes a bottom bar and tables and strips restack, with no horizontal
-page scroll.
+is keyboard accessible with a visible focus ring on every control, and the layout
+works down to 375 pixels wide: the view switcher becomes a bottom bar and tables
+and strips restack, with no horizontal page scroll.
+
+Every text and background pairing, including the status chips, tags and flags,
+meets WCAG AA contrast (4.5:1) in both themes; a test computes this from the
+stylesheet's color tokens. With reduced motion requested the dashboard also drops
+hover lift, and a new or jumped-to message stays marked with a still highlight
+instead of a flash.
 
 ## Storage and compatibility
 
@@ -157,9 +197,13 @@ directory, registers a small fleet, sends messages, creates claims and (when the
 broker supports them) work items, then serves the dashboard and prints its link:
 
 ```sh
-node scripts/dashboard-fixture.mjs [--mock] [--port N] [--open] [--keep]
+node scripts/dashboard-fixture.mjs [--mock | --no-git | --empty] [--port N] [--open] [--keep]
 ```
 
-`--mock` overlays synthetic roadmap, branch ownership, registry and liveness
-data, which previews every view even on a broker that cannot report them yet.
+Without flags it creates real git worktrees, branch claims and an imported
+roadmap through the broker. `--mock` overlays synthetic roadmap, branch
+ownership, registry (1,410 stored identities) and liveness data, including very
+long branch and agent names, which previews every view even on a broker that
+cannot report them yet. `--no-git` keeps the fleet but leaves the project
+outside a repository. `--empty` makes a brand-new room with nothing in it.
 The temporary directory is removed on Ctrl+C unless `--keep` is given.

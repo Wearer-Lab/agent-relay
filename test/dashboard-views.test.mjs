@@ -207,7 +207,7 @@ test('tower shows the registry hygiene story, attention items and degraded state
 test('tower summarizes the flight plan and branch conflicts when the broker supplies them',async()=>{
  const page=boot({projects:rooms,snapshot:fleetSnapshot(),work:workPayload(),ownership:ownershipPayload(),usage:{available:true,agents:{stored:33,active:33,left:0},nearLimit:[]}});
  await page.flush();
- assert.equal(textOf(page.$('conflicts-count')),'1');assert.equal(textOf(page.$('conflicts-sub')),'1 orphaned · 1 unclaimed · 1 missing');
+ assert.equal(textOf(page.$('conflicts-count')),'3','the number counts branches with any flag');assert.equal(textOf(page.$('conflicts-sub')),'1 contested · 1 missing · 1 orphaned · 1 unclaimed');
  assert.equal(textOf(page.$('plan-count')),'40%');assert.equal(textOf(page.$('plan-sub')),'2/5 items done');
  assert.equal(textOf(page.$('count-runways')),'3');assert.equal(textOf(page.$('count-plan')),'40%');
  assert.equal(textOf(page.$('registry')).includes('Source: broker storage usage'),true);
@@ -266,7 +266,7 @@ test('runways put flags first, filter by flag, and degrade when ownership is una
  assert.equal(findButton(page.$('runway-chips'),'Orphaned1').attributes['aria-pressed'],'true');
  findButton(page.$('runway-chips'),'Orphaned1').listeners.click();assert.equal(names().length,4);
  page.$('runway-q').value='vector';page.$('runway-q').listeners.input();assert.deepEqual(names(),['feat/tree','old']);
- assert.match(textOf(page.$('unassigned')),/agents \(1\)/);assert.match(textOf(page.$('unassigned')),/idle-1/);
+ assert.match(textOf(page.$('unassigned')),/Agents not on a branch \(1\)/);assert.match(textOf(page.$('unassigned')),/idle-1/);
  const off=boot({projects:rooms,snapshot:fleetSnapshot(),ownership:{available:false},search:'?view=runways'});await off.flush();
  assert.match(textOf(off.$('runways')),/Branch ownership is not available on this broker/);assert.equal(findAll(off.$('runway-chips'),el=>el.tag==='button').length,0);
 });
