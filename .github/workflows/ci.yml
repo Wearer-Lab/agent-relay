@@ -34,7 +34,7 @@ jobs:
         if: matrix.os == 'windows-latest' && matrix.node == 20
         continue-on-error: true
         timeout-minutes: 8
-        run: node --test --test-reporter=spec --test-timeout=60000 test/ownership.test.mjs
+        run: node --test --test-reporter=spec --test-timeout=90000 --test-name-pattern="real CLI exposes branches" test/ownership.test.mjs
       - run: npm run release:check
       - run: npm publish --dry-run --ignore-scripts --provenance=false
   package:

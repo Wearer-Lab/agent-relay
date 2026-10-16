@@ -504,12 +504,15 @@ gitTest('real CLI exposes branches, branch claim/release/list and force-release 
   t.after(async () => {
     try {
       const { pid } = JSON.parse(await fs.readFile(path.join(w.dataDir, 'broker.json'), 'utf8'));
+      process.stderr.write(`[diag] teardown kill ${pid}\n`);
       process.kill(pid, 'SIGTERM');
       for (let i = 0; i < 50; i++) { try { process.kill(pid, 0); await new Promise(r => setTimeout(r, 100)); } catch { break; } }
+      process.stderr.write(`[diag] teardown killed\n`);
     } catch { /* never started */ }
   });
   const env = { ...process.env, AGENT_RELAY_HOME: w.dataDir };
-  const exec = async (project, ...args) => JSON.parse((await run(process.execPath, [cli, ...args, '--project', project, '--data-dir', w.dataDir], { timeout: 20000, env })).stdout);
+  const T0 = Date.now(), dbg = m => process.stderr.write(`[diag +${Date.now() - T0}ms] ${m}\n`);
+  const exec = async (project, ...args) => { dbg(`start ${args.slice(0, 2).join(' ')}`); try { const r = await run(process.execPath, [cli, ...args, '--project', project, '--data-dir', w.dataDir], { timeout: 20000, env }); dbg(`done ${args.slice(0, 2).join(' ')}`); return JSON.parse(r.stdout); } catch (e) { dbg(`fail ${args.slice(0, 2).join(' ')} ${e.code ?? ''} ${e.killed ?? ''}`); throw e; } };
   await exec(w.trees.feature, 'join', '--as', 'a', '--runner', 'codex');
   await exec(w.repo, 'join', '--as', 'b', '--runner', 'codex');
   const claimed = await exec(w.trees.feature, 'branch', 'claim', 'feature', '--as', 'a', '--note', 'cli note');
