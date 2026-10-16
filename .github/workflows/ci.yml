@@ -1,4 +1,6 @@
 name: CI
+# Tests the package on macOS, Linux and Windows with Node 20 and 22, then
+# installs the packed archive into an empty project (shrinkwrap included).
 on:
   push:
     branches: [main]
@@ -7,22 +9,55 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   test:
+    name: test (${{ matrix.os }}, node ${{ matrix.node }})
     strategy:
       fail-fast: false
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
         node: [20, 22]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run release:check
-      - run: npm publish --dry-run --ignore-scripts
+      - run: npm publish --dry-run --ignore-scripts --provenance=false
+  package:
+    name: packed install (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Pack and install into an empty project
+        run: |
+          mkdir pack-out consumer
+          npm pack --ignore-scripts --pack-destination pack-out
+          cd consumer
+          npm init -y >/dev/null
+          npm install --ignore-scripts --no-audit --no-fund ../pack-out/*.tgz
+          expected="$(node -p "require('../package.json').version")"
+          actual="$(npx --no-install agent-relay --version)"
+          test "$actual" = "$expected" || { echo "::error::agent-relay reports $actual, expected $expected"; exit 1; }
+          npx --no-install agent-relay --help | grep -q 'npx --yes @wearer-haitch/agent-relay launch'

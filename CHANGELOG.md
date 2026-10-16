@@ -1,0 +1,59 @@
+# Changelog
+
+All notable changes to `@wearer-haitch/agent-relay` are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/) (pre-1.0: minor versions may add or change behavior).
+
+## [Unreleased]
+
+## [0.4.0] - 2026-10-15
+
+### Added
+
+- **Registry hygiene** ([docs/registry.md](docs/registry.md)). Broadcast `*` now reaches only live agents (connected, or seen within `--within` minutes, default 120); `*all` keeps the old "every non-left agent" meaning. Send results report the audience and how many agents were skipped, and `NO_RECIPIENTS` explains how to widen it. Direct messages to a dormant identity (left but not retired) are stored in its durable inbox until it registers again. Ephemeral registrations (`join --ephemeral`, `mcp --ephemeral`, `AGENT_RELAY_EPHEMERAL=1`, or a temporary session ID) leave on exit when idle and are kept while they hold claims, handoffs, process records or open tasks. `AGENT_RELAY_AGENT_ID` (or `--as` on `agent-relay mcp`) gives pooled workers a stable identity. The new `prune` operation (`agent-relay prune`, `relay_prune`) is a dry run unless `--apply`; the broker also sweeps automatically (`pruneAfterMinutes` default 1440, `ephemeralPruneMinutes` default 15, tunable with `--prune-after-minutes`, `--ephemeral-prune-minutes` or the matching environment variables). `agents` counts and `snapshot` carry `live`, `dormant`, `retired`, `ephemeral` and `prunable`.
+- **Branch ownership** ([docs/branches.md](docs/branches.md)). Repo-scoped branch claims shared by all worktrees of one repository (`agent-relay branch claim|release|list|force-release`, `agent-relay branches`, `relay_branch`), an optional per-agent git report on `status` (sent automatically by the MCP adapter and OpenCode plugin), and a read-only ownership view (`relay_ownership`) that joins git worktrees and branches, claims, live agents and tasks and flags `orphaned`, `contested`, `unclaimed` and `missing` branches. Retiring an agent now treats branch claims as obligations.
+- **Work items and roadmaps** ([docs/work-items.md](docs/work-items.md)). The task ledger is now a tree of `roadmap > phase > epic > task > todo` with status `todo | in-progress | blocked | review | done | cancelled`, `parentId`, `priority`, `labels`, `branch`, `artifacts`, `dueAt` and rolled-up progress. New actions `tree`, `move`, `remove` and `import` (markdown roadmap import, atomic and re-runnable), `agent-relay work ...` commands, and the `relay_roadmap` tool. Flat tasks from earlier versions keep working unchanged.
+- **Release and site automation.** GitHub Actions now run CI on macOS, Linux and Windows with Node 20 and 22 plus a packed-install check; pushing a `vX.Y.Z` tag publishes the exact packed archive to npm with provenance (trusted publishing) and creates the GitHub release; a Pages workflow publishes the landing page. Added release-note categories, Dependabot (npm and GitHub Actions, weekly), issue templates and a pull request template. See [docs/publishing.md](docs/publishing.md).
+- `package.json` now sets `publishConfig.provenance` and points `homepage` at the landing page; `release-check` verifies the changelog entry, lockfile versions and provenance setting.
+
+### Changed
+
+- **Dashboard redesign** ([docs/dashboard.md](docs/dashboard.md)). The dashboard is now an air traffic control tower with six views: Tower, Flight plan, Runways, Strips, Radio log and Claims (keys `1` to `6`, `?view=` deep links), Dark ("night tower"), Light and System themes, and a layout that works down to 375 pixels. It stays read-only and degrades with a clear message on brokers that lack the new operations (`/api/work`, `/api/ownership`, `/api/usage`). `scripts/dashboard-fixture.mjs` seeds a throwaway broker for previewing.
+- `send --to '*'` no longer reaches idle agents; use `--to '*all'` for the previous behavior.
+
+## [0.3.2] - 2026-10-13
+
+### Fixed
+
+- Windows swap measurement for `gate` sums `Win32_PageFileUsage` instead of using commit charge, which made an idle machine report far more swap than it used and refused every heavy check.
+
+## [0.3.1] - 2026-10-12
+
+### Fixed
+
+- Addressed the 0.3.0 code review: verified shutdown ownership; waiter-safe and offline restore with attachment verification; `relay_read_page` continuation that retrieves every omitted row within the 64 KiB response limit; an honest receipt ladder with missing states; direction-locked handoffs; version-bound bulletin acknowledgements; retire preflight; per-room usage; exact TOML table parsing during setup; full feature-set negotiation; CLI, MCP and OpenCode tool parity; and Unicode-safe bounded context.
+- Machine-specific operational reports moved to `docs/internal/`, which is never published.
+
+## [0.3.0] - 2026-10-11
+
+### Added
+
+- Capacity split between active and retained sessions, with a `retire` lifecycle.
+- Sender receipts, outbox and full history search; pinned policy bulletins with per-session acknowledgement.
+- Claim narrowing with a handoff workflow, claim provenance metadata, process records and structured tasks.
+- Storage maintenance (`usage`, `export`, `restore`, `audit-attachments`) and broker `doctor`, `stop` and `restart`.
+- Adapter reconnect with backoff, Windows attachment diagnostics, setup diagnostics, and honest gate measurement.
+
+## [0.2.0] - 2026-10-05
+
+### Added
+
+- Pollable inbox (`--unread`, `--since`, `--from`, `--limit`) and resilient `watch --json-lines`.
+- Machine-scope claims with audited forced release, and `gate` swap, load and disk preflight.
+- Last-seen presence, `agents --active`, and explicit `leave`.
+- Message summaries and durable attachments verified by SHA-256 on `fetch`.
+
+[Unreleased]: https://github.com/Wearer-Lab/agent-relay/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/Wearer-Lab/agent-relay/releases/tag/v0.4.0
+[0.3.2]: https://www.npmjs.com/package/@wearer-haitch/agent-relay/v/0.3.2
+[0.3.1]: https://www.npmjs.com/package/@wearer-haitch/agent-relay/v/0.3.1
+[0.3.0]: https://github.com/Wearer-Lab/agent-relay/commit/f41e531
+[0.2.0]: https://github.com/Wearer-Lab/agent-relay/releases/tag/v0.2.0

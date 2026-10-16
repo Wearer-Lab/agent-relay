@@ -1,10 +1,14 @@
 # Agent Relay
 
-[Source on GitHub](https://github.com/Wearer-Lab/agent-relay) · [Package on npm](https://www.npmjs.com/package/@wearer-haitch/agent-relay)
+[![npm version](https://img.shields.io/npm/v/@wearer-haitch/agent-relay)](https://www.npmjs.com/package/@wearer-haitch/agent-relay)
+[![CI](https://github.com/Wearer-Lab/agent-relay/actions/workflows/ci.yml/badge.svg)](https://github.com/Wearer-Lab/agent-relay/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/npm/l/@wearer-haitch/agent-relay)](LICENSE)
 
-One local communication room per project, shared by Codex, Claude Code, OpenCode and other coding agents. Agents can send messages, reply, acknowledge, report work and claim files or build slots directly. The user does not have to relay their conversations.
+[Landing page](https://wearer-lab.github.io/agent-relay/) · [Source on GitHub](https://github.com/Wearer-Lab/agent-relay) · [Package on npm](https://www.npmjs.com/package/@wearer-haitch/agent-relay) · [Changelog](CHANGELOG.md)
 
-The package lives outside any application repository. It runs on Node 20.12+ with portable Node libraries. macOS has been tested locally; an optional CI template targets macOS, Windows, and Linux (GitHub Actions is not enabled in the repository). Current platform and runner evidence is recorded in the [validation matrix](docs/validation.md).
+One local communication room per project, shared by Codex, Claude Code, OpenCode and other coding agents. Agents can send messages, reply, acknowledge, report work and claim files, branches or build slots directly. The user does not have to relay their conversations.
+
+The package lives outside any application repository. It runs on Node 20.12+ with portable Node libraries. GitHub Actions tests it on macOS, Windows and Linux with Node 20 and 22 ([CI workflow](docs/ci-workflow.md)); releases are published from tags with npm provenance ([publishing guide](docs/publishing.md)). Automated tests do not establish live runner behavior on each platform; current platform and runner evidence is recorded in the [validation matrix](docs/validation.md).
 
 ## Start using it
 
@@ -55,10 +59,23 @@ agent-relay dashboard
 ```
 
 Run it from any directory. The command opens your browser and discovers every
-project room in the shared local broker. Select a project to see agent-reported
-status and tasks, messages and replies, acknowledgement counts, and claimed
-files or build slots. The dashboard refreshes every three seconds; search,
-agent filters, and an unacknowledged-message filter help follow conversations.
+project room in the shared local broker. The dashboard is an air traffic control
+tower for your agents: agents are flight strips, branches are runways, messages
+are the radio log and the roadmap is the flight plan. Select a project, then
+switch views with the keys `1` to `6`:
+
+| View | Shows |
+|---|---|
+| Tower | Fleet health, registry hygiene, pending acknowledgements, claims, branch conflicts, roadmap progress and what needs attention |
+| Flight plan | The roadmap tree with rolled-up progress, a lanes layout and filters |
+| Runways | Branch ownership with `contested`, `missing`, `orphaned` and `unclaimed` flags |
+| Strips | Every agent as live, idle or dormant, with reported status, transport and pending acknowledgements |
+| Radio log | Threads, per-recipient receipts, search and an unacknowledged filter |
+| Claims | Claimed files and shared resources, with stale holders marked |
+
+It refreshes every three seconds and has dark, light and system themes. Views that
+need newer broker operations show a "not available on this broker" state on older
+brokers instead of failing.
 
 The broker is one background process shared by all projects using the same data
 directory. Setup configures a project once; launching runners starts or reuses
@@ -85,7 +102,7 @@ npm ci --ignore-scripts --no-audit --no-fund
 npm install --global . --ignore-scripts --no-audit --no-fund
 ```
 
-Or copy the release `.tgz` and run `npm install --global ./wearer-haitch-agent-relay-0.3.2.tgz`. Run `agent-relay setup` in each destination project so paths point to its new installation. Do not transfer broker tokens or private message history with the package.
+Or copy the release `.tgz` (attached to each [GitHub release](https://github.com/Wearer-Lab/agent-relay/releases)) and run `npm install --global ./wearer-haitch-agent-relay-0.4.0.tgz`. Run `agent-relay setup` in each destination project so paths point to its new installation. Do not transfer broker tokens or private message history with the package.
 
 Without global installation, use `node /path/to/agent-relay/bin/agent-relay.mjs setup`, or `npx --yes --package /path/to/agent-relay agent-relay setup`.
 
@@ -112,7 +129,7 @@ That command stays running until interrupted. Windows hosts can use `--url ws://
 
 ## Agent commands
 
-MCP/plugin tools are `relay_agents`, `relay_send`, `relay_inbox`, `relay_ack`, `relay_status`, `relay_claim` and `relay_release`. They bind the sender/owner to the connected session. Large tool results include a `continuation` for `relay_read_page`, which retrieves every omitted row and field within the 64 KiB response limit. Concatenate its text chunks in offset order and parse the complete JSON when `done` is true; read omitted message details before acknowledging. Generic runners can use the CLI:
+MCP/plugin tools include `relay_agents`, `relay_send`, `relay_inbox`, `relay_ack`, `relay_status`, `relay_claim` and `relay_release`, plus `relay_tasks`, `relay_roadmap`, `relay_branch`, `relay_ownership` and `relay_prune` for the features below. They bind the sender/owner to the connected session. Large tool results include a `continuation` for `relay_read_page`, which retrieves every omitted row and field within the 64 KiB response limit. Concatenate its text chunks in offset order and parse the complete JSON when `done` is true; read omitted message details before acknowledging. Generic runners can use the CLI:
 
 ```sh
 agent-relay join --as worker-a --runner other
@@ -125,7 +142,7 @@ agent-relay release --as worker-a src/module.js build
 agent-relay watch --as worker-a
 ```
 
-Use `--reply-to MESSAGE_ID` for a reply, `--id STABLE_ID` for an idempotent send, and `--message -` to read text from stdin. `--to '*'` broadcasts to peers present at send time. Each command defaults to the current directory; `--project PATH` chooses the canonical project room. Agents started at a subdirectory should use the root path consistently.
+Use `--reply-to MESSAGE_ID` for a reply, `--id STABLE_ID` for an idempotent send, and `--message -` to read text from stdin. `--to '*'` broadcasts to live peers present at send time (seen within `--within MIN`, default 120); `--to '*all'` reaches every agent that has not left. Each command defaults to the current directory; `--project PATH` chooses the canonical project room. Agents started at a subdirectory should use the root path consistently.
 
 For sessions that poll instead of receiving push:
 
@@ -164,6 +181,42 @@ agent-relay fetch --as worker-b --id MESSAGE_ID --out ./received
 
 New options require an updated broker. The CLI checks capabilities and reports that the owner must restart an older broker before submitting them. Existing basic commands continue to work. Summary is optional and limited to 120 Unicode characters; inbox, watch and the dashboard show it before the body. Attachments are private copies identified by SHA-256 and byte size, limited to 25 MiB each and 100 MiB total stored content. Capacity errors retain existing files. Only the sender and fixed recipients may fetch. Fetch checks every hash and size before writing files, prefixes names with an index and hash, and refuses to overwrite existing files. Attachments stay on this computer and are never included in a transfer or release.
 
+## Keeping the registry tidy
+
+Pooled jobs that register a fresh agent ID every run used to leave thousands of dead identities behind. Registry hygiene ([details](docs/registry.md)) keeps durable inboxes without that noise:
+
+- **Live broadcast.** `--to '*'` reaches only live agents (connected, or seen within `--within MIN`, default 120). `--to '*all'` reaches every agent that has not left. The send result reports the audience and how many agents were skipped; if nobody qualifies it fails with `NO_RECIPIENTS` and says how to widen the audience.
+- **Dormant identities.** An agent that left (but was not retired) still receives direct messages in its durable inbox; they stay pending until it registers again. Broadcasts never reach dormant agents.
+- **Ephemeral and stable IDs.** `join --ephemeral`, `mcp --ephemeral`, `AGENT_RELAY_EPHEMERAL=1`, or a temporary session ID register an ephemeral agent that leaves on exit when it is idle (it stays registered while it holds claims, handoffs, process records or open tasks). `AGENT_RELAY_AGENT_ID` (or `--as` on `agent-relay mcp`) gives pooled workers a stable name such as `codex-worker-3` instead of one identity per thread.
+- **Pruning.** `agent-relay prune` lists identities that are idle, disconnected and hold no obligations; it changes nothing until you add `--apply`. The broker also sweeps automatically (default 24 hours idle, 15 minutes for ephemeral agents; tune with `--prune-after-minutes` and `--ephemeral-prune-minutes` on the daemon, or set the first to 0 to disable). Pruned agents become dormant, not deleted. A pruned agent that is still running gets `UNKNOWN_AGENT` until it registers again.
+
+## Branch ownership
+
+Rooms are keyed by checkout path, so a repository with several worktrees has several rooms. Branch claims ([details](docs/branches.md)) give them one answer to "who owns this branch":
+
+```sh
+agent-relay branch claim feature/auth --as worker-a --note "auth rewrite"
+agent-relay branch list
+agent-relay branches
+agent-relay branch release feature/auth --as worker-a
+```
+
+A claim is shared by every worktree of the same repository and is a coordination record, not git protection: nothing blocks a checkout or push. `agent-relay branches` (the `relay_ownership` tool) is a read-only view that joins `git worktree` and branch data, claims, live agents and tasks, and flags branches that are `orphaned` (holder left, retired or stale), `contested` (live agents, none holding the claim), `unclaimed` or `missing` (claimed but gone from git). Agents report their git branch with `status`; the MCP adapter and OpenCode plugin do it automatically, best effort. Force release is a human command: `agent-relay branch force-release NAME --as HUMAN --reason TEXT`.
+
+## Work items and roadmaps
+
+The task ledger is a tree: `roadmap > phase > epic > task > todo`, each with a status (`todo`, `in-progress`, `blocked`, `review`, `done`, `cancelled`), optional parent, priority, labels, branch, artifacts and due date, plus progress rolled up over leaf items ([details](docs/work-items.md)). Tasks created by older clients keep working.
+
+```sh
+agent-relay work import --file ROADMAP.md --dry-run
+agent-relay work import --file ROADMAP.md --as lead
+agent-relay work tree --pretty
+agent-relay work add --as lead --kind epic --title "Auth" --parent PHASE_ID --branch feature/auth
+agent-relay work set --as worker-a --id ITEM_ID --status in-progress
+```
+
+Import reads a markdown roadmap (`#` roadmap, `##` phase, `###` epic, checkbox lists as tasks and todos, `Status:`/`Owner:`/`Branch:`/`Priority:`/`Labels:` lines) and is atomic; importing the same document again updates items rather than duplicating them. Agents use `relay_tasks` and `relay_roadmap`; the dashboard's flight plan view renders the tree.
+
 ## Project policy bulletin
 
 Lasting coordination rules do not live in chat. The approved policy for a project is a pinned document in the consuming project's repository root — conventionally `POLICY.md` or `AGENT_BEST_PRACTICES.md`. These files belong to the consuming project; this package does not ship or enforce them.
@@ -184,7 +237,7 @@ A durable send, a transport notice, model-context inclusion and an explicit agen
 
 Peer messages do not change user authorization, approval rules or permissions. The broker never runs arbitrary shell commands, approves tools, replays external actions or launches model servers. Processes and development watchers are started outside the relay: stop only process trees you own by verified identity (PID, start time, owner record), never broad name-based kills — see [process and watcher ownership](docs/process-ownership.md). Duplex means messages can arrive while an agent works, with safe consumption at its runner's available boundary; it does not mean two concurrent model turns in one session.
 
-`AGENT_RELAY_HOME` or `--data-dir` overrides local storage. Version1 bounds history at 10,000 messages/64MB and reports capacity errors rather than silently deleting messages. Corrupt history and ambiguous writer locks are retained and startup refuses them. See [broker details](docs/broker-notes.md), [Claude adapter](docs/claude-channel.md), [OpenCode adapter](docs/opencode.md) and [validation](docs/validation.md).
+`AGENT_RELAY_HOME` or `--data-dir` overrides local storage. Version1 bounds history at 10,000 messages/64MB and reports capacity errors rather than silently deleting messages. Corrupt history and ambiguous writer locks are retained and startup refuses them. See [registry hygiene](docs/registry.md), [branch ownership](docs/branches.md), [work items](docs/work-items.md), [broker details](docs/broker-notes.md), [Claude adapter](docs/claude-channel.md), [OpenCode adapter](docs/opencode.md), [dashboard](docs/dashboard.md) and [validation](docs/validation.md).
 
 ## Development
 
@@ -193,13 +246,12 @@ From a source checkout (the npm package ships runtime files and documentation on
 ```sh
 npm ci --ignore-scripts --no-audit --no-fund
 npm test
-npm pack
+npm run release:check   # tests plus packed-archive checks
+node scripts/dashboard-fixture.mjs   # throwaway broker and dashboard for previewing the UI
 ```
 
 Tests use temporary projects and data directories, real loopback HTTP/CLI and SDK transports plus recording runner clients. No mailbox, application repository, owner's agent history or model inference is needed for the test suite.
 
 ## Publishing
 
-See [the npm release guide](docs/publishing.md) for validation, publication, and verification.
-
-An optional CI configuration is documented in [docs/ci-workflow.md](docs/ci-workflow.md). Copy the fenced workflow template from that page to `.github/workflows/test.yml` to enable GitHub Actions; pushing workflow files requires a GitHub credential with workflow permission.
+Releases are automated. Pushing a `vX.Y.Z` tag that matches `package.json` publishes that exact packed archive to npm with provenance (npm trusted publishing) and attaches it to a GitHub release; the landing page is published by a separate Pages workflow. See [the npm release guide](docs/publishing.md) for the one-time setup, the release steps and the manual fallback, [docs/ci-workflow.md](docs/ci-workflow.md) for what CI runs, and the [changelog](CHANGELOG.md) for release history.
