@@ -125,7 +125,7 @@ test('real SDK tools use pinned project/agent identity and exact broker fields',
     ['relay_read_page', 'relay_agents', 'relay_send', 'relay_inbox', 'relay_ack', 'relay_status', 'relay_claim', 'relay_release',
       'relay_leave', 'relay_fetch', 'relay_outbox', 'relay_receipt', 'relay_history', 'relay_bulletin_get',
       'relay_bulletin_ack', 'relay_handoff_request', 'relay_handoff_respond', 'relay_handoffs', 'relay_claim_narrow',
-      'relay_tasks', 'relay_processes_list', 'relay_group_agents', 'relay_prune']);
+      'relay_tasks', 'relay_processes_list', 'relay_group_agents', 'relay_prune', 'relay_ownership', 'relay_branch']);
   const operations = [
     ['relay_agents', {}, { op: 'agents', limit: 100 }],
     ['relay_agents', { active: true, within: 5, transport: 'connected' },
@@ -452,7 +452,7 @@ test('optional Codex attachment tool pins callback identity without claiming cha
     attachments.push(input);
     return { attached: true, threadId: input.threadId };
   } });
-  assert.equal(f.tools.tools.length, 24);
+  assert.equal(f.tools.tools.length, 26);
   assert.equal(f.tools.tools.at(-1).name, 'relay_attach_codex');
   assert.deepEqual(f.tools.tools.at(-1).inputSchema.required, ['threadId']);
   assert.equal(f.tools.tools.at(-1).inputSchema.additionalProperties, false);
