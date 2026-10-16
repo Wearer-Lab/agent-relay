@@ -54,7 +54,8 @@ runner can leave that message pending for the next real model boundary or `relay
 
 The standard plugin client in OpenCode 1.18.34 uses the legacy SDK request shape (`path`, `query`,
 `body`), not the SDK v2 flattened parameter shape. Named/default exports refer to the same function,
-which OpenCode's plugin loader deduplicates. `@opencode-ai/plugin` is pinned to 1.18.34.
+which OpenCode's plugin loader deduplicates. Tool definitions use Zod directly with the same `tool()` contract as `@opencode-ai/plugin`
+(an identity wrapper plus `tool.schema`), so the relay does not depend on that package.
 
 Session deletion fences stale hooks, aborts that session's wait and reports offline in background.
 A sessionless `server.instance.disposed` event is handled before session-ID filtering; the plugin's

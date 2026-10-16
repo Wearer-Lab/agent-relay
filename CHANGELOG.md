@@ -19,6 +19,13 @@ All notable changes to `@wearer-haitch/agent-relay` are recorded here. The forma
 - **Dashboard redesign** ([docs/dashboard.md](docs/dashboard.md)). The dashboard is now an air traffic control tower with six views: Tower, Flight plan, Runways, Strips, Radio log and Claims (keys `1` to `6`, `?view=` deep links), Dark ("night tower"), Light and System themes, and a layout that works down to 375 pixels. It stays read-only and degrades with a clear message on brokers that lack the new operations (`/api/work`, `/api/ownership`, `/api/usage`). `scripts/dashboard-fixture.mjs` seeds a throwaway broker for previewing.
 - `send --to '*'` no longer reaches idle agents; use `--to '*all'` for the previous behavior.
 
+### Security
+
+- Dropped the `@opencode-ai/plugin` runtime dependency. The OpenCode tools now use
+  Zod directly with the same `tool()` contract, which removes `effect` (a beta),
+  `msgpackr` (flagged by Socket as a potential vulnerability) and the native
+  `msgpackr-extract` from the installed tree (runtime packages in the shrinkwrap: 123 to 97).
+
 ## [0.3.2] - 2026-10-13
 
 ### Fixed
