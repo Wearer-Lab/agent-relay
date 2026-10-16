@@ -125,7 +125,7 @@ test('real SDK tools use pinned project/agent identity and exact broker fields',
     ['relay_read_page', 'relay_agents', 'relay_send', 'relay_inbox', 'relay_ack', 'relay_status', 'relay_claim', 'relay_release',
       'relay_leave', 'relay_fetch', 'relay_outbox', 'relay_receipt', 'relay_history', 'relay_bulletin_get',
       'relay_bulletin_ack', 'relay_handoff_request', 'relay_handoff_respond', 'relay_handoffs', 'relay_claim_narrow',
-      'relay_tasks', 'relay_processes_list', 'relay_group_agents']);
+      'relay_tasks', 'relay_roadmap', 'relay_processes_list', 'relay_group_agents']);
   const operations = [
     ['relay_agents', {}, { op: 'agents', limit: 100 }],
     ['relay_agents', { active: true, within: 5, transport: 'connected' },
@@ -271,7 +271,7 @@ test('invalid/spoofed arguments and broker conflicts cannot look successful', as
     ['relay_handoff_request', { resources: ['a'], reason: 'x', agentId: 'spoof' }],
     ['relay_handoff_respond', { id: 'h', accept: 'yes' }], ['relay_handoff_respond', { id: 'h' }],
     ['relay_claim_narrow', { resource: 'src' }], ['relay_claim_narrow', { resource: 'src', resources: [] }],
-    ['relay_tasks', {}], ['relay_tasks', { action: 'remove' }], ['relay_tasks', { action: 'list', blocked: 'yes' }],
+    ['relay_tasks', {}], ['relay_tasks', { action: 'bogus' }], ['relay_tasks', { action: 'list', blocked: 'yes' }],
     ['relay_tasks', { action: 'list', state: 'done' }],
     ['relay_tasks', { action: 'upsert', title: 'x', blockedBy: Array.from({ length: 65 }, (_, i) => `b-${i}`) }],
     ['relay_tasks', { action: 'upsert', title: 'x', resources: Array.from({ length: 65 }, (_, i) => `r-${i}`) }],
@@ -452,7 +452,7 @@ test('optional Codex attachment tool pins callback identity without claiming cha
     attachments.push(input);
     return { attached: true, threadId: input.threadId };
   } });
-  assert.equal(f.tools.tools.length, 23);
+  assert.equal(f.tools.tools.length, 24);
   assert.equal(f.tools.tools.at(-1).name, 'relay_attach_codex');
   assert.deepEqual(f.tools.tools.at(-1).inputSchema.required, ['threadId']);
   assert.equal(f.tools.tools.at(-1).inputSchema.additionalProperties, false);

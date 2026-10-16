@@ -1536,12 +1536,12 @@ test('usage separates per-room and global capacity honestly', async t => {
   assert.equal(usage.headroom.machineClaims, 4094);
   assert.equal(usage.headroom.handoffs, 1017);
   assert.equal(usage.headroom.processes, 251);
-  assert.equal(usage.headroom.tasks, 1015);
+  assert.equal(usage.headroom.tasks, 4087);
   assert.ok(usage.headroom.agentsRetained > 0 && usage.headroom.agentsActive > 0 && usage.headroom.claims > 0);
   assert.equal(usage.notices.largest.allowance, 3072);
   assert.equal(usage.notices.largest.markers, 2000);
   assert.equal(usage.headroom.notices, 1072);
-  assert.deepEqual(usage.tasks, { used: 13, limit: 1024 });
+  assert.deepEqual(usage.tasks, { used: 13, limit: 4096 });
   assert.deepEqual(usage.followups, { used: 2, perMessageLimit: 32 });
   assert.deepEqual(usage.releaseLog, { used: 1, limit: 10000 });
   assert.deepEqual(usage.bulletins, { rooms: 1, versionsLimit: 16 });
