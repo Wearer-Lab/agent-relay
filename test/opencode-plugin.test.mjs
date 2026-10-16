@@ -145,7 +145,7 @@ test('existing inbox is recovered; failed acknowledgement retains context; self 
 
 test('twenty-two standard tools bind sender and resource owner to context session and refuse cross-project calls', async t => {
   const h = harness(), hooks = await plugin(h); t.after(() => hooks.dispose()); await busy(hooks);
-  assert.equal(Object.keys(hooks.tool).length, 22);
+  assert.equal(Object.keys(hooks.tool).length, 23);
   for (const definition of Object.values(hooks.tool)) assert.ok(z.object(definition.args));
   await hooks.tool.relay_send.execute({ to: 'codex:existing', body: 'Safe coordination', from: 'forged', op: 'forged' }, toolContext());
   await hooks.tool.relay_claim.execute({ resources: ['build'] }, toolContext());
@@ -323,7 +323,7 @@ test('bulk acknowledgement moves only handled pending rows to acknowledged', asy
 });
 test('r24 coordination tools forward exact broker fields with context identity and refuse cross-project calls', async t => {
   const h = harness(), hooks = await plugin(h); t.after(() => hooks.dispose()); await busy(hooks);
-  assert.equal(Object.keys(hooks.tool).length, 22);
+  assert.equal(Object.keys(hooks.tool).length, 23);
   for (const definition of Object.values(hooks.tool)) assert.ok(z.object(definition.args));
   const schemas = Object.fromEntries(Object.entries(hooks.tool).map(([name, definition]) => [name, z.object(definition.args)]));
   schemas.relay_bulletin_get.parse({});
