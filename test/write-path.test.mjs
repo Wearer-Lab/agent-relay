@@ -159,13 +159,21 @@ test('a failed write does not lose presence: the next flush carries it again', a
   await f.call({ op: 'register', agentId: 'a', runner: 'test' });
   await new Promise(r => setTimeout(r, 1100));
   const real = fs.rename;
-  let failures = 0;
+  let failures = 0, inFlight = false;
   fs.rename = async (from, to, ...rest) => {
-    if (failures < 1 && String(to).endsWith('state.json')) { failures++; throw Object.assign(new Error('busy'), { code: 'EIO' }); }
+    if (failures < 1 && String(to).endsWith('state.json')) {
+      failures++; inFlight = true;
+      await new Promise(r => setTimeout(r, 200));
+      inFlight = false;
+      throw Object.assign(new Error('busy'), { code: 'EIO' });
+    }
     return real.call(fs, from, to, ...rest);
   };
   t.after(() => { fs.rename = real; });
   await f.call({ op: 'inbox', agentId: 'a' });
+  // Read while the presence timer's write is in flight and about to fail: reads must not
+  // wait on, or fail with, a presence-only write.
+  while (!inFlight) await new Promise(r => setTimeout(r, 5));
   const refreshed = (await f.call({ op: 'agents' })).agents[0].updatedAt;
   const deadline = Date.now() + 3000;
   while (Date.now() < deadline && (await f.disk()).rooms[0].agents[0].updatedAt !== refreshed) await new Promise(r => setTimeout(r, 25));
