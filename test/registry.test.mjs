@@ -26,7 +26,7 @@ async function fixture(t,brokerOptions={pruneAfterMinutes:0}){
  const serverFactory=callback=>{handler=callback;const server=new EventEmitter();server.listen=(port,host,ready)=>queueMicrotask(ready);server.address=()=>({port:0});server.close=done=>done?.();return server;};
  const open=()=>createBroker({dataDir,serverFactory,...options});
  broker=await open();
- t.after(async()=>{await broker.close();await fs.rm(root,{recursive:true,force:true});});
+ t.after(async()=>{await broker.close();await fs.rm(root,{recursive:true,force:true,maxRetries:15,retryDelay:200});});
  async function request(fields,room=project){
   let status,result;const response=new EventEmitter();response.writeHead=code=>{status=code;};response.end=body=>{result=JSON.parse(body);};
   const incoming={method:'POST',url:'/rpc',headers:{authorization:'Bearer '+broker.token},async *[Symbol.asyncIterator](){yield Buffer.from(JSON.stringify({project:room,...fields}));}};
@@ -345,7 +345,7 @@ test('ephemeral adapter against a real broker leaves when idle and stays when it
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'relay-registry-mcp-'));
  const dataDir=path.join(root,'data'),project=path.join(root,'project');await fs.mkdir(dataDir);await fs.mkdir(project);
  const broker=await createBroker({dataDir,pruneAfterMinutes:0});
- t.after(async()=>{await broker.close();await fs.rm(root,{recursive:true,force:true});});
+ t.after(async()=>{await broker.close();await fs.rm(root,{recursive:true,force:true,maxRetries:15,retryDelay:200});});
  const rpcImpl=async(room,fields,{signal}={})=>{
   const response=await fetch(broker.url+'/rpc',{method:'POST',headers:{authorization:'Bearer '+broker.token,'content-type':'application/json'},body:JSON.stringify({project:room,...fields}),signal});
   const body=await response.json();if(!body.ok){const e=new Error(body.error?.message);e.code=body.error?.code;throw e;}return body;
@@ -403,7 +403,7 @@ test('OpenCode tools relay_send(within) and relay_prune mirror the MCP surface',
 test('real CLI: prune is a dry run unless --apply; send accepts *all and --within; join --ephemeral',async t=>{
  const exec=promisify(execFile),cli=fileURLToPath(new URL('../bin/agent-relay.mjs',import.meta.url));
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'relay-registry-cli-')),project=path.join(root,'project'),dataDir=path.join(root,'data');await fs.mkdir(project);
- t.after(async()=>{try{const {pid}=JSON.parse(await fs.readFile(path.join(dataDir,'broker.json'),'utf8'));process.kill(pid,'SIGTERM');for(let i=0;i<50;i++){try{process.kill(pid,0);await new Promise(r=>setTimeout(r,20));}catch{break;}}}catch{}await fs.rm(root,{recursive:true,force:true});});
+ t.after(async()=>{try{const {pid}=JSON.parse(await fs.readFile(path.join(dataDir,'broker.json'),'utf8'));process.kill(pid,'SIGTERM');for(let i=0;i<50;i++){try{process.kill(pid,0);await new Promise(r=>setTimeout(r,20));}catch{break;}}}catch{}await fs.rm(root,{recursive:true,force:true,maxRetries:15,retryDelay:200});});
  const run=async(...args)=>JSON.parse((await exec(process.execPath,[cli,...args,'--project',project,'--data-dir',dataDir],{timeout:20000,env:{...process.env,AGENT_RELAY_PRUNE_AFTER_MINUTES:'0'}})).stdout);
  await run('join','--as','a','--runner','codex');
  const eph=await run('join','--as','b','--runner','codex','--ephemeral');assert.equal(eph.agent.ephemeral,true);
@@ -424,7 +424,7 @@ test('real CLI mcp: AGENT_RELAY_AGENT_ID names the worker, --ephemeral leaves on
  const {spawn}=await import('node:child_process');
  const exec=promisify(execFile),cli=fileURLToPath(new URL('../bin/agent-relay.mjs',import.meta.url));
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'relay-registry-mcpcli-')),project=path.join(root,'project'),dataDir=path.join(root,'data');await fs.mkdir(project);
- t.after(async()=>{try{const {pid}=JSON.parse(await fs.readFile(path.join(dataDir,'broker.json'),'utf8'));process.kill(pid,'SIGTERM');for(let i=0;i<50;i++){try{process.kill(pid,0);await new Promise(r=>setTimeout(r,20));}catch{break;}}}catch{}await fs.rm(root,{recursive:true,force:true});});
+ t.after(async()=>{try{const {pid}=JSON.parse(await fs.readFile(path.join(dataDir,'broker.json'),'utf8'));process.kill(pid,'SIGTERM');for(let i=0;i<50;i++){try{process.kill(pid,0);await new Promise(r=>setTimeout(r,20));}catch{break;}}}catch{}await fs.rm(root,{recursive:true,force:true,maxRetries:15,retryDelay:200});});
  const base={...process.env,AGENT_RELAY_PRUNE_AFTER_MINUTES:'0'};
  for(const key of envKeys)delete base[key];
  const run=async(...args)=>JSON.parse((await exec(process.execPath,[cli,...args,'--project',project,'--data-dir',dataDir],{timeout:20000,env:base})).stdout);

@@ -11,7 +11,7 @@ const run = promisify(execFile);
 test('gitCommonDir resolves one common directory for a checkout and its linked worktrees', async t => {
   try { await run('git', ['--version']); } catch { t.skip('git is unavailable'); return; }
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-relay-git-'));
-  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  t.after(() => fs.rm(root, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 }));
   const repo = path.join(root, 'repo');
   const worktree = path.join(root, 'wt');
   await fs.mkdir(repo);

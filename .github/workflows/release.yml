@@ -89,11 +89,12 @@ jobs:
         run: npm publish "$ARCHIVE" --access public --provenance --tag "$NPM_TAG"
       - name: Wait for the registry to serve the version
         run: |
-          for i in 1 2 3 4 5 6; do
-            npm view "@wearer-haitch/agent-relay@$VERSION" version && exit 0
+          # The registry can take a few minutes to serve a fresh version.
+          for i in $(seq 1 30); do
+            npm view "@wearer-haitch/agent-relay@$VERSION" version >/dev/null 2>&1 && exit 0
             sleep 10
           done
-          echo "::error::npm does not list $VERSION yet"; exit 1
+          echo "::error::npm does not list $VERSION after 5 minutes; re-run this job to create the release"; exit 1
       - name: Create or update the GitHub release
         run: |
           if gh release view "$TAG" >/dev/null 2>&1; then

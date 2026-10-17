@@ -7,7 +7,7 @@ import {setupProject} from '../lib/setup.mjs';
 import {parse} from 'jsonc-parser';
 
 test('setup preserves instructions, JSONC, permissions and is idempotent',async t=>{
- const dir=await fs.mkdtemp(path.join(os.tmpdir(),'relay-setup-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'relay-setup-'));t.after(()=>fs.rm(dir,{recursive:true,force:true,maxRetries:15,retryDelay:200}));
  await fs.writeFile(path.join(dir,'AGENTS.md'),'# Our rules\nNever overwrite our policy.\n');
  await fs.writeFile(path.join(dir,'.mcp.json'),'{\n// existing provider\n"mcpServers":{"existing":{"command":"other"}},"policy":"ask"\n}\n');
  await fs.mkdir(path.join(dir,'.codex'));await fs.writeFile(path.join(dir,'.codex/config.toml'),'approval_policy = "on-request"\n[features]\nexample = true\n');
@@ -18,19 +18,19 @@ test('setup preserves instructions, JSONC, permissions and is idempotent',async 
  assert.deepEqual((await setupProject(dir)).changed,[]);
 });
 test('conflicting runner configuration is preserved',async t=>{
- const dir=await fs.mkdtemp(path.join(os.tmpdir(),'relay-conflict-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'relay-conflict-'));t.after(()=>fs.rm(dir,{recursive:true,force:true,maxRetries:15,retryDelay:200}));
  const original='{"mcpServers":{"agent-relay":{"command":"my-other-server"}}}';await fs.writeFile(path.join(dir,'.mcp.json'),original);
  await assert.rejects(setupProject(dir,{runners:['claude']}),/Existing/);assert.equal(await fs.readFile(path.join(dir,'.mcp.json'),'utf8'),original);await assert.rejects(fs.stat(path.join(dir,'AGENTS.md')),{code:'ENOENT'});
 });
 test('equivalent quoted and inline Codex relay entries are preserved before any project writes',async t=>{
  for(const original of ['[mcp_servers."agent-relay"]\ncommand = "existing"\n',"[mcp_servers.'agent-relay']\ncommand = 'existing'\n",'[mcp_servers]\nagent-relay = {command = "existing"}\n']){
-  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'relay-toml-conflict-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));await fs.mkdir(path.join(dir,'.codex'));await fs.writeFile(path.join(dir,'.codex/config.toml'),original);
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'relay-toml-conflict-'));t.after(()=>fs.rm(dir,{recursive:true,force:true,maxRetries:15,retryDelay:200}));await fs.mkdir(path.join(dir,'.codex'));await fs.writeFile(path.join(dir,'.codex/config.toml'),original);
   await assert.rejects(setupProject(dir,{runners:['codex']}),/preserved/);assert.equal(await fs.readFile(path.join(dir,'.codex/config.toml'),'utf8'),original);await assert.rejects(fs.stat(path.join(dir,'AGENTS.md')),{code:'ENOENT'});
  }
 });
 test('diagnose reports binding health and detects a moved installation',async t=>{
  const {diagnoseSetup,refreshSetup}=await import('../lib/setup.mjs');
- const dir=await fs.mkdtemp(path.join(os.tmpdir(),'relay-diagnose-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'relay-diagnose-'));t.after(()=>fs.rm(dir,{recursive:true,force:true,maxRetries:15,retryDelay:200}));
  const empty=await diagnoseSetup(dir);
  assert.equal(empty.packageRoot.moved,false);
  assert.ok(empty.bindings.every(b=>b.ok===false));
@@ -43,7 +43,7 @@ test('diagnose reports binding health and detects a moved installation',async t=
  assert.equal(relocated.packageRoot.moved,true);
  assert.ok(relocated.bindings.every(b=>b.ok===true), 'a comparison-only override leaves files intact');
  const mcpPath=path.join(dir,'.mcp.json');
- await fs.writeFile(mcpPath,(await fs.readFile(mcpPath,'utf8')).replace(process.execPath,'/elsewhere/node'));
+ await fs.writeFile(mcpPath,(await fs.readFile(mcpPath,'utf8')).replace(JSON.stringify(process.execPath).slice(1,-1),'/elsewhere/node'));
  const stale=await diagnoseSetup(dir);
  const claude=stale.bindings.find(b=>b.runner==='claude');
  assert.equal(claude.ok,false);assert.match(claude.detail,/not found/);
@@ -57,7 +57,7 @@ test('diagnose selects exact relay table despite neighboring servers',async t=>{
  const {diagnoseSetup}=await import('../lib/setup.mjs');
  const valid=process.execPath;
  async function binding(toml){
-  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'relay-exact-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'relay-exact-'));t.after(()=>fs.rm(dir,{recursive:true,force:true,maxRetries:15,retryDelay:200}));
   await fs.mkdir(path.join(dir,'.codex'),{recursive:true});
   await fs.writeFile(path.join(dir,'.codex/config.toml'),toml);
   return (await diagnoseSetup(dir)).bindings.find(b=>b.runner==='codex');
@@ -79,7 +79,7 @@ test('diagnose handles quoted tables inline config and multiline args',async t=>
  const {diagnoseSetup}=await import('../lib/setup.mjs');
  const valid=process.execPath;
  async function binding(toml){
-  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'relay-forms-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'relay-forms-'));t.after(()=>fs.rm(dir,{recursive:true,force:true,maxRetries:15,retryDelay:200}));
   await fs.mkdir(path.join(dir,'.codex'),{recursive:true});
   await fs.writeFile(path.join(dir,'.codex/config.toml'),toml);
   return (await diagnoseSetup(dir)).bindings.find(b=>b.runner==='codex');
@@ -105,7 +105,7 @@ test('diagnose decodes TOML escapes in relay table',async t=>{
  const {diagnoseSetup}=await import('../lib/setup.mjs');
  const valid=process.execPath;
  async function binding(toml){
-  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'relay-escapes-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'relay-escapes-'));t.after(()=>fs.rm(dir,{recursive:true,force:true,maxRetries:15,retryDelay:200}));
   await fs.mkdir(path.join(dir,'.codex'),{recursive:true});
   await fs.writeFile(path.join(dir,'.codex/config.toml'),toml);
   return (await diagnoseSetup(dir)).bindings.find(b=>b.runner==='codex');
@@ -137,7 +137,7 @@ test('diagnose fails closed on inline key order with missing side',async t=>{
  const {diagnoseSetup}=await import('../lib/setup.mjs');
  const valid=process.execPath;
  async function binding(toml){
-  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'relay-inline-missing-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'relay-inline-missing-'));t.after(()=>fs.rm(dir,{recursive:true,force:true,maxRetries:15,retryDelay:200}));
   await fs.mkdir(path.join(dir,'.codex'),{recursive:true});
   await fs.writeFile(path.join(dir,'.codex/config.toml'),toml);
   return (await diagnoseSetup(dir)).bindings.find(b=>b.runner==='codex');
@@ -173,7 +173,7 @@ test('diagnose handles inline nesting comments quoting multiline escapes and nei
  const {diagnoseSetup}=await import('../lib/setup.mjs');
  const valid=process.execPath;
  async function binding(toml){
-  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'relay-inline-forms-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'relay-inline-forms-'));t.after(()=>fs.rm(dir,{recursive:true,force:true,maxRetries:15,retryDelay:200}));
   await fs.mkdir(path.join(dir,'.codex'),{recursive:true});
   await fs.writeFile(path.join(dir,'.codex/config.toml'),toml);
   return (await diagnoseSetup(dir)).bindings.find(b=>b.runner==='codex');

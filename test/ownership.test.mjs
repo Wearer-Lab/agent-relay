@@ -42,7 +42,18 @@ async function world(t, { worktrees = ['feature', 'bugfix'], broker: withBroker 
   const dataDir = path.join(root, 'data');
   await fs.mkdir(dataDir);
   const broker = withBroker ? await createBroker({ dataDir, ...(staleMinutes === undefined ? {} : { staleMinutes }) }) : null;
-  t.after(async () => { await broker?.close(); await fs.rm(root, { recursive: true, force: true }); });
+  t.after(async () => {
+    await broker?.close();
+    // A CLI-started daemon records itself in broker.json; stop it before deleting its data dir.
+    // After hooks run in registration order, so a later hook would find broker.json already gone,
+    // and on Windows the orphaned daemon keeps the test runner's output handles open.
+    try {
+      const { pid } = JSON.parse(await fs.readFile(path.join(dataDir, 'broker.json'), 'utf8'));
+      process.kill(pid, 'SIGTERM');
+      for (let i = 0; i < 50; i++) { try { process.kill(pid, 0); await new Promise(r => setTimeout(r, 100)); } catch { break; } }
+    } catch { /* no CLI daemon was started */ }
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 });
+  });
   async function request(fields, room = repo) {
     const response = await fetch(`${broker.url}/rpc`, { method: 'POST',
       headers: { authorization: `Bearer ${broker.token}`, 'content-type': 'application/json' },
@@ -75,7 +86,7 @@ gitTest('git helpers report branch, detached HEAD, worktrees, branches and fail 
     [[w.repo, 'main', false, false, false], [w.trees.feature, null, true, false, false]]);
   assert.equal(await listWorktrees(w.root), null);
   assert.equal(await listWorktrees(''), null);
-  await fs.rm(w.trees.feature, { recursive: true, force: true });
+  await fs.rm(w.trees.feature, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 });
   assert.equal((await listWorktrees(w.repo)).find(row => row.path.endsWith('wt-feature')).prunable, true);
   await git(w.repo, 'branch', 'topic');
   const branches = await listBranches(w.repo);
@@ -367,7 +378,7 @@ gitTest('capabilities advertise the new features and the client gates the new op
   const caps = await w.call({ op: 'capabilities' });
   for (const feature of ['branch-claims', 'ownership', 'git-context']) assert.ok(caps.features.includes(feature), feature);
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'relay-own-gate-'));
-  t.after(() => fs.rm(dir, { recursive: true, force: true }));
+  t.after(() => fs.rm(dir, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 }));
   await fs.writeFile(path.join(dir, 'broker.json'), JSON.stringify({ pid: process.pid, url: 'http://127.0.0.1:12399', token: 'fixture' }));
   const previous = globalThis.fetch;
   t.after(() => { globalThis.fetch = previous; });
@@ -449,7 +460,7 @@ gitTest('MCP adapter exposes relay_ownership and relay_branch and auto-reports g
 });
 
 gitTest('OpenCode plugin exposes relay_ownership and relay_branch and auto-reports git context best effort', async t => {
-  const directory = '/tmp/relay-own-project';
+  const directory = path.resolve('/tmp/relay-own-project');
   const sessionID = 'ses_own';
   const calls = [];
   const transport = {
@@ -501,13 +512,6 @@ gitTest('OpenCode plugin exposes relay_ownership and relay_branch and auto-repor
 
 gitTest('real CLI exposes branches, branch claim/release/list and force-release against a live broker', async t => {
   const w = await world(t, { worktrees: ['feature'], broker: false });
-  t.after(async () => {
-    try {
-      const { pid } = JSON.parse(await fs.readFile(path.join(w.dataDir, 'broker.json'), 'utf8'));
-      process.kill(pid, 'SIGTERM');
-      for (let i = 0; i < 50; i++) { try { process.kill(pid, 0); await new Promise(r => setTimeout(r, 100)); } catch { break; } }
-    } catch { /* never started */ }
-  });
   const env = { ...process.env, AGENT_RELAY_HOME: w.dataDir };
   const exec = async (project, ...args) => JSON.parse((await run(process.execPath, [cli, ...args, '--project', project, '--data-dir', w.dataDir], { timeout: 20000, env })).stdout);
   await exec(w.trees.feature, 'join', '--as', 'a', '--runner', 'codex');

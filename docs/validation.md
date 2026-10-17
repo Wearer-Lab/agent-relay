@@ -7,12 +7,13 @@ npm ci --ignore-scripts --no-audit --no-fund
 npm run release:check
 ```
 
-The current automated suite has **358 passing tests for 0.4.0** on macOS and Linux. The
+The current automated suite has **358 passing tests for 0.4.0** on macOS, Linux and Windows. The
 CI (`.github/workflows/ci.yml`, see [CI workflow](./ci-workflow.md)) runs the release checks on macOS,
 Linux, and Windows with Node.js 20 and 22 for every pull request and push to `main`.
-On Windows the suite currently has 25 failing tests caused by POSIX-only test
-assumptions (file-mode assertions, bare-path `--import`, `/tmp` literals), so that
-step reports without blocking; the packed Windows installation is still required to pass.
+Every job, including the Windows test suite and the packed Windows installation, is
+required to pass. POSIX file-mode assertions are skipped on Windows, which has no
+POSIX permission bits, and the signal-flush watch test is skipped there because
+Windows cannot deliver a catchable SIGINT or SIGTERM to a child process.
 CI results are not recorded in the matrix below, which lists live runner behavior only.
 
 The suite covers project isolation, durable message delivery, acknowledgements,

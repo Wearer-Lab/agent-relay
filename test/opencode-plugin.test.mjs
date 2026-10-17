@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { AgentRelayPlugin, default as defaultPlugin } from '../lib/opencode-plugin.mjs';
 import { createBroker } from '../lib/broker.mjs';
 
-const directory = '/tmp/relay-project';
+const directory = path.resolve('/tmp/relay-project');
 const sessionID = 'ses_existing';
 const id = `opencode:${sessionID}`;
 const message = (messageId, extra = {}) => ({ messageId, from: 'codex:existing', to: id, body: 'Build slot released.',
@@ -218,10 +218,10 @@ test('restart hydrates recipient-specific durable wake/toast attempts; unacked c
 
 test('explicit setup project binds room, non-git root sentinel uses directory, tools validate runtime context', async t => {
   const h = harness();
-  const hooks = await AgentRelayPlugin({client: h.client, directory, worktree: '/'}, {transport: h.transport, project: '/tmp/setup-room'});
+  const hooks = await AgentRelayPlugin({client: h.client, directory, worktree: '/'}, {transport: h.transport, project: path.resolve('/tmp/setup-room')});
   t.after(() => hooks.dispose()); await busy(hooks);
   await hooks.tool.relay_agents.execute({}, toolContext({worktree: '/'}));
-  assert.ok(h.calls.every(x => x.project === '/tmp/setup-room'));
+  assert.ok(h.calls.every(x => x.project === path.resolve('/tmp/setup-room')));
   await assert.rejects(hooks.tool.relay_agents.execute({}, toolContext({worktree: '/tmp/another-room'})), /different project/);
   const fallback = harness();
   const fallbackHooks = await AgentRelayPlugin({client: fallback.client, directory, worktree: '/'}, {transport: fallback.transport});
@@ -492,7 +492,7 @@ test('handoff request and respond round-trip through a real broker', async t => 
   const project = path.join(root, 'project');
   await Promise.all([dataDir, project].map(dir => fs.mkdir(dir, { recursive: true })));
   const broker = await createBroker({ dataDir });
-  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 }); });
   async function brokerRpc(target, fields) {
     const response = await fetch(broker.url + '/rpc', { method: 'POST',
       headers: { authorization: 'Bearer ' + broker.token, 'content-type': 'application/json' },
@@ -597,7 +597,7 @@ test('unread matches broker acknowledgement state through a real broker', async 
   const project = path.join(root, 'project');
   await Promise.all([dataDir, project].map(dir => fs.mkdir(dir, { recursive: true })));
   const broker = await createBroker({ dataDir });
-  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 }); });
   async function brokerRpc(target, fields) {
     const response = await fetch(broker.url + '/rpc', { method: 'POST',
       headers: { authorization: 'Bearer ' + broker.token, 'content-type': 'application/json' },
@@ -867,7 +867,7 @@ test('task empty lists clear through broker while empty claim stays rejected', a
   const project = path.join(root, 'project');
   await Promise.all([dataDir, project].map(dir => fs.mkdir(dir, { recursive: true })));
   const broker = await createBroker({ dataDir });
-  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 }); });
   async function brokerRpc(target, fields) {
     const response = await fetch(broker.url + '/rpc', { method: 'POST',
       headers: { authorization: 'Bearer ' + broker.token, 'content-type': 'application/json' },
@@ -916,7 +916,7 @@ test('800-recipient broadcast receipt stays bounded with full counts and resumab
   const project = path.join(root, 'project');
   await Promise.all([dataDir, project].map(dir => fs.mkdir(dir, { recursive: true })));
   const broker = await createBroker({ dataDir });
-  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 }); });
   async function brokerRpc(target, fields) {
     const response = await fetch(broker.url + '/rpc', { method: 'POST',
       headers: { authorization: 'Bearer ' + broker.token, 'content-type': 'application/json' },
@@ -1054,7 +1054,7 @@ test('large agent listing is bounded with continuation', async t => {
   const project = path.join(root, 'project');
   await Promise.all([dataDir, project].map(dir => fs.mkdir(dir, { recursive: true })));
   const broker = await createBroker({ dataDir });
-  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 }); });
   async function brokerRpc(target, fields) {
     const response = await fetch(broker.url + '/rpc', { method: 'POST',
       headers: { authorization: 'Bearer ' + broker.token, 'content-type': 'application/json' },
@@ -1103,7 +1103,7 @@ test('max-size task metadata stays bounded', async t => {
   const project = path.join(root, 'project');
   await Promise.all([dataDir, project].map(dir => fs.mkdir(dir, { recursive: true })));
   const broker = await createBroker({ dataDir });
-  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 }); });
   async function brokerRpc(target, fields) {
     const response = await fetch(broker.url + '/rpc', { method: 'POST',
       headers: { authorization: 'Bearer ' + broker.token, 'content-type': 'application/json' },
