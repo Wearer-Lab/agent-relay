@@ -1,7 +1,7 @@
-import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs/promises';import os from 'node:os';import path from 'node:path';import {execFile,spawn} from 'node:child_process';import {promisify} from 'node:util';import {fileURLToPath} from 'node:url';
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs/promises';import os from 'node:os';import path from 'node:path';import {execFile,spawn} from 'node:child_process';import {promisify} from 'node:util';import {pathToFileURL,fileURLToPath} from 'node:url';
 const exec=promisify(execFile),cli=fileURLToPath(new URL('../bin/agent-relay.mjs',import.meta.url));
 async function fixture(t){
- const root=await fs.mkdtemp(path.join(os.tmpdir(),'relay-cli-options-')),journal=path.join(root,'requests.jsonl'),preload=path.join(root,'transport.mjs');t.after(()=>fs.rm(root,{recursive:true,force:true}));
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'relay-cli-options-')),journal=path.join(root,'requests.jsonl'),preload=path.join(root,'transport.mjs');t.after(()=>fs.rm(root,{recursive:true,force:true,maxRetries:15,retryDelay:200}));
  await fs.writeFile(path.join(root,'broker.json'),JSON.stringify({pid:process.pid,url:'http://127.0.0.1:12345',token:'test-only'}));
  await fs.writeFile(preload,`import fs from 'node:fs/promises';
  globalThis.fetch=async(url,options)=>{
@@ -12,8 +12,8 @@ async function fixture(t){
   return {ok:true,json:async()=>result};
  };
  `);
- const args=['--import',preload,cli],env={...process.env,AGENT_RELAY_HOME:root,RELAY_TEST_JOURNAL:journal};
- return {root,journal,args,env,run:(...command)=>exec(process.execPath,[...args,...command,'--data-dir',root],{env,timeout:10000}),requests:async()=>{try{return (await fs.readFile(journal,'utf8')).trim().split('\n').map(line=>JSON.parse(line));}catch(e){if(e.code==='ENOENT')return [];throw e;}}};
+ const args=['--import',pathToFileURL(preload).href,cli],env={...process.env,AGENT_RELAY_HOME:root,RELAY_TEST_JOURNAL:journal};
+ return {root,journal,args,env,run:(...command)=>exec(process.execPath,[...args,...command,'--data-dir',root],{env,timeout:60000}),requests:async()=>{try{return (await fs.readFile(journal,'utf8')).trim().split('\n').map(line=>JSON.parse(line));}catch(e){if(e.code==='ENOENT')return [];throw e;}}};
 }
 test('CLI forwards repeatable attachments, summary, filters, machine scope and explicit forced identity',async t=>{
  const f=await fixture(t);
@@ -25,7 +25,7 @@ test('CLI forwards repeatable attachments, summary, filters, machine scope and e
 test('gated claim refuses before broker requests when measured disk limit fails',async t=>{
  const f=await fixture(t);await assert.rejects(f.run('claim','--as','a','--gate','--min-free-gb','1000000','native'),/Free disk/);assert.deepEqual(await f.requests(),[]);
 });
-test('CLI JSON watch flushes preview and exits zero on SIGINT and SIGTERM',async t=>{
+test('CLI JSON watch flushes preview and exits zero on SIGINT and SIGTERM',{skip:process.platform==='win32'&&'Windows has no catchable SIGINT/SIGTERM for child processes'},async t=>{
  const f=await fixture(t);
  for(const signal of ['SIGINT','SIGTERM']){
   const child=spawn(process.execPath,[...f.args,'watch','--as','b','--json-lines','--unread','--max-chars','1','--data-dir',f.root],{env:f.env,stdio:['ignore','pipe','pipe']});

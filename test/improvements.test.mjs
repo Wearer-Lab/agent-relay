@@ -13,7 +13,7 @@ async function fixture(t){
  let handler,broker;
  const serverFactory=callback=>{handler=callback;const server=new EventEmitter();server.listen=(port,host,ready)=>queueMicrotask(ready);server.address=()=>({port:0});server.close=done=>done?.();return server;};
  const open=()=>createBroker({dataDir,serverFactory});broker=await open();
- t.after(async()=>{await broker.close();await fs.rm(root,{recursive:true,force:true});});
+ t.after(async()=>{await broker.close();await fs.rm(root,{recursive:true,force:true,maxRetries:15,retryDelay:200});});
  async function request(fields,room=project){
   let status,result;const response=new EventEmitter();response.writeHead=code=>{status=code;};response.end=body=>{result=JSON.parse(body);};
   const request={method:'POST',url:'/rpc',headers:{authorization:'Bearer '+broker.token},async *[Symbol.asyncIterator](){yield Buffer.from(JSON.stringify({project:room,...fields}));}};

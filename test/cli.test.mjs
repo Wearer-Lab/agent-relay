@@ -2,7 +2,7 @@ import test from 'node:test';import assert from 'node:assert/strict';import path
 const exec=promisify(execFile),cli=fileURLToPath(new URL('../bin/agent-relay.mjs',import.meta.url));
 test('real CLI starts one daemon under concurrent clients and configures/reuses an isolated project',async t=>{
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'relay-cli-')),project=path.join(root,'project'),dataDir=path.join(root,'data');await fs.mkdir(project);
- t.after(async()=>{try{const {pid}=JSON.parse(await fs.readFile(path.join(dataDir,'broker.json'),'utf8'));process.kill(pid,'SIGTERM');for(let i=0;i<50;i++){try{process.kill(pid,0);await new Promise(r=>setTimeout(r,20));}catch{break;}}}catch{}await fs.rm(root,{recursive:true,force:true});});
+ t.after(async()=>{try{const {pid}=JSON.parse(await fs.readFile(path.join(dataDir,'broker.json'),'utf8'));process.kill(pid,'SIGTERM');for(let i=0;i<50;i++){try{process.kill(pid,0);await new Promise(r=>setTimeout(r,20));}catch{break;}}}catch{}await fs.rm(root,{recursive:true,force:true,maxRetries:15,retryDelay:200});});
  const run=async(...args)=>JSON.parse((await exec(process.execPath,[cli,...args,'--project',project,'--data-dir',dataDir],{timeout:20000})).stdout);
  const joined=await Promise.all([run('join','--as','a','--runner','codex'),run('join','--as','b','--runner','claude')]);assert.equal(joined.length,2);
  const discovery=JSON.parse(await fs.readFile(path.join(dataDir,'broker.json'),'utf8'));assert.ok(discovery.pid);
@@ -15,7 +15,7 @@ test('real CLI starts one daemon under concurrent clients and configures/reuses 
 });
 test('real CLI exposes receipts, history, claims workflow, tasks, maintenance and lifecycle',async t=>{
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'relay-cli-wide-')),project=path.join(root,'project'),dataDir=path.join(root,'data');await fs.mkdir(project);
- t.after(async()=>{try{const {pid}=JSON.parse(await fs.readFile(path.join(dataDir,'broker.json'),'utf8'));process.kill(pid,'SIGTERM');for(let i=0;i<50;i++){try{process.kill(pid,0);await new Promise(r=>setTimeout(r,20));}catch{break;}}}catch{}await fs.rm(root,{recursive:true,force:true});});
+ t.after(async()=>{try{const {pid}=JSON.parse(await fs.readFile(path.join(dataDir,'broker.json'),'utf8'));process.kill(pid,'SIGTERM');for(let i=0;i<50;i++){try{process.kill(pid,0);await new Promise(r=>setTimeout(r,20));}catch{break;}}}catch{}await fs.rm(root,{recursive:true,force:true,maxRetries:15,retryDelay:200});});
  const run=async(...args)=>JSON.parse((await exec(process.execPath,[cli,...args,'--project',project,'--data-dir',dataDir],{timeout:20000})).stdout);
  await run('join','--as','a','--runner','codex','--session','ses_a','--group','g1');
  await run('join','--as','b','--runner','claude','--session','ses_b','--group','g1');
@@ -72,7 +72,7 @@ test('real CLI exposes receipts, history, claims workflow, tasks, maintenance an
 });
 test('real CLI stops, restarts with a preservation receipt and keeps a bare version',async t=>{
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'relay-cli-cycle-')),project=path.join(root,'project'),dataDir=path.join(root,'data');await fs.mkdir(project);
- t.after(async()=>{try{const {pid}=JSON.parse(await fs.readFile(path.join(dataDir,'broker.json'),'utf8'));process.kill(pid,'SIGTERM');for(let i=0;i<50;i++){try{process.kill(pid,0);await new Promise(r=>setTimeout(r,20));}catch{break;}}}catch{}await fs.rm(root,{recursive:true,force:true});});
+ t.after(async()=>{try{const {pid}=JSON.parse(await fs.readFile(path.join(dataDir,'broker.json'),'utf8'));process.kill(pid,'SIGTERM');for(let i=0;i<50;i++){try{process.kill(pid,0);await new Promise(r=>setTimeout(r,20));}catch{break;}}}catch{}await fs.rm(root,{recursive:true,force:true,maxRetries:15,retryDelay:200});});
  const run=async(...args)=>JSON.parse((await exec(process.execPath,[cli,...args,'--project',project,'--data-dir',dataDir],{timeout:20000})).stdout);
  const raw=async(...args)=>(await exec(process.execPath,[cli,...args,'--project',project,'--data-dir',dataDir],{timeout:20000})).stdout.trim();
  await run('join','--as','a','--runner','codex');await run('join','--as','b','--runner','codex');
@@ -94,7 +94,7 @@ test('real CLI stops, restarts with a preservation receipt and keeps a bare vers
 test('verified stop refuses ambiguous discovery without signaling',async t=>{
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'relay-cli-verify-')),project=path.join(root,'project'),dataDir=path.join(root,'data');await fs.mkdir(project);
  let victim=null;
- t.after(async()=>{try{if(victim&&victim.pid)process.kill(victim.pid,'SIGTERM');}catch{}try{const {pid}=JSON.parse(await fs.readFile(path.join(dataDir,'broker.json'),'utf8'));try{process.kill(pid,'SIGTERM');for(let i=0;i<50;i++){try{process.kill(pid,0);await new Promise(r=>setTimeout(r,20));}catch{break;}}}catch{}}catch{}try{if(victim)victim.kill('SIGTERM');}catch{}await fs.rm(root,{recursive:true,force:true});});
+ t.after(async()=>{try{if(victim&&victim.pid)process.kill(victim.pid,'SIGTERM');}catch{}try{const {pid}=JSON.parse(await fs.readFile(path.join(dataDir,'broker.json'),'utf8'));try{process.kill(pid,'SIGTERM');for(let i=0;i<50;i++){try{process.kill(pid,0);await new Promise(r=>setTimeout(r,20));}catch{break;}}}catch{}}catch{}try{if(victim)victim.kill('SIGTERM');}catch{}await fs.rm(root,{recursive:true,force:true,maxRetries:15,retryDelay:200});});
  const run=async(...args)=>JSON.parse((await exec(process.execPath,[cli,...args,'--project',project,'--data-dir',dataDir],{timeout:20000})).stdout);
  const alive=pid=>{try{process.kill(pid,0);return true;}catch(e){return e.code==='EPERM';}};
  await run('join','--as','a','--runner','codex');
@@ -143,7 +143,7 @@ test('verified stop refuses ambiguous discovery without signaling',async t=>{
 });
 test('offline restore round-trips with backup and enforces safety',async t=>{
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'relay-cli-offline-')),project=path.join(root,'project'),dataDir=path.join(root,'data');await fs.mkdir(project);
- t.after(async()=>{try{const {pid}=JSON.parse(await fs.readFile(path.join(dataDir,'broker.json'),'utf8'));process.kill(pid,'SIGTERM');for(let i=0;i<50;i++){try{process.kill(pid,0);await new Promise(r=>setTimeout(r,20));}catch{break;}}}catch{}await fs.rm(root,{recursive:true,force:true});});
+ t.after(async()=>{try{const {pid}=JSON.parse(await fs.readFile(path.join(dataDir,'broker.json'),'utf8'));process.kill(pid,'SIGTERM');for(let i=0;i<50;i++){try{process.kill(pid,0);await new Promise(r=>setTimeout(r,20));}catch{break;}}}catch{}await fs.rm(root,{recursive:true,force:true,maxRetries:15,retryDelay:200});});
  const run=async(...args)=>JSON.parse((await exec(process.execPath,[cli,...args,'--project',project,'--data-dir',dataDir],{timeout:20000})).stdout);
  await run('join','--as','a','--runner','codex');
  await run('join','--as','b','--runner','codex');
@@ -161,10 +161,10 @@ test('offline restore round-trips with backup and enforces safety',async t=>{
  assert.deepEqual(restored.missingAttachments,[]);
  assert.deepEqual(restored.corruptAttachments,[]);
  assert.equal(restored.bytes,Buffer.byteLength(JSON.stringify(JSON.parse(await fs.readFile(out,'utf8')).state)));
- assert.equal((await fs.stat(path.join(dataDir,restored.backup))).mode&0o777,0o600);
+ if(process.platform!=='win32')assert.equal((await fs.stat(path.join(dataDir,restored.backup))).mode&0o777,0o600);
  const names=(await fs.readdir(dataDir)).filter(f=>f.startsWith('state.backup-'));
  assert.equal(names.length,1);
- assert.equal((await fs.stat(path.join(dataDir,names[0]))).mode&0o777,0o600);
+ if(process.platform!=='win32')assert.equal((await fs.stat(path.join(dataDir,names[0]))).mode&0o777,0o600);
  assert.equal((await run('inbox','--as','b')).messages.length,1);
  await run('stop');
  const before=await fs.readFile(path.join(dataDir,'state.json'),'utf8');
@@ -186,14 +186,14 @@ test('offline restore round-trips with backup and enforces safety',async t=>{
  assert.equal(allowed.messages,1);
  assert.equal(typeof allowed.bytes,'number');
  assert.match(allowed.backup,/^state\.backup-\d+\.json$/u);
- assert.equal((await fs.stat(path.join(dataDir,allowed.backup))).mode&0o777,0o600);
+ if(process.platform!=='win32')assert.equal((await fs.stat(path.join(dataDir,allowed.backup))).mode&0o777,0o600);
  assert.equal((await fs.readdir(dataDir)).filter(f=>f.startsWith('state.backup-')).length,2);
 });
 test('offline restore refuses live lease without discovery',async t=>{
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'relay-cli-offline-lease-')),project=path.join(root,'project'),dataDir=path.join(root,'data');await fs.mkdir(project);await fs.mkdir(dataDir,{recursive:true});
  const run=async(...args)=>JSON.parse((await exec(process.execPath,[cli,...args,'--project',project,'--data-dir',dataDir],{timeout:20000})).stdout);
  const broker=await createBroker({dataDir});
- t.after(async()=>{try{await broker.close();}catch{}await fs.rm(root,{recursive:true,force:true});});
+ t.after(async()=>{try{await broker.close();}catch{}await fs.rm(root,{recursive:true,force:true,maxRetries:15,retryDelay:200});});
  assert.deepEqual((await fs.readdir(dataDir)).filter(f=>f==='broker.json'),[]);
  assert.ok((await fs.stat(path.join(dataDir,'writer.lock'))).isFile());
  const incoming={version:1,nextCursor:1,rooms:[]};
@@ -211,7 +211,7 @@ test('offline restore refuses live lease without discovery',async t=>{
 });
 test('offline restore refuses oversized import before backup',async t=>{
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'relay-cli-offline-huge-')),project=path.join(root,'project'),dataDir=path.join(root,'data');await fs.mkdir(project);
- t.after(async()=>{try{const {pid}=JSON.parse(await fs.readFile(path.join(dataDir,'broker.json'),'utf8'));process.kill(pid,'SIGTERM');for(let i=0;i<50;i++){try{process.kill(pid,0);await new Promise(r=>setTimeout(r,20));}catch{break;}}}catch{}await fs.rm(root,{recursive:true,force:true});});
+ t.after(async()=>{try{const {pid}=JSON.parse(await fs.readFile(path.join(dataDir,'broker.json'),'utf8'));process.kill(pid,'SIGTERM');for(let i=0;i<50;i++){try{process.kill(pid,0);await new Promise(r=>setTimeout(r,20));}catch{break;}}}catch{}await fs.rm(root,{recursive:true,force:true,maxRetries:15,retryDelay:200});});
  const run=async(...args)=>JSON.parse((await exec(process.execPath,[cli,...args,'--project',project,'--data-dir',dataDir],{timeout:60000})).stdout);
  await run('join','--as','a','--runner','codex');
  const out=path.join(root,'export.json');
@@ -235,7 +235,7 @@ test('offline restore refuses oversized import before backup',async t=>{
 });
 test('bulletin ack passes explicit version and hash through',async t=>{
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'relay-cli-bulletin-')),project=path.join(root,'project'),dataDir=path.join(root,'data');await fs.mkdir(project);
- t.after(async()=>{try{const {pid}=JSON.parse(await fs.readFile(path.join(dataDir,'broker.json'),'utf8'));process.kill(pid,'SIGTERM');for(let i=0;i<50;i++){try{process.kill(pid,0);await new Promise(r=>setTimeout(r,20));}catch{break;}}}catch{}await fs.rm(root,{recursive:true,force:true});});
+ t.after(async()=>{try{const {pid}=JSON.parse(await fs.readFile(path.join(dataDir,'broker.json'),'utf8'));process.kill(pid,'SIGTERM');for(let i=0;i<50;i++){try{process.kill(pid,0);await new Promise(r=>setTimeout(r,20));}catch{break;}}}catch{}await fs.rm(root,{recursive:true,force:true,maxRetries:15,retryDelay:200});});
  const run=async(...args)=>JSON.parse((await exec(process.execPath,[cli,...args,'--project',project,'--data-dir',dataDir],{timeout:20000})).stdout);
  await run('join','--as','a','--runner','codex');
  await run('join','--as','b','--runner','codex');
@@ -250,7 +250,7 @@ test('bulletin ack passes explicit version and hash through',async t=>{
 });
 test('export uses private permissions atomically and refuses symlinks',async t=>{
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'relay-cli-export-')),project=path.join(root,'project'),dataDir=path.join(root,'data');await fs.mkdir(project);
- t.after(async()=>{try{const {pid}=JSON.parse(await fs.readFile(path.join(dataDir,'broker.json'),'utf8'));process.kill(pid,'SIGTERM');for(let i=0;i<50;i++){try{process.kill(pid,0);await new Promise(r=>setTimeout(r,20));}catch{break;}}}catch{}await fs.rm(root,{recursive:true,force:true});});
+ t.after(async()=>{try{const {pid}=JSON.parse(await fs.readFile(path.join(dataDir,'broker.json'),'utf8'));process.kill(pid,'SIGTERM');for(let i=0;i<50;i++){try{process.kill(pid,0);await new Promise(r=>setTimeout(r,20));}catch{break;}}}catch{}await fs.rm(root,{recursive:true,force:true,maxRetries:15,retryDelay:200});});
  const run=async(...args)=>JSON.parse((await exec(process.execPath,[cli,...args,'--project',project,'--data-dir',dataDir],{timeout:20000})).stdout);
  await run('join','--as','a','--runner','codex');
  await run('join','--as','b','--runner','codex');
@@ -258,8 +258,8 @@ test('export uses private permissions atomically and refuses symlinks',async t=>
  const previous=process.umask(0o022);
  let freshOut;
  try{freshOut=await run('export','--out',path.join(root,'fresh.json'));}finally{process.umask(previous);}
- assert.equal(freshOut.mode,'600');
- assert.equal((await fs.stat(path.join(root,'fresh.json'))).mode&0o777,0o600);
+ if(process.platform!=='win32')assert.equal(freshOut.mode,'600');
+ if(process.platform!=='win32')assert.equal((await fs.stat(path.join(root,'fresh.json'))).mode&0o777,0o600);
  const link=path.join(root,'link.json');
  await fs.symlink(path.join(root,'fresh.json'),link);
  await assert.rejects(run('export','--out',link),/symlink/i);
@@ -267,13 +267,13 @@ test('export uses private permissions atomically and refuses symlinks',async t=>
  await fs.writeFile(perm,'{}');
  await fs.chmod(perm,0o644);
  const overwrote=await run('export','--out',perm);
- assert.equal((await fs.stat(perm)).mode&0o777,0o600);
- assert.equal(overwrote.mode,'600');
+ if(process.platform!=='win32')assert.equal((await fs.stat(perm)).mode&0o777,0o600);
+ if(process.platform!=='win32')assert.equal(overwrote.mode,'600');
  assert.equal(overwrote.overwrote,true);
 });
 test('real CLI diagnoses an unreachable Codex endpoint without launching anything',async t=>{
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'relay-cli-diag-')),project=path.join(root,'project'),dataDir=path.join(root,'data');await fs.mkdir(project);
- t.after(()=>fs.rm(root,{recursive:true,force:true}));
+ t.after(()=>fs.rm(root,{recursive:true,force:true,maxRetries:15,retryDelay:200}));
  const out=JSON.parse((await exec(process.execPath,[cli,'diagnose-codex','--socket',path.join(root,'absent.sock'),'--project',project,'--data-dir',dataDir],{timeout:20000})).stdout);
  assert.equal(out.endpoint.candidates[0],path.join(root,'absent.sock'));
  assert.equal(out.attempts[0].errorCategory,'ENOENT');

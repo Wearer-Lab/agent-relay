@@ -305,7 +305,7 @@ test('a real dashboard serves work, ownership and usage from a live broker, degr
  const {createBroker}=await import('../lib/broker.mjs'),{startDashboard}=await import('../lib/dashboard.mjs');
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'relay-dashboard-feeds-')),dataDir=path.join(root,'data'),project=path.join(root,'one');
  await Promise.all([dataDir,project].map(dir=>fs.mkdir(dir)));const live=await createBroker({dataDir});let dashboard,decorated;
- t.after(async()=>{await dashboard?.close();await decorated?.close();await live.close();await fs.rm(root,{recursive:true,force:true});});
+ t.after(async()=>{await dashboard?.close();await decorated?.close();await live.close();await fs.rm(root,{recursive:true,force:true,maxRetries:15,retryDelay:200});});
  await fs.writeFile(path.join(dataDir,'broker.json'),JSON.stringify({pid:process.pid,url:live.url,token:live.token}));
  const write=async fields=>{const response=await fetch(live.url+'/rpc',{method:'POST',headers:{authorization:'Bearer '+live.token,'content-type':'application/json'},body:JSON.stringify({project,...fields})});const result=await response.json();assert.equal(result.ok,true,JSON.stringify(result));return result;};
  await write({op:'register',agentId:'a',runner:'test'});await write({op:'tasks',action:'upsert',agentId:'a',id:'t1',title:'First task',owner:'a'});

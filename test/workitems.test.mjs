@@ -22,7 +22,7 @@ async function fixture(t) {
   const dataDir = path.join(root, 'data'), project = path.join(root, 'project'), other = path.join(root, 'other');
   await Promise.all([dataDir, project, other].map(dir => fs.mkdir(dir)));
   let broker = await createBroker({ dataDir });
-  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 }); });
   async function request(fields, room = project) {
     const response = await fetch(broker.url + '/rpc', { method: 'POST',
       headers: { authorization: 'Bearer ' + broker.token, 'content-type': 'application/json' },
@@ -147,7 +147,7 @@ test('legacy stored tasks without status or kind load, derive status and still c
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-relay-work-legacy-'));
   const dataDir = path.join(root, 'data'), project = path.join(root, 'project');
   await Promise.all([dataDir, project].map(dir => fs.mkdir(dir)));
-  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  t.after(() => fs.rm(root, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 }));
   let broker = await createBroker({ dataDir });
   const call = async fields => (await (await fetch(broker.url + '/rpc', { method: 'POST',
     headers: { authorization: 'Bearer ' + broker.token, 'content-type': 'application/json' },
@@ -496,7 +496,7 @@ test('validateStore accepts old and new task shapes and rejects invalid work-ite
 
 test('client gates work-item fields and actions on the advertised capabilities', async t => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'relay-work-capability-'));
-  t.after(() => fs.rm(dir, { recursive: true, force: true }));
+  t.after(() => fs.rm(dir, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 }));
   await fs.writeFile(path.join(dir, 'broker.json'), JSON.stringify({ pid: process.pid, url: 'http://127.0.0.1:12399', token: 'fixture' }));
   const previous = globalThis.fetch;
   t.after(() => { globalThis.fetch = previous; });
@@ -548,7 +548,7 @@ test('MCP relay_tasks and relay_roadmap expose the hierarchy end to end', async 
   await Promise.all([dataDir, project].map(dir => fs.mkdir(dir)));
   const broker = await createBroker({ dataDir });
   const saved = process.env.AGENT_RELAY_TEST_ROOM; delete process.env.AGENT_RELAY_TEST_ROOM;
-  t.after(async () => { if (saved !== undefined) process.env.AGENT_RELAY_TEST_ROOM = saved; await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  t.after(async () => { if (saved !== undefined) process.env.AGENT_RELAY_TEST_ROOM = saved; await broker.close(); await fs.rm(root, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 }); });
   const [serverTransport, clientTransport] = InMemoryTransport.createLinkedPair();
   const adapter = await createMcpAdapter({ project, runner: 'claude', sessionId: 'work-mcp',
     rpcImpl: async (target, fields) => (await fetch(broker.url + '/rpc', { method: 'POST',
@@ -593,7 +593,7 @@ test('OpenCode relay_tasks and relay_roadmap mirror the hierarchy tools', async 
   const dataDir = path.join(root, 'data'), project = path.join(root, 'project');
   await Promise.all([dataDir, project].map(dir => fs.mkdir(dir)));
   const broker = await createBroker({ dataDir });
-  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true }); });
+  t.after(async () => { await broker.close(); await fs.rm(root, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 }); });
   const transport = {
     async rpc(target, fields) {
       return (await fetch(broker.url + '/rpc', { method: 'POST', headers: { authorization: 'Bearer ' + broker.token, 'content-type': 'application/json' },
@@ -635,7 +635,7 @@ test('real CLI manages work items with add, set, move, tree --pretty, import and
   t.after(async () => {
     try { const { pid } = JSON.parse(await fs.readFile(path.join(dataDir, 'broker.json'), 'utf8')); process.kill(pid, 'SIGTERM');
       for (let i = 0; i < 50; i++) { try { process.kill(pid, 0); await new Promise(r => setTimeout(r, 20)); } catch { break; } } } catch {}
-    await fs.rm(root, { recursive: true, force: true });
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 15, retryDelay: 200 });
   });
   const raw = async (...args) => (await exec(process.execPath, [cli, ...args, '--project', project, '--data-dir', dataDir], { timeout: 20000 })).stdout;
   const run = async (...args) => JSON.parse(await raw(...args));

@@ -39,7 +39,7 @@ test('one dashboard switches projects and returns conditional snapshots with no 
 test('legacy observer reads committed history without restarting, writing, or swallowing broker faults',async t=>{
  const fs=await import('node:fs/promises'),os=await import('node:os'),path=await import('node:path');
  const {createObserver}=await import('../lib/dashboard.mjs');
- const directory=await fs.mkdtemp(path.join(os.tmpdir(),'relay-observer-'));t.after(()=>fs.rm(directory,{recursive:true,force:true}));
+ const directory=await fs.mkdtemp(path.join(os.tmpdir(),'relay-observer-'));t.after(()=>fs.rm(directory,{recursive:true,force:true,maxRetries:15,retryDelay:200}));
  const state=fixture();state.version=1;state.nextCursor=3;
  for(const room of state.rooms)for(const agent of room.agents)Object.assign(agent,{runner:'test',registeredAt:agent.updatedAt,status:'idle',frozen:false,resources:[],task:null});
  await fs.writeFile(path.join(directory,'state.json'),JSON.stringify(state));const before=await fs.readFile(path.join(directory,'state.json'),'utf8');
@@ -71,7 +71,7 @@ test('history endpoint pages older messages with durable cursors and falls back 
 test('observer feature-detects broker history paging and falls back to the labeled window when the op is absent',async t=>{
  const fs=await import('node:fs/promises'),os=await import('node:os'),path=await import('node:path');
  const {createObserver}=await import('../lib/dashboard.mjs');
- const directory=await fs.mkdtemp(path.join(os.tmpdir(),'relay-history-'));t.after(()=>fs.rm(directory,{recursive:true,force:true}));
+ const directory=await fs.mkdtemp(path.join(os.tmpdir(),'relay-history-'));t.after(()=>fs.rm(directory,{recursive:true,force:true,maxRetries:15,retryDelay:200}));
  const asked=[];
  const paging=createObserver({project:'/work/alpha',dataDir:directory,call:async(project,fields)=>{asked.push({project,...fields});if(fields.op==='history')return {messages:[{messageId:'old',cursor:fields.before-1}],nextCursor:fields.before-1,done:false};return {rooms:[]};},ensure:async()=>{}});
  const page=await paging.getHistory('/work/alpha',{before:2,limit:5});
@@ -283,7 +283,7 @@ test('real dashboard serves packaged assets and discovers two broker rooms throu
  const {createBroker}=await import('../lib/broker.mjs'),{startDashboard}=await import('../lib/dashboard.mjs');
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'relay-dashboard-http-')),dataDir=path.join(root,'data'),project=path.join(root,'one'),other=path.join(root,'two');
  await Promise.all([dataDir,project,other].map(dir=>fs.mkdir(dir)));const broker=await createBroker({dataDir});let dashboard;
- t.after(async()=>{await dashboard?.close();await broker.close();await fs.rm(root,{recursive:true,force:true});});
+ t.after(async()=>{await dashboard?.close();await broker.close();await fs.rm(root,{recursive:true,force:true,maxRetries:15,retryDelay:200});});
  await fs.writeFile(path.join(dataDir,'broker.json'),JSON.stringify({pid:process.pid,url:broker.url,token:broker.token}));
  const write=async(fields,room=project)=>{const response=await fetch(broker.url+'/rpc',{method:'POST',headers:{authorization:'Bearer '+broker.token,'content-type':'application/json'},body:JSON.stringify({project:room,...fields})});const result=await response.json();assert.equal(result.ok,true,JSON.stringify(result));return result;};
  await write({op:'register',agentId:'a',runner:'test'});await write({op:'register',agentId:'b',runner:'test'},other);

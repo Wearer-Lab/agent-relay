@@ -41,12 +41,7 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Release check
-        # The Windows suite still has POSIX-only test assumptions (file modes,
-        # bare-path --import, /tmp literals); it reports without blocking until
-        # those tests are ported. Packed installs on Windows stay blocking.
-        continue-on-error: ${{ matrix.os == 'windows-latest' }}
-        run: npm run release:check
+      - run: npm run release:check
       - run: npm publish --dry-run --ignore-scripts --provenance=false
   package:
     name: packed install (${{ matrix.os }})
