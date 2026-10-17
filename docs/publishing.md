@@ -86,10 +86,10 @@ From a directory outside this source checkout:
 ```sh
 npm view @wearer-haitch/agent-relay version dist.integrity
 npm audit signatures    # in a project that installed it; checks registry signatures and provenance
-npx --yes @wearer-haitch/agent-relay@0.4.0 --version
-npx --yes @wearer-haitch/agent-relay@0.4.0 --help
+npx --yes @wearer-haitch/agent-relay@0.5.0 --version
+npx --yes @wearer-haitch/agent-relay@0.5.0 --help
 # From a real project:
-npx --yes @wearer-haitch/agent-relay@0.4.0 launch codex
+npx --yes @wearer-haitch/agent-relay@0.5.0 launch codex
 ```
 
 The package page on npmjs.com shows the provenance statement linking the
@@ -147,8 +147,8 @@ Release validation must run the same packed artifact users install (see
 
 ```sh
 npm pack --pack-destination /tmp
-npx --yes --package /tmp/wearer-haitch-agent-relay-0.4.0.tgz agent-relay --version
-npx --yes --package /tmp/wearer-haitch-agent-relay-0.4.0.tgz agent-relay --help
+npx --yes --package /tmp/wearer-haitch-agent-relay-0.5.0.tgz agent-relay --version
+npx --yes --package /tmp/wearer-haitch-agent-relay-0.5.0.tgz agent-relay --help
 ```
 
 In a disposable project, try `setup` and then `launch codex` using the same
@@ -160,14 +160,14 @@ keep broker history separate from your normal installation.
 
 ```sh
 npm pack --pack-destination /tmp
-npm publish /tmp/wearer-haitch-agent-relay-0.4.0.tgz --access public --provenance=false --registry=https://registry.npmjs.org/
+npm publish /tmp/wearer-haitch-agent-relay-0.5.0.tgz --access public --provenance=false --registry=https://registry.npmjs.org/
 ```
 
 Publishing the archive sends the exact packed artifact. Archive publication
 does not run this checkout's `prepublishOnly`; run `release:check` first.
 Publishing the directory with `npm publish` runs `prepublishOnly` automatically.
 Complete npm's account/2FA flow when prompted. Never put a token in this project.
-Then create the GitHub release yourself (`gh release create v0.4.0 /tmp/wearer-haitch-agent-relay-0.4.0.tgz --generate-notes --verify-tag`)
+Then create the GitHub release yourself (`gh release create v0.5.0 /tmp/wearer-haitch-agent-relay-0.5.0.tgz --generate-notes --verify-tag`)
 and update archive names in these examples for later versions.
 
 Reference: https://docs.npmjs.com/trusted-publishers and https://docs.npmjs.com/cli/commands/npm-publish/
