@@ -154,6 +154,25 @@ test('presence refreshes stay in memory, then ride along with the next write or 
   assert.equal((await f.disk()).rooms[0].agents[0].updatedAt, refreshed);
 });
 
+test('a failed write does not lose presence: the next flush carries it again', async t => {
+  const f = await fixture(t, { presenceFlushMs: 40 });
+  await f.call({ op: 'register', agentId: 'a', runner: 'test' });
+  await new Promise(r => setTimeout(r, 1100));
+  const real = fs.rename;
+  let failures = 0;
+  fs.rename = async (from, to, ...rest) => {
+    if (failures < 1 && String(to).endsWith('state.json')) { failures++; throw Object.assign(new Error('busy'), { code: 'EIO' }); }
+    return real.call(fs, from, to, ...rest);
+  };
+  t.after(() => { fs.rename = real; });
+  await f.call({ op: 'inbox', agentId: 'a' });
+  const refreshed = (await f.call({ op: 'agents' })).agents[0].updatedAt;
+  const deadline = Date.now() + 3000;
+  while (Date.now() < deadline && (await f.disk()).rooms[0].agents[0].updatedAt !== refreshed) await new Promise(r => setTimeout(r, 25));
+  assert.equal(failures, 1, 'the first presence flush failed');
+  assert.equal((await f.disk()).rooms[0].agents[0].updatedAt, refreshed, 'a later flush wrote the presence');
+});
+
 test('long-poll wakes see only durable messages and only the tail past their cursor', async t => {
   const f = await fixture(t);
   for (const id of ['a', 'b']) await f.call({ op: 'register', agentId: id, runner: 'test' });
