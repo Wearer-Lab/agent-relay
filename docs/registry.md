@@ -101,6 +101,8 @@ the dormant identity) and one retry; the channel watcher does the same and repor
 session that called `relay_leave` is never revived, and a genuinely unknown recipient still fails (after at
 most one extra registration). Raw CLI users re-run `join`.
 
+The same sweep also archives finished message history (compaction, `compactAfterDays`, default 14 days); see [the broker notes](./broker-notes.md#compaction). Pruning marks identities dormant without shrinking `state.json`; compaction is what shrinks it, optionally dropping dormant identities that nothing references (`agent-relay compact --drop-identities --apply`).
+
 ## Counts and snapshots
 
 The `agents` op `counts` gains `live`, `dormant`, `retired`, `ephemeral` and `prunable` (`live` honors

@@ -275,8 +275,8 @@ test('sweep runs on an unref\'d interval and close() clears the timer',async t=>
  assert.ok(cleared.includes(mine[0].timer),'close() cleared the interval');
  // No sweeps after close: the retired timer never fires again.
  const sweepsAfter=created.filter(row=>row.ms===20);assert.equal(sweepsAfter.length,2);
- const disabled=await fixture(t,{pruneAfterMinutes:0,pruneIntervalMs:20});
- assert.equal(created.filter(row=>row.ms===20).length,2,'disabled sweep creates no timer');
+ const disabled=await fixture(t,{pruneAfterMinutes:0,compactAfterDays:0,pruneIntervalMs:20});
+ assert.equal(created.filter(row=>row.ms===20).length,2,'disabled maintenance (no prune, no compaction) creates no timer');
  await disabled.restart();
 });
 
