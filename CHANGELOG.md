@@ -4,6 +4,8 @@ All notable changes to `@wearer-haitch/agent-relay` are recorded here. The forma
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-17
+
 ### Changed
 
 - **Broker write path** ([docs/broker-notes.md](docs/broker-notes.md#write-path-and-durability)). Writes are batched: mutations apply in memory on copy-on-write drafts and share one atomic `state.json` replacement, and every response, reads included, is released only once the state it observed is durable. Per-message validation and serialization are cached for unchanged messages, presence refreshes no longer write on their own (they ride along with the next write or a 30-second flush), and long-poll wakes scan only new messages. On a 16 MB ledger with 25 polling agents, throughput rose from 9 to 118 ops/s and `send` p99 fell from 5.0 s to 0.17 s (`node scripts/bench-broker.mjs`).
@@ -14,6 +16,17 @@ All notable changes to `@wearer-haitch/agent-relay` are recorded here. The forma
 - **Compaction** (`compact`, `agent-relay compact`). Archives finished message history older than `olderThanDays` into fsynced JSONL files under `<dataDir>/archive/` and records the archived range on the room. Optionally (`--drop-identities`) it deletes dormant identities that nothing references. The maintenance sweep compacts automatically (`compactAfterDays`, default 14, `--compact-after-days`, `AGENT_RELAY_COMPACT_AFTER_DAYS`). On the benchmark ledger, prune plus compaction shrank `state.json` from 16.5 MiB to 4.3 MiB.
 - `scripts/bench-broker.mjs`: a reproducible write-path benchmark on a large ledger.
 - Runtime dependency `immer` (MIT, no dependencies) for copy-on-write mutations.
+
+### Fixed
+
+- **Windows.** The full test suite now passes on Windows with Node 20 and 22, and Windows CI is required again. Two product fixes came out of that port:
+  - Task blocker references now resolve junctions and symlinks the same way claims do (`realpathSync.native`).
+  - Replacing `state.json` while another process has it open is retried briefly instead of failing.
+- **Presence.** A failed write no longer loses in-memory presence, and presence-only writes never hold up or fail a response.
+- **Release workflow.** It waits up to five minutes for npm to serve a fresh version before creating the GitHub release.
+- **Test hygiene.**
+  - Test fixtures stop CLI-started brokers before deleting their data directories, so test runs no longer leave broker daemons running.
+  - `npm test` runs with a five-minute per-test timeout, so a hang fails with the test's name.
 
 ## [0.4.0] - 2026-10-15
 
@@ -69,7 +82,8 @@ All notable changes to `@wearer-haitch/agent-relay` are recorded here. The forma
 - Last-seen presence, `agents --active`, and explicit `leave`.
 - Message summaries and durable attachments verified by SHA-256 on `fetch`.
 
-[Unreleased]: https://github.com/Wearer-Lab/agent-relay/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/Wearer-Lab/agent-relay/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/Wearer-Lab/agent-relay/releases/tag/v0.5.0
 [0.4.0]: https://github.com/Wearer-Lab/agent-relay/releases/tag/v0.4.0
 [0.3.2]: https://www.npmjs.com/package/@wearer-haitch/agent-relay/v/0.3.2
 [0.3.1]: https://www.npmjs.com/package/@wearer-haitch/agent-relay/v/0.3.1

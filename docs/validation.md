@@ -7,7 +7,7 @@ npm ci --ignore-scripts --no-audit --no-fund
 npm run release:check
 ```
 
-The current automated suite has **358 passing tests for 0.4.0** on macOS, Linux and Windows. The
+The current automated suite has **369 passing tests for 0.5.0** on macOS, Linux and Windows. The
 CI (`.github/workflows/ci.yml`, see [CI workflow](./ci-workflow.md)) runs the release checks on macOS,
 Linux, and Windows with Node.js 20 and 22 for every pull request and push to `main`.
 Every job, including the Windows test suite and the packed Windows installation, is
