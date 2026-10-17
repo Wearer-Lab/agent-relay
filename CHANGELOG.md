@@ -4,6 +4,17 @@ All notable changes to `@wearer-haitch/agent-relay` are recorded here. The forma
 
 ## [Unreleased]
 
+### Changed
+
+- **Broker write path** ([docs/broker-notes.md](docs/broker-notes.md#write-path-and-durability)). Writes are batched: mutations apply in memory on copy-on-write drafts and share one atomic `state.json` replacement, and every response, reads included, is released only once the state it observed is durable. Per-message validation and serialization are cached for unchanged messages, presence refreshes no longer write on their own (they ride along with the next write or a 30-second flush), and long-poll wakes scan only new messages. On a 16 MB ledger with 25 polling agents, throughput rose from 9 to 118 ops/s and `send` p99 fell from 5.0 s to 0.17 s (`node scripts/bench-broker.mjs`).
+- Ledgers must keep each room's messages in ascending cursor order, which every broker-written ledger already does.
+
+### Added
+
+- **Compaction** (`compact`, `agent-relay compact`). Archives finished message history older than `olderThanDays` into fsynced JSONL files under `<dataDir>/archive/` and records the archived range on the room. Optionally (`--drop-identities`) it deletes dormant identities that nothing references. The maintenance sweep compacts automatically (`compactAfterDays`, default 14, `--compact-after-days`, `AGENT_RELAY_COMPACT_AFTER_DAYS`). On the benchmark ledger, prune plus compaction shrank `state.json` from 16.5 MiB to 4.3 MiB.
+- `scripts/bench-broker.mjs`: a reproducible write-path benchmark on a large ledger.
+- Runtime dependency `immer` (MIT, no dependencies) for copy-on-write mutations.
+
 ## [0.4.0] - 2026-10-15
 
 ### Added

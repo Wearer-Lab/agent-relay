@@ -30,9 +30,10 @@ release claims, or execute work.
 | `leave` | `agentId` | `{left:agentId}` |
 | `fetch` | `agentId`, `messageId`, absolute `out` directory | `{files}` with name, hash, size and output path |
 | `wait` | `agentId`, optional `after` (0), `timeoutMs` (25000) | `{messages,cursor}` |
+| `compact` | optional `olderThanDays` (broker default, 14), `dryRun` (default true), `dropIdentities` (default false) | `{archivedMessages,removedIdentities,retainedMessages,bytesBefore,bytesAfter,archive}` |
 
 Agent records contain `agentId, runner, registeredAt, updatedAt, status, frozen, resources,
-task` and optional `sessionId` and `left`. Left records remain internal for history validation; presence queries exclude them. Query records add `lastSeenAgeMs`. Agent operations refresh last seen at most once a second; `agents`, `rooms` and `snapshot` do not. Initial status is `idle`, frozen is false, resources is an
+task` and optional `sessionId` and `left`. Left records remain internal for history validation; presence queries exclude them. Query records add `lastSeenAgeMs`. Agent operations refresh last seen at most once a second, in memory (see [Write path](#write-path-and-durability)); `agents`, `rooms` and `snapshot` do not. Initial status is `idle`, frozen is false, resources is an
 empty array and task is null. Status accepts any nonempty string up to 80 UTF-8 bytes,
 including `busy`, `offline`, `awaiting-attachment` and `channel-ready`. Re-registration and
 partial status updates retain omitted fields. Task is null, a string, or a JSON object
@@ -111,6 +112,76 @@ dead-PID recovery and unknown-owner refusal. These checks do not validate Codex/
 adapter wake-up behavior or actual external tool execution. The `test/` and `scripts/`
 directories are not included in the npm package; they are available in the source
 repository at the installed version (https://github.com/Wearer-Lab/agent-relay).
+
+## Write path and durability
+
+The broker keeps the whole ledger in memory and is its only writer. Mutations are applied
+in memory under the serial lock and written in **batches**: one atomic replacement of
+`state.json` (temporary file, fsync, rename, directory fsync) carries every mutation applied
+before it started, while later mutations queue for the next batch. A response is released only
+after everything its operation observed is on disk, reads included, so no client ever sees
+state that a failed write could take back. Responses leave in the order their operations ran.
+
+- **Atomic mutations.** Each mutation runs on a copy-on-write draft. A mutation that fails
+  partway leaves the ledger untouched, and unchanged rooms, agents and messages are shared
+  between versions rather than deep-copied.
+- **Incremental checks.** Every new ledger is still validated in full structurally, but
+  per-message checks are skipped for message objects that already passed them. Messages in a
+  room must be in ascending cursor order, which every broker-written ledger satisfies. The size
+  bound is computed from cached per-message JSON, and serialization reuses it.
+- **Failed writes.** A write that fails before the rename is rolled back: the operations it
+  carried fail with `STORE_IO` and the in-memory ledger returns to the last durable one, so a
+  rolled-back cursor is reused, never skipped. A failure after the rename has an unknown durable
+  result and faults the broker until restart, as before.
+- **Presence is volatile.** Refreshing an agent's last-seen time never writes on its own. It
+  rides along with the next write, a periodic presence flush (`presenceFlushMs`, default 30
+  seconds) or shutdown. After a crash, last-seen times may lag by up to that interval.
+- **Long-poll wakes** look only at messages past each waiter's cursor, and only at durable ones.
+
+### Compaction
+
+`compact` moves finished history out of `state.json` into append-only archive files under
+`<dataDir>/archive/` (`<room hash>-<timestamp>-<id>.jsonl`, one `{project, message}` per line,
+fsynced before the smaller ledger is written; a crash in between can at most duplicate lines in
+an archive). A message is archived when it is older than `olderThanDays`, has no attachments,
+and its delivery is finished:
+
+- every recipient acknowledged it, or
+- each recipient that did not acknowledge it is retired, or
+- for a broadcast, each recipient that did not acknowledge it is dormant or retired.
+
+Direct messages to a dormant identity stay, because dormant identities keep durable inboxes.
+Messages that a retained message replies to also stay. The room records
+`archived: {messages, through, files, at}`. `history` reports it in `scope.archived`, and the
+room cursor keeps counting past archived messages. Archived messages no longer appear in
+`inbox`, `history`, `outbox`, `receipt` or `export`; read them from the archive files.
+`dropIdentities: true` also deletes dormant identities that nothing retained references
+(messages, claims, branch and machine claims, tasks, handoffs, bulletin acknowledgements,
+process records). Retired identities are always kept, so they still cannot register again.
+
+The maintenance sweep runs compaction for every room at the prune interval (default every 10
+minutes), with `compactAfterDays` (default 14, `0` disables, `--compact-after-days` or
+`AGENT_RELAY_COMPACT_AFTER_DAYS` on the daemon). The sweep never drops identities. From the
+CLI: `agent-relay compact [--older-than-days N] [--drop-identities] [--apply]` (dry run unless
+`--apply`).
+
+### Measured effect
+
+`node scripts/bench-broker.mjs` builds a 16.3 MiB ledger: 1,400 identities (25 live), 9,000
+messages, broadcasts to about 1,000 recipients. It then runs 15 seconds of mixed load with 25
+long-polling agents and five workers sending, acknowledging, reporting status, reading and
+claiming. On a MacBook (Apple silicon, local SSD):
+
+| | Before (0.4.0) | After | After prune + compaction (4.3 MiB) |
+| --- | --- | --- | --- |
+| Throughput | 9.2 ops/s | 117.9 ops/s | 146.2 ops/s |
+| `send` p50 / p99 | 3,914 / 5,035 ms | 55 / 166 ms | 42 / 89 ms |
+| `status` p50 / p99 | 3,945 / 4,295 ms | 57 / 167 ms | 42 / 83 ms |
+| CPU per mutation | ~60 ms (clone 31 + validate 11 + stringify 18) | ~1.7 ms (draft 0.1 + validate 0.6 + size 1.0) | |
+
+Throughput after the change is limited by the benchmark's own pacing (each worker pauses 20 ms
+between operations). The remaining per-operation latency is one write and fsync of the whole
+file, shared by every operation in the batch, which is why compaction still matters.
 
 ## Optional ledger additions and local files
 
