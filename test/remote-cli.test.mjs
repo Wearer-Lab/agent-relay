@@ -37,7 +37,7 @@ test('the CLI lists the remote commands and reports an idle remote state', async
 
 test('a cloud agent pairs, a person approves, and the agent gets a scoped token', async t => {
   const dataDir = await temp(t);
-  const gateway = await startGateway({dataDir, call: async (room, fields) => ({ok: true, room, op: fields.op})});
+  const gateway = await startGateway({dataDir, port: 0, call: async (room, fields) => ({ok: true, room, op: fields.op})});
   t.after(() => gateway.close());
 
   const paired = await fetch(`${gateway.url}/pair`, {
@@ -76,7 +76,7 @@ test('a cloud agent pairs, a person approves, and the agent gets a scoped token'
 
 test('a denied request is never approved', async t => {
   const dataDir = await temp(t);
-  const gateway = await startGateway({dataDir, call: async () => ({ok: true})});
+  const gateway = await startGateway({dataDir, port: 0, call: async () => ({ok: true})});
   t.after(() => gateway.close());
   const paired = await fetch(`${gateway.url}/pair`, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({repo: 'github.com/org/repo', runner: 'claude'})});
   const request = await paired.json();
@@ -128,7 +128,7 @@ test('the read-only dashboard rides on the same public URL, behind its own secre
 
 test('the remote status reports the gateway, the tunnel and the live tokens', async t => {
   const dataDir = await temp(t);
-  const gateway = await startGateway({dataDir, call: async () => ({ok: true})});
+  const gateway = await startGateway({dataDir, port: 0, call: async () => ({ok: true})});
   t.after(() => gateway.close());
   const status = await remoteStatus({dataDir});
   assert.equal(status.ok, true);

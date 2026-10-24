@@ -18,6 +18,8 @@ const gatewayWith = async (t, {call, ...options} = {}) => {
   const calls = [];
   const gateway = await startGateway({
     dataDir,
+    // Port 0: the test files run in parallel and must not fight over one port.
+    port: 0,
     call: call ?? (async (room, fields) => { calls.push([room, fields]); return {ok: true, echoed: fields}; }),
     ...options,
   });
