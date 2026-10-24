@@ -23,6 +23,7 @@ const exists=async (base,ref)=>{
  try{const info=await stat(target);if(info.isFile())return true;if(info.isDirectory())return (await stat(path.join(target,'index.html'))).isFile();}catch{}
  return false;
 };
+const pick=(source,re)=>source.match(re)?.[1]?.trim()??null;
 const inside=(base,ref)=>{const target=path.resolve(base,ref.split(/[?#]/)[0]);return target===site||target.startsWith(site+path.sep);};
 
 test('every page: relative asset references resolve inside site/ and stay portable under a subpath',async()=>{
@@ -88,7 +89,7 @@ test('the landing page variants are self-contained drafts with valid references'
    assert.ok(await exists(base,ref),`${page}: missing file for reference: ${ref}`);
   }
   assert.equal((source.match(/<h1[\s>]/g)||[]).length,1,`${page} needs exactly one h1`);
-  assert.match(source,/<meta name="robots" content="noindex">/,`${page} should stay out of search results`);
+  assert.match(source,/<meta name="robots" content="noindex, follow">/,`${page} should stay out of search results`);
   for(const match of source.matchAll(/<script\b[^>]*\ssrc="([^"]+)"/gi))assert.ok(!external(match[1]),`${page}: external script: ${match[1]}`);
  }
 });
@@ -104,6 +105,61 @@ test('the navigation is the same on every page and marks the current page',async
  const home=await readFile(path.join(site,'index.html'),'utf8');
  assert.ok(!home.includes('aria-current="page"'),'the home page marks no section as current');
  assert.match(await readFile(path.join(site,'product/index.html'),'utf8'),/aria-current="page"/);
+});
+
+test('every page carries the metadata a crawler and a link preview need',async()=>{
+ const pages=[...PAGES,...VARIANTS];
+ for(const page of pages){
+  const source=await readFile(path.join(site,page),'utf8');
+  const title=pick(source,/<title>([^<]*)<\/title>/i);
+  const description=pick(source,/<meta name="description" content="([^"]*)"/i);
+  assert.ok(title,`${page}: no title`);
+  assert.ok(title.length<=60,`${page}: title is ${title.length} characters, over 60`);
+  assert.ok(description,`${page}: no description`);
+  assert.ok(description.length<=160,`${page}: description is ${description.length} characters, over 160`);
+  const canonical=pick(source,/<link rel="canonical" href="([^"]*)"/i);
+  assert.ok(canonical,`${page}: no canonical`);
+  assert.ok(canonical.startsWith('https://wearer-lab.github.io/agent-relay/'),`${page}: canonical is not absolute: ${canonical}`);
+  assert.ok(canonical.endsWith('/'),`${page}: canonical should end with a slash`);
+  for(const [label,re] of [['og:title',/<meta property="og:title" content="([^"]*)"/i],['og:description',/<meta property="og:description" content="([^"]*)"/i],['og:url',/<meta property="og:url" content="([^"]*)"/i],['og:image',/<meta property="og:image" content="([^"]*)"/i],['og:site_name',/<meta property="og:site_name" content="([^"]*)"/i],['twitter:card',/<meta name="twitter:card" content="([^"]*)"/i],['twitter:title',/<meta name="twitter:title" content="([^"]*)"/i],['twitter:description',/<meta name="twitter:description" content="([^"]*)"/i],['twitter:image',/<meta name="twitter:image" content="([^"]*)"/i]]){
+   assert.ok(pick(source,re),`${page}: no ${label}`);
+  }
+  assert.match(source,/<link rel="icon" href="[^"]*favicon\.svg" type="image\/svg\+xml">/,`${page}: no SVG icon`);
+  assert.match(source,/<link rel="apple-touch-icon"/,`${page}: no apple-touch-icon`);
+  assert.match(source,/<link rel="manifest"/,`${page}: no web manifest`);
+  assert.match(source,/<script type="application\/ld\+json">\{/,`${page}: no structured data`);
+  const ld=source.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)?.[1]??'';
+  assert.doesNotThrow(()=>JSON.parse(ld),`${page}: structured data is not valid JSON`);
+  assert.match(source,/<html lang="en"/,`${page}: no lang`);
+  assert.match(source,/<meta name="viewport" content="width=device-width, initial-scale=1">/,`${page}: no viewport`);
+  assert.equal((source.match(/<h1[\s>]/g)||[]).length,1,`${page} needs exactly one h1`);
+ }
+ const home=await readFile(path.join(site,'index.html'),'utf8');
+ const ld=JSON.parse(home.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1]);
+ assert.ok(ld['@graph'].some(x=>x['@type']==='SoftwareApplication'),'the home page should describe the software');
+ assert.ok(ld['@graph'].some(x=>x['@type']==='WebSite'),'the home page should describe the site');
+ for(const page of VARIANTS)assert.match(await readFile(path.join(site,page),'utf8'),/<meta name="robots" content="noindex, follow">/,`${page} should stay out of the index`);
+});
+
+test('the site tells crawlers where to go, and ships a way home for a bad URL',async()=>{
+ const robots=await readFile(path.join(site,'robots.txt'),'utf8');
+ assert.match(robots,/User-agent: \*/);
+ assert.match(robots,/Allow: \//);
+ assert.match(robots,/Sitemap: https:\/\/wearer-lab\.github\.io\/agent-relay\/sitemap\.xml/);
+ const sitemap=await readFile(path.join(site,'sitemap.xml'),'utf8');
+ for(const page of PAGES){
+  const path=page==='index.html'?'':page.replace('index.html','');
+  assert.ok(sitemap.includes(`<loc>https://wearer-lab.github.io/agent-relay/${path}</loc>`),`the sitemap is missing ${path}`);
+ }
+ assert.ok(!sitemap.includes('/variants/'),'the copy drafts should not be in the sitemap');
+ const notFound=await readFile(path.join(site,'404.html'),'utf8');
+ assert.match(notFound,/<title>[^<]*not found[^<]*<\/title>/i);
+ assert.match(notFound,/Agent Relay/);
+ assert.ok(notFound.includes('https://wearer-lab.github.io/agent-relay/'),'the 404 page needs absolute links');
+ const manifest=JSON.parse(await readFile(path.join(site,'site.webmanifest'),'utf8'));
+ assert.equal(manifest.name,'Agent Relay');
+ assert.ok(manifest.icons.length>=2,'the manifest needs icons');
+ for(const file of ['assets/favicon-32.png','assets/apple-touch-icon.png','assets/icon-512.png'])assert.ok(await exists(site,file),`missing icon: ${file}`);
 });
 
 test('site assets stay small (under 3 MB) and screenshots exist for both themes',async()=>{

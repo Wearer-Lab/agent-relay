@@ -32,6 +32,11 @@ ordinary relative links.
 | `assets/fonts/` | Self-hosted fonts: Bubbledot (CC BY 4.0, credited in the footer), Geist Pixel Circle and Inter. Nothing is fetched from a third party. |
 | `assets/dash-*.webp` | Dashboard screenshots, six views in dark and light. |
 | `assets/og.png` | 1200x630 social preview card. |
+| `assets/favicon-32.png`, `assets/apple-touch-icon.png`, `assets/icon-512.png` | Raster icons next to the SVG mark, for browsers and home screens that want one. |
+| `robots.txt` | Allows crawling and points at the sitemap. The copy drafts are not listed there; they carry `noindex` in their own metadata. |
+| `sitemap.xml` | The six public pages, with the drafts left out. |
+| `404.html` | A styled not-found page. It uses absolute links, because it is served for any missing path. |
+| `site.webmanifest` | Name, colours and icons, for a home-screen install. |
 
 All asset paths are relative, so the page works under the `/agent-relay/`
 subpath and from any local server. The social metadata in each page uses
@@ -85,6 +90,21 @@ WebP (`cwebp -q 80`), and save as `assets/dash-<view>-<theme>.webp`, where the
 radio log view is named `radio`. The claims view is cropped to 1440x540. Stop
 the fixture with Ctrl+C. Keep `assets/` under 3 MB; `test/site.test.mjs` checks
 that.
+
+## SEO
+
+Every page carries a title of at most 60 characters, a description of at most 160,
+an absolute canonical URL, the Open Graph and Twitter card tags, an SVG icon with
+raster fallbacks, an apple-touch icon, a web manifest link and JSON-LD
+structured data. The home page describes the software and the site; every other
+page describes itself and its place in the breadcrumb.
+
+The absolute URLs all come from one constant in the page generator. Moving the
+site to a domain of its own is one edit there plus the same constant in
+`robots.txt`, `sitemap.xml` and `404.html`.
+
+`npm test` includes `test/site.test.mjs`, which enforces all of the above, so a
+page that loses a tag or grows a long description fails the build.
 
 ## Checks
 
