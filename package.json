@@ -51,7 +51,7 @@
     "type": "git",
     "url": "git+https://github.com/Wearer-Lab/agent-relay.git"
   },
-  "homepage": "https://wearer-lab.github.io/agent-relay/",
+  "homepage": "https://relay.next-notes.com/",
   "bugs": {
     "url": "https://github.com/Wearer-Lab/agent-relay/issues"
   }

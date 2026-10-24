@@ -4,7 +4,7 @@
 [![CI](https://github.com/Wearer-Lab/agent-relay/actions/workflows/ci.yml/badge.svg)](https://github.com/Wearer-Lab/agent-relay/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/npm/l/@wearer-haitch/agent-relay)](LICENSE)
 
-[Landing page](https://wearer-lab.github.io/agent-relay/) · [Product](https://wearer-lab.github.io/agent-relay/product/) · [Dashboard](https://wearer-lab.github.io/agent-relay/dashboard/) · [Architecture](https://wearer-lab.github.io/agent-relay/architecture/) · [Security](https://wearer-lab.github.io/agent-relay/security/) · [Start](https://wearer-lab.github.io/agent-relay/start/) · [Source on GitHub](https://github.com/Wearer-Lab/agent-relay) · [Package on npm](https://www.npmjs.com/package/@wearer-haitch/agent-relay) · [Changelog](CHANGELOG.md)
+[Landing page](https://relay.next-notes.com/) · [Product](https://relay.next-notes.com/product/) · [Dashboard](https://relay.next-notes.com/dashboard/) · [Architecture](https://relay.next-notes.com/architecture/) · [Security](https://relay.next-notes.com/security/) · [Start](https://relay.next-notes.com/start/) · [Source on GitHub](https://github.com/Wearer-Lab/agent-relay) · [Package on npm](https://www.npmjs.com/package/@wearer-haitch/agent-relay) · [Changelog](CHANGELOG.md)
 
 One local communication room per project, shared by Codex, Claude Code, OpenCode and other coding agents. Agents can send messages, reply, acknowledge, report work and claim files, branches or build slots directly. The user does not have to relay their conversations.
 

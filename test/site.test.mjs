@@ -76,6 +76,8 @@ test('every page: no third-party scripts, no tracking, required metadata and one
 });
 
 const VARIANTS=['variants/index.html','variants/a/index.html','variants/b/index.html','variants/c/index.html'];
+// The site's origin lives in package.json; scripts/set-site-origin.mjs moves it.
+const origin=JSON.parse(await readFile(path.join(root,'package.json'),'utf8')).homepage.replace(/\/+$/,'');
 test('the landing page variants are self-contained drafts with valid references',async()=>{
  for(const page of VARIANTS){
   const source=await readFile(path.join(site,page),'utf8');
@@ -120,7 +122,7 @@ test('every page carries the metadata a crawler and a link preview need',async()
   assert.ok(description.length<=160,`${page}: description is ${description.length} characters, over 160`);
   const canonical=pick(source,/<link rel="canonical" href="([^"]*)"/i);
   assert.ok(canonical,`${page}: no canonical`);
-  assert.ok(canonical.startsWith('https://wearer-lab.github.io/agent-relay/'),`${page}: canonical is not absolute: ${canonical}`);
+  assert.ok(canonical.startsWith(`${origin}/`),`${page}: canonical is not absolute or on the wrong origin: ${canonical}`);
   assert.ok(canonical.endsWith('/'),`${page}: canonical should end with a slash`);
   for(const [label,re] of [['og:title',/<meta property="og:title" content="([^"]*)"/i],['og:description',/<meta property="og:description" content="([^"]*)"/i],['og:url',/<meta property="og:url" content="([^"]*)"/i],['og:image',/<meta property="og:image" content="([^"]*)"/i],['og:site_name',/<meta property="og:site_name" content="([^"]*)"/i],['twitter:card',/<meta name="twitter:card" content="([^"]*)"/i],['twitter:title',/<meta name="twitter:title" content="([^"]*)"/i],['twitter:description',/<meta name="twitter:description" content="([^"]*)"/i],['twitter:image',/<meta name="twitter:image" content="([^"]*)"/i]]){
    assert.ok(pick(source,re),`${page}: no ${label}`);
@@ -146,17 +148,17 @@ test('the site tells crawlers where to go, and ships a way home for a bad URL',a
  const robots=await readFile(path.join(site,'robots.txt'),'utf8');
  assert.match(robots,/User-agent: \*/);
  assert.match(robots,/Allow: \//);
- assert.match(robots,/Sitemap: https:\/\/wearer-lab\.github\.io\/agent-relay\/sitemap\.xml/);
+ assert.ok(robots.includes(`Sitemap: ${origin}/sitemap.xml`),'robots.txt must point at the sitemap on the site origin');
  const sitemap=await readFile(path.join(site,'sitemap.xml'),'utf8');
  for(const page of PAGES){
   const path=page==='index.html'?'':page.replace('index.html','');
-  assert.ok(sitemap.includes(`<loc>https://wearer-lab.github.io/agent-relay/${path}</loc>`),`the sitemap is missing ${path}`);
+  assert.ok(sitemap.includes(`<loc>${origin}/${path}</loc>`),`the sitemap is missing ${path}`);
  }
  assert.ok(!sitemap.includes('/variants/'),'the copy drafts should not be in the sitemap');
  const notFound=await readFile(path.join(site,'404.html'),'utf8');
  assert.match(notFound,/<title>[^<]*not found[^<]*<\/title>/i);
  assert.match(notFound,/Agent Relay/);
- assert.ok(notFound.includes('https://wearer-lab.github.io/agent-relay/'),'the 404 page needs absolute links');
+ assert.ok(notFound.includes(origin),'the 404 page needs absolute links');
  const manifest=JSON.parse(await readFile(path.join(site,'site.webmanifest'),'utf8'));
  assert.equal(manifest.name,'Agent Relay');
  assert.ok(manifest.icons.length>=2,'the manifest needs icons');
@@ -164,8 +166,6 @@ test('the site tells crawlers where to go, and ships a way home for a bad URL',a
 });
 
 test('every absolute URL on the site points at the same origin',async()=>{
- const pkg=JSON.parse(await readFile(path.join(root,'package.json'),'utf8'));
- const origin=new URL(pkg.homepage).origin+new URL(pkg.homepage).pathname.replace(/\/+$/,'');
  const files=['robots.txt','sitemap.xml','404.html','site.webmanifest',...PAGES,...VARIANTS];
  for(const file of files){
   const source=await readFile(path.join(site,file),'utf8');
