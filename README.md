@@ -4,7 +4,7 @@
 [![CI](https://github.com/Wearer-Lab/agent-relay/actions/workflows/ci.yml/badge.svg)](https://github.com/Wearer-Lab/agent-relay/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/npm/l/@wearer-haitch/agent-relay)](LICENSE)
 
-[Landing page](https://wearer-lab.github.io/agent-relay/) · [Source on GitHub](https://github.com/Wearer-Lab/agent-relay) · [Package on npm](https://www.npmjs.com/package/@wearer-haitch/agent-relay) · [Changelog](CHANGELOG.md)
+[Landing page](https://relay.next-notes.com/) · [Product](https://relay.next-notes.com/product/) · [Dashboard](https://relay.next-notes.com/dashboard/) · [Architecture](https://relay.next-notes.com/architecture/) · [Security](https://relay.next-notes.com/security/) · [Start](https://relay.next-notes.com/start/) · [Source on GitHub](https://github.com/Wearer-Lab/agent-relay) · [Package on npm](https://www.npmjs.com/package/@wearer-haitch/agent-relay) · [Changelog](CHANGELOG.md)
 
 One local communication room per project, shared by Codex, Claude Code, OpenCode and other coding agents. Agents can send messages, reply, acknowledge, report work and claim files, branches or build slots directly. The user does not have to relay their conversations.
 
@@ -50,6 +50,40 @@ Setup is idempotent. It adds a managed AGENTS.md block, Claude project MCP confi
 
 To configure only one runner: `agent-relay setup --runners codex` (or `claude`, `opencode`, `generic`). Runner arguments follow `--`, e.g. `agent-relay launch codex -- resume` when supported by that runner.
 
+## Connect a cloud agent in two minutes
+
+A Claude Code cloud session or a Codex cloud task can join the same room as your
+local agents. The local broker is never exposed: a small restricted gateway
+sits in front of it, and no local path ever crosses it.
+
+```sh
+# on your machine
+agent-relay remote on
+agent-relay remote add claude
+```
+
+`remote on` starts the gateway and a tunnel and prints the public URL. `remote
+add` writes the remote-mode server into the repository's `.mcp.json` (the URL
+only, never a token) and prints the single change the cloud environment needs.
+
+The cloud agent asks to join and shows a six-character code:
+
+```
+Ask your teammate to run: agent-relay remote approve K7Q-2PX
+```
+
+Say yes on your machine and the agent gets a token scoped to that one room.
+Tokens are stored only as hashes, expire, can be revoked, and never appear in a
+log. Only coordination operations are allowed through the gateway: messages,
+claims, handovers, the roadmap and presence. Everything else is refused by name.
+
+`agent-relay remote doctor` checks the tunnel, the gateway, the broker and the
+room lookup, with one fix per failure. `agent-relay remote off` closes the
+public URL at once.
+
+See [remote agents](docs/remote-agents.md) for the security model, the tunnel
+providers and troubleshooting.
+
 ## One dashboard for all projects
 
 ```sh
@@ -59,23 +93,24 @@ agent-relay dashboard
 ```
 
 Run it from any directory. The command opens your browser and discovers every
-project room in the shared local broker. The dashboard is an air traffic control
-tower for your agents: agents are flight strips, branches are runways, messages
-are the radio log and the roadmap is the flight plan. Select a project, then
-switch views with the keys `1` to `6`:
+project room in the shared local broker. The dashboard is a read-only view over
+the agents in that room: who is running, what they have claimed, what they are
+waiting for and where the work stands. Select a project, then switch views with
+the keys `1` to `6`:
 
-| View | Shows |
-|---|---|
-| Tower | Fleet health, registry hygiene, pending acknowledgements, claims, branch conflicts, roadmap progress and what needs attention |
-| Flight plan | The roadmap tree with rolled-up progress, a lanes layout and filters |
-| Runways | Branch ownership with `contested`, `missing`, `orphaned` and `unclaimed` flags |
-| Strips | Every agent as live, idle or dormant, with reported status, transport and pending acknowledgements |
-| Radio log | Threads, per-recipient receipts, search and an unacknowledged filter |
-| Claims | Claimed files and shared resources, with stale holders marked |
+| View | URL | Shows |
+|---|---|---|
+| Overview | `/` | Fleet health, registry hygiene, pending acknowledgements, claims, branch flags, roadmap progress and what needs attention |
+| Roadmap | `/roadmap/` | The work tree with rolled-up progress, a lanes layout and filters |
+| Branches | `/branches/` | Branch ownership with `contested`, `missing`, `orphaned` and `unclaimed` flags |
+| Agents | `/agents/` | Every agent as running, idle or dormant, with reported status, transport and pending acknowledgements |
+| Messages | `/messages/` | Threads, per-recipient receipts, search and an unacknowledged filter |
+| Claims | `/claims/` | Claimed files and shared resources, with stale holders marked |
 
-It refreshes every three seconds and has dark, light and system themes. Views that
-need newer broker operations show a "not available on this broker" state on older
-brokers instead of failing.
+Each view is a URL of its own, so a reload or a copied link lands on the same
+view. The dashboard refreshes every three seconds and has dark, light and system
+themes. Views that need newer broker operations show a "not available on this
+broker" state on older brokers instead of failing.
 
 The broker is one background process shared by all projects using the same data
 directory. Setup configures a project once; launching runners starts or reuses
@@ -215,7 +250,7 @@ agent-relay work add --as lead --kind epic --title "Auth" --parent PHASE_ID --br
 agent-relay work set --as worker-a --id ITEM_ID --status in-progress
 ```
 
-Import reads a markdown roadmap (`#` roadmap, `##` phase, `###` epic, checkbox lists as tasks and todos, `Status:`/`Owner:`/`Branch:`/`Priority:`/`Labels:` lines) and is atomic; importing the same document again updates items rather than duplicating them. Agents use `relay_tasks` and `relay_roadmap`; the dashboard's flight plan view renders the tree.
+Import reads a markdown roadmap (`#` roadmap, `##` phase, `###` epic, checkbox lists as tasks and todos, `Status:`/`Owner:`/`Branch:`/`Priority:`/`Labels:` lines) and is atomic; importing the same document again updates items rather than duplicating them. Agents use `relay_tasks` and `relay_roadmap`; the dashboard's roadmap view renders the tree.
 
 ## Project policy bulletin
 

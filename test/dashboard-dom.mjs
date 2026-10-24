@@ -1,8 +1,8 @@
 // Shared fake-DOM harness for dashboard view tests (not a test file itself: it only exports helpers).
 import {readFile} from 'node:fs/promises';
 import {createContext,runInContext} from 'node:vm';
-export const dashboardSource=await readFile(new URL('../lib/dashboard/dashboard.js',import.meta.url),'utf8');
-export const modelSource=await readFile(new URL('../lib/dashboard/model.js',import.meta.url),'utf8');
+export const dashboardSource=await readFile(new URL('../lib/dashboard/assets/dashboard.js',import.meta.url),'utf8');
+export const modelSource=await readFile(new URL('../lib/dashboard/assets/model.js',import.meta.url),'utf8');
 export const textOf=el=>(el.textContent??'')+(el.children??[]).map(textOf).join('');
 export const findAll=(root,pred)=>{const out=[];const walk=n=>{for(const child of n.children??[]){if(pred(child))out.push(child);walk(child);}};walk(root);return out;};
 export const byClass=(root,cls)=>findAll(root,el=>String(el.className).split(' ').includes(cls));
@@ -10,7 +10,7 @@ export const findButton=(root,label)=>findAll(root,el=>el.tag==='button'&&(el.te
 export const plain=value=>JSON.parse(JSON.stringify(value));
 export function modelContext(){const sandbox={};createContext(sandbox);runInContext(modelSource,sandbox);return sandbox;}
 const emptySnapshot={project:'',agents:[],claims:[],messages:[],totalMessages:0,pendingDeliveries:0,pendingByAgent:{},cursor:0};
-export function boot({projects,snapshot,work,ownership,usage,search='?view=tower'}={}){
+export function boot({projects,snapshot,work,ownership,usage,path='/'}={}){
  const elements=new Map();
  const make=tag=>{
   const el={tag,children:[],parent:null,dataset:{},listeners:{},textContent:'',className:'',type:'',value:'',checked:false,hidden:false,disabled:false,title:'',dateTime:'',open:false,scrollTop:0,scrolled:false,attributes:{},
@@ -35,16 +35,16 @@ export function boot({projects,snapshot,work,ownership,usage,search='?view=tower
  const feed=(value,url)=>value===undefined?response({error:'Not found.'},404):response(typeof value==='function'?value(url):value);
  const fetch=async url=>{
   fetchLog.push(url);
-  if(url.startsWith('/api/projects'))return response(projects??{rooms:[],preferredProject:''});
-  if(url.startsWith('/api/snapshot'))return response(typeof snapshot==='function'?snapshot(url):snapshot??emptySnapshot);
-  if(url.startsWith('/api/work'))return feed(work,url);
-  if(url.startsWith('/api/ownership'))return feed(ownership,url);
-  if(url.startsWith('/api/usage'))return feed(usage,url);
-  if(url.startsWith('/api/history'))return response({available:false,messages:[],nextCursor:null,done:true});
+  if(url.startsWith('/api/v1/projects'))return response(projects??{rooms:[],preferredProject:''});
+  if(url.startsWith('/api/v1/snapshot'))return response(typeof snapshot==='function'?snapshot(url):snapshot??emptySnapshot);
+  if(url.startsWith('/api/v1/work'))return feed(work,url);
+  if(url.startsWith('/api/v1/ownership'))return feed(ownership,url);
+  if(url.startsWith('/api/v1/usage'))return feed(usage,url);
+  if(url.startsWith('/api/v1/history'))return response({available:false,messages:[],nextCursor:null,done:true});
   return response({error:'Not found.'},404);
  };
  const pushed=[];
- const sandbox={document,location:{hash:'#dashboard-test-secret',pathname:'/',search},URLSearchParams,history:{replaceState(){},pushState(_s,_t,url){pushed.push(url);}},sessionStorage:{getItem:()=>null,setItem(){}},fetch,AbortSignal:{timeout:()=>({})},Option,setInterval:()=>0,queueMicrotask,setTimeout,clearTimeout};
+ const sandbox={document,location:{hash:'#dashboard-test-secret',pathname:path,search:''},URLSearchParams,history:{replaceState(){},pushState(_s,_t,url){pushed.push(url);}},sessionStorage:{getItem:()=>null,setItem(){}},fetch,AbortSignal:{timeout:()=>({})},Option,setInterval:()=>0,queueMicrotask,setTimeout,clearTimeout};
  createContext(sandbox);runInContext(modelSource,sandbox);runInContext(dashboardSource,sandbox);
  const flush=async()=>{for(let i=0;i<40;i++)await Promise.resolve();await new Promise(resolve=>setImmediate(resolve));await new Promise(resolve=>setImmediate(resolve));};
  return {elements,sandbox,fetchLog,pushed,flush,$:id=>elements.get(id)??document.getElementById(id),document};

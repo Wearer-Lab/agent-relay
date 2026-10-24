@@ -1,26 +1,29 @@
-// Agent Relay landing page. Progressive enhancement only: theme toggle, install tabs and copy, dashboard view tabs, reveal on scroll.
-// No network access, no analytics, no cookies.
+// Agent Relay website. Progressive enhancement only: mobile menu, install tabs and copy,
+// dashboard view tabs, reveal on scroll, stat counters. No network access, no analytics, no cookies.
 (function () {
   'use strict';
   var doc = document, root = doc.documentElement;
-  var KEY = 'agent-relay-site-theme';
   function $(s, c) { return (c || doc).querySelector(s); }
   function $$(s, c) { return Array.prototype.slice.call((c || doc).querySelectorAll(s)); }
+  var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // ---- theme -----------------------------------------------------------------
-  var dark = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
-  function effective() { return root.dataset.theme || (dark && dark.matches ? 'dark' : 'light'); }
-  var toggle = $('#theme-toggle');
-  function label() { if (toggle) toggle.setAttribute('aria-label', effective() === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'); }
-  if (toggle) {
-    toggle.addEventListener('click', function () {
-      var next = effective() === 'dark' ? 'light' : 'dark';
-      root.dataset.theme = next;
-      try { localStorage.setItem(KEY, next); } catch (e) {}
-      label();
+  // ---- mobile menu ----------------------------------------------------------
+  var burger = $('.burger'), overlay = $('.mobile-overlay'), sheet = $('.mobile-menu-sheet');
+  function setMenu(open) {
+    if (!burger || !overlay) return;
+    burger.setAttribute('aria-expanded', String(open));
+    burger.setAttribute('aria-label', open ? 'Close navigation' : 'Open navigation');
+    overlay.hidden = !open;
+  }
+  if (burger && overlay) {
+    burger.addEventListener('click', function () { setMenu(burger.getAttribute('aria-expanded') !== 'true'); });
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) setMenu(false); });
+    if (sheet) sheet.addEventListener('click', function (e) { e.stopPropagation(); });
+    $$('.mobile-link, .mobile-sign-in').forEach(function (link) { link.addEventListener('click', function () { setMenu(false); }); });
+    doc.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && burger.getAttribute('aria-expanded') === 'true') { setMenu(false); burger.focus(); }
     });
-    label();
-    if (dark && dark.addEventListener) dark.addEventListener('change', label);
+    window.addEventListener('resize', function () { if (window.innerWidth > 720 && burger.getAttribute('aria-expanded') === 'true') setMenu(false); });
   }
 
   // ---- install block ---------------------------------------------------------
@@ -88,7 +91,6 @@
 
   // ---- reveal on scroll ------------------------------------------------------
   var rv = $$('.rv');
-  var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (!('IntersectionObserver' in window) || calm) {
     rv.forEach(function (e) { e.classList.add('in'); });
   } else {
@@ -98,18 +100,41 @@
     rv.forEach(function (e) { io.observe(e); });
   }
 
-  // ---- current section in the nav ---------------------------------------------
-  var links = $$('.nav ul a[href^="#"]');
-  if ('IntersectionObserver' in window && links.length) {
-    var map = {};
-    links.forEach(function (a) { var id = a.getAttribute('href').slice(1); var s = doc.getElementById(id); if (s) map[id] = a; });
-    var so = new IntersectionObserver(function (entries) {
-      entries.forEach(function (en) {
-        if (!en.isIntersecting) return;
-        links.forEach(function (a) { a.removeAttribute('aria-current'); });
-        var a = map[en.target.id]; if (a) a.setAttribute('aria-current', 'true');
-      });
-    }, { rootMargin: '-45% 0px -50% 0px' });
-    Object.keys(map).forEach(function (id) { so.observe(doc.getElementById(id)); });
+  // ---- stat counters ---------------------------------------------------------
+  var values = $$('.stat-value');
+  if (values.length) {
+    function format(el, value) {
+      var decimals = Number(el.dataset.decimals || 0), suffix = el.dataset.suffix || '';
+      return Number(value).toFixed(decimals) + suffix;
+    }
+    function setFinal() { values.forEach(function (el) { el.textContent = format(el, Number(el.dataset.target || 0)); }); }
+    if (calm) { setFinal(); }
+    else {
+      var counted = false;
+      function run() {
+        if (counted) return;
+        counted = true;
+        values.forEach(function (el, i) {
+          var target = Number(el.dataset.target || 0), duration = 1500 + i * 80, offset = 420 + i * 90;
+          setTimeout(function () {
+            var start = performance.now();
+            function frame(now) {
+              var progress = Math.min((now - start) / duration, 1);
+              var eased = 1 - Math.pow(1 - progress, 3);
+              el.textContent = format(el, target * eased);
+              if (progress < 1) requestAnimationFrame(frame); else el.textContent = format(el, target);
+            }
+            requestAnimationFrame(frame);
+          }, offset);
+        });
+      }
+      if ('IntersectionObserver' in window) {
+        var band = $('.stats');
+        var so = new IntersectionObserver(function (entries) {
+          if (entries.some(function (en) { return en.isIntersecting && en.intersectionRatio >= 0.25; })) { run(); so.disconnect(); }
+        }, { threshold: [0.25] });
+        if (band) so.observe(band);
+      } else run();
+    }
   }
 })();

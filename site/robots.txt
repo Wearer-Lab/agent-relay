@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+
+# The copy drafts under /variants/ are marked noindex in their own metadata.
+# They stay crawlable so a crawler reads that directive instead of guessing.
+
+Sitemap: https://relay.next-notes.com/sitemap.xml

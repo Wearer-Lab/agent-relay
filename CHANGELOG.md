@@ -4,6 +4,48 @@ All notable changes to `@wearer-haitch/agent-relay` are recorded here. The forma
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-10-24
+
+### Fixed
+
+- The machine gate measured free disk and page-file usage with a five second timeout, which PowerShell start-up can exceed on a loaded Windows machine. A missing measurement let the gate pass, so the timeout is now twenty seconds.
+
+## [0.7.0] - 2026-10-24
+
+### Added
+
+- **Remote agents** ([docs/remote-agents.md](docs/remote-agents.md)). A Claude Code cloud session or a Codex cloud task can now join the same relay room as your local agents.
+  - `lib/gateway.mjs`: a restricted HTTP front for the local broker on `127.0.0.1:47820`. It forwards only coordination operations (register, agents, send, inbox, ack, wait, status, claim, release, tasks, branches, ownership, history, receipt, outbox, bulletin, handoffs, blocked, leave) and refuses everything else by name, with the reason. Requests carrying a local path are refused; claims inside the room are rewritten to repo-relative paths in both directions.
+  - Tokens are 256-bit random values stored only as SHA-256 hashes, compared in constant time, scoped to one room and optionally one agent-ID prefix, and never written to a log. They expire, and `remote revoke` drops them at once.
+  - Pairing: a cloud agent posts its repository, branch and runner, gets a six-character code, and waits. `agent-relay remote approve` lists what is waiting and asks about each one; the waiting agent then receives a token, once. Requests expire after ten minutes and at most five may wait.
+  - Rooms are resolved from the cloud agent's git remote, preferring the requested branch and otherwise the main checkout. `agent-relay remote room add` sets an alias by hand when nothing matches.
+  - Rate limits per token and per address return `429` with `Retry-After`, and an audit log under the data directory records the token id, runner, room, operation and result.
+  - `lib/tunnels/`: one interface for Tailscale Funnel (the default, a stable URL with no domain of your own), Cloudflare quick and named tunnels, and ngrok. `remote on` picks the first one that is installed.
+  - `agent-relay remote on|off|status|doctor|approve|deny|revoke|add|test|room` drives it all. `remote test` pairs, approves and calls through the public URL, then revokes the test token.
+  - Remote client mode: with `AGENT_RELAY_URL` set, `lib/client.mjs` talks to the gateway and never starts or discovers a local broker. Without a token it pairs and waits, and the errors name the command that fixes them.
+  - The read-only dashboard rides on the same public URL: `agent-relay remote dashboard` prints a one-time link, the secret sits in the URL fragment as it does locally, and the feeds under `/api/v1/` need it.
+
+### Changed
+
+- The site is now served from **https://relay.next-notes.com** (Cloudflare Workers static assets, custom domain bound), with GitHub Pages keeping the same files as a mirror. The canonical, Open Graph, Twitter, sitemap, robots and 404 URLs moved with `scripts/set-site-origin.mjs`, one command. Two workflows now run in parallel: **Cloudflare** publishes the site, and **Surveillance** watches every public page, the crawler's files, the styled 404 and the published npm version every six hours.
+
+## [0.6.0] - 2026-10-24
+
+### Changed
+
+- **One design language for the website, the dashboard and the mark.** The landing page, the dashboard and the favicon now share one design system: a black canvas, floating white pills, a dot-matrix display face for headings (Bubbledot, with Geist Pixel Circle as the local fallback), Inter for prose and a monospaced face for data. Every font is self-hosted, so nothing is fetched from a third party. The mark is an SVG (a white relay cross on black) instead of an inline radar drawing.
+- **The tower vocabulary is gone.** The dashboard views are now **Overview** (`/`), **Roadmap** (`/roadmap/`), **Branches** (`/branches/`), **Agents** (`/agents/`), **Messages** (`/messages/`) and **Claims** (`/claims/`). The room picker says *Project*, the clock says *UTC*, and "on the air" is now "running". The product name, Agent Relay, is unchanged: a relay is a relay.
+- **Real URLs everywhere.**
+  - The website is six pages instead of one long page: `/`, `/product/`, `/dashboard/`, `/architecture/`, `/security/` and `/start/`. It is still a static site with no build step and no router.
+  - Every dashboard view is its own path: `/`, `/roadmap/`, `/branches/`, `/agents/`, `/messages/` and `/claims/`. The shell is served for all of them, so a reload, a copied link and browser Back and Forward land on the same view. A path without its trailing slash redirects to the canonical one.
+  - The dashboard serves its assets from `/assets/*` and its read-only feeds from `/api/v1/*` (`projects`, `snapshot`, `history`, `work`, `ownership`, `usage`).
+  - The broker answers `POST /api/v1/rpc`. `/rpc` still works, so a broker started by an older release keeps serving the clients it already has; the discovery file records which endpoint a broker speaks and the CLI follows it.
+
+### Added
+
+- `site/assets/logo.svg` and `lib/dashboard/assets/logo.svg`: the Agent Relay mark, used by the page header, the dashboard header and the favicon.
+- Three landing page directions under `site/variants/` for review: problem-first, the first-person story, and one-workspace. They are marked `noindex` and are drafts, not published pages.
+
 ## [0.5.0] - 2026-10-17
 
 ### Changed

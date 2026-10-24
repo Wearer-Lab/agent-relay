@@ -82,23 +82,23 @@ const branch=(name,extra={})=>({name,head:'abcdef123456',upstream:null,committed
 test('runways name the repository instead of the .git directory and show each worktree once with its room',async()=>{
  const ownership={available:true,git:true,repo:'/home/me/tower-demo/.git',rooms:['/w','/home/me/tower-wt'],generatedAt:new Date().toISOString(),unassigned:{claims:[{branch:'feat/gone',agentId:'k-9',reason:'missing'}],worktrees:[]},branches:[
   branch('feat/tower',{flags:['contested'],worktrees:[{path:'/home/me/tower-wt',project:'/home/me/tower-wt'},{path:'/w',project:'/w'},{path:'/home/me/loose',project:null}]})]};
- const page=boot({projects:rooms,snapshot:snapshotOf(),ownership,search:'?view=runways'});await page.flush();
- const meta=page.$('runways-meta');
+ const page=boot({projects:rooms,snapshot:snapshotOf(),ownership,path:'/branches/'});await page.flush();
+ const meta=page.$('branches-meta');
  assert.match(textOf(meta),/^tower-demo · 1 branch · 1 flagged/);assert.doesNotMatch(textOf(meta),/\.git/);assert.equal(meta.title,'/home/me/tower-demo/.git','the full path stays one hover away');
- const card=findAll(page.$('runways'),el=>el.tag==='article')[0],items=byClass(card,'wt');
+ const card=findAll(page.$('branches'),el=>el.tag==='article')[0],items=byClass(card,'wt');
  assert.equal(items.length,3);
  assert.deepEqual(items.map(el=>byClass(el,'wt-name').map(textOf)[0]),['w','loose','tower-wt'],'each checkout appears once, the current room first');
  assert.deepEqual(items.map(el=>byClass(el,'chip').map(textOf)),[['this room','room registered'],['no room'],['room registered']]);
  assert.doesNotMatch(textOf(items[2]),/tower-wt.*tower-wt/,'the folder name is not repeated');
  assert.equal(items[2].title.includes('/home/me/tower-wt'),true);
- assert.match(textOf(page.$('unassigned')),/Claims without a runway \(1\)/);assert.match(textOf(page.$('unassigned')),/feat\/gone · k-9 · branch not found/);
+ assert.match(textOf(page.$('unassigned')),/Claims without a branch \(1\)/);assert.match(textOf(page.$('unassigned')),/feat\/gone · k-9 · branch not found/);
 });
 
 test('tower branch card: the number is every flagged branch and the caption lists each flag kind', async()=>{
  const ownership={available:true,git:true,repo:'/w/.git',rooms:['/w'],branches:[branch('a',{flags:['contested']}),branch('b',{flags:['orphaned']}),branch('c',{flags:['unclaimed']}),branch('d',{flags:['unclaimed']}),branch('e'),branch('f',{flags:['missing']})]};
  const page=boot({projects:rooms,snapshot:snapshotOf(),ownership});await page.flush();
  assert.equal(textOf(page.$('conflicts-count')),'5');assert.equal(textOf(page.$('conflicts-sub')),'1 contested · 1 missing · 1 orphaned · 2 unclaimed');
- assert.equal(textOf(page.$('count-runways')),'5','the rail agrees with the card');
+ assert.equal(textOf(page.$('count-branches')),'5','the rail agrees with the card');
  const clear=boot({projects:rooms,snapshot:snapshotOf(),ownership:{...ownership,branches:[branch('main')]}});await clear.flush();
  assert.equal(textOf(clear.$('conflicts-count')),'0');assert.equal(textOf(clear.$('conflicts-sub')),'all branches clear');
 });
@@ -106,30 +106,30 @@ test('tower branch card: the number is every flagged branch and the caption list
 test('flight plan shows a derived status on parents that kept the default, falling back to progress on older brokers', async()=>{
  const parent=(extra={})=>node('EP','Registry','epic','todo',{progress:{done:2,total:5,percent:40},children:[node('A','Done one','task','done'),node('B','Open one','task','todo')],...extra});
  const root=extra=>({available:true,roots:[node('RM','Roadmap','roadmap','todo',{progress:{done:2,total:5,percent:40},children:[parent(extra)]})],counts:{byKind:{},byStatus:{}}});
- const chipFor=(page,id)=>byClass(findAll(page.$('plan-tree'),el=>el.tag==='li'&&el.dataset.id===id)[0],'status')[0];
- const older=boot({projects:rooms,snapshot:snapshotOf(),work:root(),search:'?view=plan'});await older.flush();
+ const chipFor=(page,id)=>byClass(findAll(page.$('roadmap-tree'),el=>el.tag==='li'&&el.dataset.id===id)[0],'status')[0];
+ const older=boot({projects:rooms,snapshot:snapshotOf(),work:root(),path:'/roadmap/'});await older.flush();
  assert.match(textOf(chipFor(older,'EP')),/In progress/,'no derivedStatus from the broker: derived from progress');
  assert.match(String(chipFor(older,'EP').className),/derived/);assert.match(chipFor(older,'EP').title,/Derived from the progress/);
  assert.match(textOf(chipFor(older,'RM')),/In progress/);assert.match(textOf(chipFor(older,'A')),/Done/);assert.doesNotMatch(String(chipFor(older,'A').className),/derived/);
- const newer=boot({projects:rooms,snapshot:snapshotOf(),work:root({derivedStatus:'review'}),search:'?view=plan'});await newer.flush();
+ const newer=boot({projects:rooms,snapshot:snapshotOf(),work:root({derivedStatus:'review'}),path:'/roadmap/'});await newer.flush();
  assert.match(textOf(chipFor(newer,'EP')),/In review/,'the broker derivedStatus is used when present');
- const explicit=boot({projects:rooms,snapshot:snapshotOf(),work:root({status:'blocked'}),search:'?view=plan'});await explicit.flush();
+ const explicit=boot({projects:rooms,snapshot:snapshotOf(),work:root({status:'blocked'}),path:'/roadmap/'});await explicit.flush();
  assert.match(textOf(chipFor(explicit,'EP')),/Blocked/);assert.doesNotMatch(String(chipFor(explicit,'EP').className),/derived/);
- const idle=boot({projects:rooms,snapshot:snapshotOf(),work:root({progress:{done:0,total:2,percent:0},children:[node('A','One','task','todo'),node('B','Two','task','todo')]}),search:'?view=plan'});await idle.flush();
+ const idle=boot({projects:rooms,snapshot:snapshotOf(),work:root({progress:{done:0,total:2,percent:0},children:[node('A','One','task','todo'),node('B','Two','task','todo')]}),path:'/roadmap/'});await idle.flush();
  assert.match(textOf(chipFor(idle,'EP')),/To do/);assert.doesNotMatch(String(chipFor(idle,'EP').className),/derived/);
 });
 
 test('a project that is not a git repository says so instead of showing an empty board', async()=>{
  const ownership={available:true,git:false,repo:'/w',rooms:['/w'],branches:[],totalBranches:0,truncated:false,unassigned:{claims:[{branch:'feat/x',agentId:'a',reason:'no-git'}],worktrees:[]}};
- const page=boot({projects:rooms,snapshot:snapshotOf(),ownership,search:'?view=runways'});await page.flush();
- assert.match(textOf(page.$('runways')),/No git repository here/);assert.match(textOf(page.$('runways-meta')),/Not a git repository/);
- assert.equal(findAll(page.$('runway-chips'),el=>el.tag==='button').length,0);
+ const page=boot({projects:rooms,snapshot:snapshotOf(),ownership,path:'/branches/'});await page.flush();
+ assert.match(textOf(page.$('branches')),/No git repository here/);assert.match(textOf(page.$('branches-meta')),/Not a git repository/);
+ assert.equal(findAll(page.$('branch-chips'),el=>el.tag==='button').length,0);
  assert.match(textOf(page.$('unassigned')),/feat\/x · a · no git repository/,'claims that cannot be placed stay visible');
- page.sandbox.go('tower');assert.equal(textOf(page.$('conflicts-count')),'—');assert.equal(textOf(page.$('conflicts-sub')),'not a git repository');
- const empty=boot({projects:rooms,snapshot:snapshotOf(),ownership:{available:true,git:true,repo:'/w/.git',rooms:['/w'],branches:[],unassigned:{claims:[],worktrees:[]}},search:'?view=runways'});await empty.flush();
- assert.match(textOf(empty.$('runways')),/No branches yet/);
- const cut=boot({projects:rooms,snapshot:snapshotOf(),ownership:{available:true,git:true,repo:'/w/.git',rooms:['/w'],branches:[branch('a')],totalBranches:900,truncated:true,unassigned:{}},search:'?view=runways'});await cut.flush();
- assert.match(textOf(cut.$('runways')),/mapped 1 of 900 branches/);assert.match(textOf(cut.$('runways-meta')),/1 of 900 branches/);
+ page.sandbox.go('overview');assert.equal(textOf(page.$('conflicts-count')),'—');assert.equal(textOf(page.$('conflicts-sub')),'not a git repository');
+ const empty=boot({projects:rooms,snapshot:snapshotOf(),ownership:{available:true,git:true,repo:'/w/.git',rooms:['/w'],branches:[],unassigned:{claims:[],worktrees:[]}},path:'/branches/'});await empty.flush();
+ assert.match(textOf(empty.$('branches')),/No branches yet/);
+ const cut=boot({projects:rooms,snapshot:snapshotOf(),ownership:{available:true,git:true,repo:'/w/.git',rooms:['/w'],branches:[branch('a')],totalBranches:900,truncated:true,unassigned:{}},path:'/branches/'});await cut.flush();
+ assert.match(textOf(cut.$('branches')),/mapped 1 of 900 branches/);assert.match(textOf(cut.$('branches-meta')),/1 of 900 branches/);
 });
 
 test('a brand-new room and a broker with no rooms get an orientation, not a wall of zeros', async()=>{
@@ -144,8 +144,8 @@ test('a brand-new room and a broker with no rooms get an orientation, not a wall
 });
 
 test('empty plan state tells you how to start a roadmap', async()=>{
- const page=boot({projects:rooms,snapshot:snapshotOf(),work:{available:true,roots:[],counts:{}},search:'?view=plan'});await page.flush();
- assert.match(textOf(page.$('plan-tree')),/agent-relay work import --file ROADMAP\.md/);
+ const page=boot({projects:rooms,snapshot:snapshotOf(),work:{available:true,roots:[],counts:{}},path:'/roadmap/'});await page.flush();
+ assert.match(textOf(page.$('roadmap-tree')),/agent-relay work import --file ROADMAP\.md/);
 });
 
 // ---- Static design contract --------------------------------------------------------------

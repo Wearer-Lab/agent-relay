@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {runInNewContext} from 'node:vm';
-const source=await readFile(new URL('../lib/dashboard/theme.js',import.meta.url),'utf8');
+const source=await readFile(new URL('../lib/dashboard/assets/theme.js',import.meta.url),'utf8');
 function boot({cookie='',saved=null,systemDark=false,blocked=false}={}){
  const events={},control={value:'',addEventListener:(event,callback)=>{events[event]=callback;}},documentEvents={};
  const document={documentElement:{dataset:{}},cookie,getElementById:()=>control,addEventListener:(event,callback)=>{documentEvents[event]=callback;}};
@@ -24,7 +24,7 @@ test('system theme follows OS changes while explicit themes remain fixed, and bl
 });
 
 // ---- Contrast: every text/background pairing the dashboard uses must reach WCAG AA (4.5:1) in both themes ----
-const css=await readFile(new URL('../lib/dashboard/dashboard.css',import.meta.url),'utf8');
+const css=await readFile(new URL('../lib/dashboard/assets/dashboard.css',import.meta.url),'utf8');
 const tokens=selector=>{const body=css.match(new RegExp(selector.replace(/[[\]"]/g,'\\$&')+'\\s*\\{([^}]*)\\}'))?.[1]??'';return Object.fromEntries([...body.matchAll(/--([\w-]+):\s*([^;]+);/g)].map(([,key,value])=>[key,value.trim()]));};
 const themes={light:tokens(':root'),dark:{...tokens(':root'),...tokens(':root[data-theme="dark"]')}};
 const channels=hex=>{const h=hex.replace('#','');return [0,2,4].map(i=>parseInt(h.slice(i,i+2),16));};

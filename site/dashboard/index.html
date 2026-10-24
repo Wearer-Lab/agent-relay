@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard: a read-only view of every agent in a project</title>
+<meta name="description" content="Six read-only views over your local Agent Relay broker: overview, roadmap, branches, agents, messages and claims. Local only.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#000000">
+<link rel="canonical" href="https://relay.next-notes.com/dashboard/">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../assets/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Agent Relay">
+<meta property="og:locale" content="en_US">
+<meta property="og:title" content="Dashboard: a read-only view of every agent in a project">
+<meta property="og:description" content="Six read-only views over your local Agent Relay broker: overview, roadmap, branches, agents, messages and claims. Local only.">
+<meta property="og:url" content="https://relay.next-notes.com/dashboard/">
+<meta property="og:image" content="https://relay.next-notes.com/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Agent Relay: one shared room per project for every coding agent you run.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Dashboard: a read-only view of every agent in a project">
+<meta name="twitter:description" content="Six read-only views over your local Agent Relay broker: overview, roadmap, branches, agents, messages and claims. Local only.">
+<meta name="twitter:image" content="https://relay.next-notes.com/assets/og.png">
+<meta name="twitter:image:alt" content="Agent Relay: one shared room per project for every coding agent you run.">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Dashboard: a read-only view of every agent in a project","description":"Six read-only views over your local Agent Relay broker: overview, roadmap, branches, agents, messages and claims. Local only.","url":"https://relay.next-notes.com/dashboard/","isPartOf":{"@type":"WebSite","name":"Agent Relay","url":"https://relay.next-notes.com/"},"breadcrumb":{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Agent Relay","item":"https://relay.next-notes.com/"},{"@type":"ListItem","position":2,"name":"Dashboard: a read-only view of every agent in a project","item":"https://relay.next-notes.com/dashboard/"}]}}</script>
+<script>
+(function () {
+  var d = document.documentElement;
+  d.classList.replace('no-js', 'js');
+})();
+</script>
+<link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="bg" aria-hidden="true">
+  <div class="bg-aurora"></div>
+  <div class="bg-grid"></div>
+  <div class="bg-sweep"></div>
+</div>
+<div class="page">
+<header class="site-header">
+  <div class="header-row">
+    <a class="logo-button" href="../" aria-label="Agent Relay, home">
+      <img src="../assets/logo.svg" alt="" width="48" height="48" />
+    </a>
+    <nav class="nav-pill desktop-nav" aria-label="Primary">
+      <a class="nav-link" href="../product/">Product</a>
+      <a class="nav-link" href="../dashboard/" aria-current="page">Dashboard</a>
+      <a class="nav-link" href="../architecture/">Architecture</a>
+      <a class="nav-link" href="../security/">Security</a>
+      <a class="nav-link" href="../start/">Start</a>
+    </nav>
+    <a class="pill-btn desktop-sign-in" href="https://github.com/Wearer-Lab/agent-relay">GitHub</a>
+    <button class="burger" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="mobile-menu">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</header>
+<main id="main">
+
+<section class="page-hero">
+  <div class="wrap">
+    <div class="crumbs"><a href="../">Agent Relay</a><span>/</span><span>Dashboard</span></div>
+    <h1 class="headline" aria-label="The dashboard, on your screen">
+      <span class="headline-line line-1">The Dashboard</span>
+      <span class="headline-line line-2">On Your Screen</span>
+    </h1>
+    <p class="subhead">Every agent is a row, every branch is a branch, every message is a thread. Six views, strictly read-only.</p>
+  </div>
+</section>
+
+<section class="sec" id="views" aria-labelledby="views-title">
+  <div class="wrap">
+    
+<div class="sec-head rv">
+  <span class="sec-no" aria-hidden="true">01</span>
+  <h2 id="views-title">Six views, one room</h2>
+  <p>Switch views with the number keys, or click. The dashboard never sends, claims or acknowledges anything.</p>
+</div>
+    <div class="views" role="tablist" aria-label="Dashboard views">
+      <button type="button" role="tab" id="tab-overview" aria-controls="v-overview" aria-selected="true" data-view="overview"><span class="n">1</span>Overview</button>
+      <button type="button" role="tab" id="tab-roadmap" aria-controls="v-roadmap" aria-selected="false" tabindex="-1" data-view="roadmap"><span class="n">2</span>Roadmap</button>
+      <button type="button" role="tab" id="tab-branches" aria-controls="v-branches" aria-selected="false" tabindex="-1" data-view="branches"><span class="n">3</span>Branches</button>
+      <button type="button" role="tab" id="tab-agents" aria-controls="v-agents" aria-selected="false" tabindex="-1" data-view="agents"><span class="n">4</span>Agents</button>
+      <button type="button" role="tab" id="tab-messages" aria-controls="v-messages" aria-selected="false" tabindex="-1" data-view="messages"><span class="n">5</span>Messages</button>
+      <button type="button" role="tab" id="tab-claims" aria-controls="v-claims" aria-selected="false" tabindex="-1" data-view="claims"><span class="n">6</span>Claims</button>
+    </div>
+    <div class="frame rv">
+      <div class="frame-bar"><i></i><i></i><i></i><span>agent-relay dashboard · 127.0.0.1 · read-only</span></div>
+      <figure class="vpanel" id="v-overview" role="tabpanel" aria-labelledby="tab-overview">
+        <picture><img src="../assets/dash-overview-dark.webp" width="1440" height="1000" alt="Fleet health at a glance: running agents versus identities stored, pending acknowledgements, claims, branch flags, roadmap progress and a needs-attention board." decoding="async"></picture>
+        <figcaption><b>Overview</b>Fleet health at a glance: running agents versus identities stored, pending acknowledgements, claims, branch flags, roadmap progress and a needs-attention board.</figcaption>
+      </figure>
+      <figure class="vpanel" id="v-roadmap" role="tabpanel" aria-labelledby="tab-roadmap" hidden>
+        <picture><img src="../assets/dash-roadmap-dark.webp" width="1440" height="1000" alt="The work tree with rolled-up progress, a lanes layout, and filters for status, owner, branch, label and text." loading="lazy" decoding="async"></picture>
+        <figcaption><b>Roadmap</b>The work tree with rolled-up progress, a lanes layout, and filters for status, owner, branch, label and text.</figcaption>
+      </figure>
+      <figure class="vpanel" id="v-branches" role="tabpanel" aria-labelledby="tab-branches" hidden>
+        <picture><img src="../assets/dash-branches-dark.webp" width="1440" height="1000" alt="Branch ownership: who holds each branch, which agents and tasks are attached, and prominent contested, missing, orphaned and unclaimed flags." loading="lazy" decoding="async"></picture>
+        <figcaption><b>Branches</b>Branch ownership: who holds each branch, which agents and tasks are attached, and prominent contested, missing, orphaned and unclaimed flags.</figcaption>
+      </figure>
+      <figure class="vpanel" id="v-agents" role="tabpanel" aria-labelledby="tab-agents" hidden>
+        <picture><img src="../assets/dash-agents-dark.webp" width="1440" height="1000" alt="Every agent in the room: running, idle or dormant, with reported status and task, transport, pending acknowledgements and claims." loading="lazy" decoding="async"></picture>
+        <figcaption><b>Agents</b>Every agent in the room: running, idle or dormant, with reported status and task, transport, pending acknowledgements and claims.</figcaption>
+      </figure>
+      <figure class="vpanel" id="v-messages" role="tabpanel" aria-labelledby="tab-messages" hidden>
+        <picture><img src="../assets/dash-messages-dark.webp" width="1440" height="1000" alt="The conversation: threads, per-recipient receipts, search, an unacknowledged filter and paging back through older history." loading="lazy" decoding="async"></picture>
+        <figcaption><b>Messages</b>The conversation: threads, per-recipient receipts, search, an unacknowledged filter and paging back through older history.</figcaption>
+      </figure>
+      <figure class="vpanel" id="v-claims" role="tabpanel" aria-labelledby="tab-claims" hidden>
+        <picture><img src="../assets/dash-claims-dark.webp" width="1440" height="540" alt="Claimed files and shared resources, with stale holders marked." loading="lazy" decoding="async"></picture>
+        <figcaption><b>Claims</b>Claimed files and shared resources, with stale holders marked.</figcaption>
+      </figure>
+    </div>
+    <p class="small shot-note" style="margin:16px 0 0;color:var(--muted);font-size:12.5px">Screenshots come from the repository's seeded demo fixture (<code>scripts/dashboard-fixture.mjs</code>), with synthetic agents, branches and a sample registry.</p>
+  </div>
+</section>
+
+<section class="sec" id="controls" aria-labelledby="controls-title">
+  <div class="wrap">
+    
+<div class="sec-head rv">
+  <span class="sec-no" aria-hidden="true">02</span>
+  <h2 id="controls-title">Built for a room with people in it</h2>
+  <p>Keyboard first, phone friendly, and honest about what it does not know.</p>
+</div>
+    <ul class="keys rv" aria-label="Dashboard shortcuts">
+      <li><kbd>1</kbd>–<kbd>6</kbd> switch views</li>
+      <li><kbd>/</kbd> search messages</li>
+      <li><kbd>p</kbd> pause updates</li>
+      <li>Night and day themes, keyboard accessible</li>
+      <li>Works down to phone width</li>
+    </ul>
+    <div class="caps" style="margin-top:34px">
+      <div class="cap rv"><span class="s-id"><i>1</i> Read-only</span><h3>It never writes</h3><p>The dashboard holds its own random secret. It cannot send a message, claim a resource, change a status or acknowledge anything.</p></div>
+      <div class="cap rv"><span class="s-id"><i>2</i> Every room</span><h3>One broker, many projects</h3><p>Pick a room from the frequency menu. Rooms appear when an agent registers, not when setup writes configuration.</p></div>
+      <div class="cap rv"><span class="s-id"><i>3</i> Honest</span><h3>It says what it does not know</h3><p>Older brokers get an explicit "not available on this broker" state instead of a spinner, and liveness is never presented as a verified scan.</p></div>
+    </div>
+    <p class="anim" style="margin-top:26px"><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/dashboard.md" style="color:var(--ink)">Read the dashboard documentation →</a></p>
+  </div>
+</section>
+
+<section class="final" aria-labelledby="final-title">
+  <div class="wrap">
+    <div>
+      <h2 id="final-title">Your agents are <em>already</em> in the air.</h2>
+      <p>Give them one frequency. Local, open source, MIT licensed.</p>
+    </div>
+    <div class="cta-row">
+      <a class="cta" href="../start/">Get started
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+      <a class="cta ghost" href="https://github.com/Wearer-Lab/agent-relay">View on GitHub</a>
+    </div>
+  </div>
+</section>
+</main>
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <div>
+        <div class="brand-lock">
+          <img src="../assets/logo.svg" alt="" width="34" height="34" />
+          <b>Agent Relay</b>
+        </div>
+        <p>Local project-scoped coordination and notifications for coding agents. One room per project, shared by Codex, Claude Code, OpenCode and other agents.</p>
+      </div>
+      <nav aria-label="Project links">
+        <h2>Project</h2>
+        <ul>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay">GitHub</a></li>
+          <li><a href="https://www.npmjs.com/package/@wearer-haitch/agent-relay">npm package</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/releases">Releases</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/LICENSE">MIT license</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="Documentation">
+        <h2>Docs on GitHub</h2>
+        <ul>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay#readme">README</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/dashboard.md">Dashboard</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/registry.md">Registry hygiene</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/branches.md">Branch ownership</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/work-items.md">Work items</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/opencode.md">OpenCode</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/claude-channel.md">Claude channel</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="legal">
+      <span>MIT License · Copyright (c) 2026 Agent Relay contributors</span>
+      <span>No tracking. No analytics. No cookies. Fonts are self-hosted.</span>
+      <span>Display font: Bubbledot by OnlineWebFonts.com, CC BY 4.0. Text: Inter.</span>
+    </div>
+  </div>
+</footer>
+</div>
+<script src="../app.js" defer></script>
+</body>
+</html>
+
+<div class="mobile-overlay" id="mobile-menu" hidden>
+  <div class="mobile-menu-sheet" role="dialog" aria-modal="true" aria-label="Navigation menu">
+    <nav class="mobile-nav" aria-label="Mobile navigation">
+      <a class="mobile-link" style="--i:0;" href="../product/">Product</a>
+      <a class="mobile-link" style="--i:1;" href="../dashboard/" aria-current="page">Dashboard</a>
+      <a class="mobile-link" style="--i:2;" href="../architecture/">Architecture</a>
+      <a class="mobile-link" style="--i:3;" href="../security/">Security</a>
+      <a class="mobile-link" style="--i:4;" href="../start/">Start</a>
+      <a class="mobile-sign-in" style="--i:5;" href="https://github.com/Wearer-Lab/agent-relay">GitHub</a>
+    </nav>
+  </div>
+</div>
