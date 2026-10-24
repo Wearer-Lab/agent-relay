@@ -4,6 +4,13 @@ All notable changes to `@wearer-haitch/agent-relay` are recorded here. The forma
 
 ## [Unreleased]
 
+## [0.7.3] - 2026-10-24
+
+### Added
+
+- `agent-relay remote on --persist` installs the job that brings the gateway back when the machine boots: a launchd job on macOS, a systemd user unit on Linux, a Task Scheduler entry on Windows. `remote off --persist` removes it again.
+- `agent-relay remote on --access` puts a Cloudflare Access service token in front of the gateway: every request must carry `CF-Access-Client-Id` and `CF-Access-Client-Secret`, and the gateway refuses everything else. The values come from `AGENT_RELAY_ACCESS_CLIENT_ID` and `AGENT_RELAY_ACCESS_CLIENT_SECRET`.
+
 ## [0.7.2] - 2026-10-24
 
 ### Fixed

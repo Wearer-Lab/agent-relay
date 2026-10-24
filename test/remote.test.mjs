@@ -184,6 +184,17 @@ test('the audit log is rotated instead of growing forever', async t => {
   assert.ok(rotated.length > 1024 * 1024, 'the old log is kept beside it');
 });
 
+test('a Cloudflare Access token, when configured, is required', async t => {
+  const {gateway} = await gatewayWith(t, {access: {clientId: 'id', clientSecret: 'secret'}});
+  const token = await issue(gateway);
+  const none = await fetch(`${gateway.url}/rpc`, {method: 'POST', headers: {authorization: `Bearer ${token.value}`}, body: JSON.stringify({op: 'agents'})});
+  assert.equal(none.status, 401);
+  const wrong = await fetch(`${gateway.url}/rpc`, {method: 'POST', headers: {authorization: `Bearer ${token.value}`, 'cf-access-client-id': 'id', 'cf-access-client-secret': 'nope'}, body: JSON.stringify({op: 'agents'})});
+  assert.equal(wrong.status, 401);
+  const right = await fetch(`${gateway.url}/rpc`, {method: 'POST', headers: {authorization: `Bearer ${token.value}`, 'cf-access-client-id': 'id', 'cf-access-client-secret': 'secret'}, body: JSON.stringify({op: 'agents'})});
+  assert.equal(right.status, 200);
+});
+
 test('the gateway refuses too many pairing requests at once', async t => {
   const {gateway} = await gatewayWith(t);
   for (let i = 0; i < 5; i++) {

@@ -102,7 +102,7 @@ One provider interface: detect, install hint, sign in, start, stop, status and p
 ### Cloudflare
 - [x] Quick tunnel: `cloudflared tunnel --url http://127.0.0.1:47820`, parse the trycloudflare URL, and warn that it changes on every start (cloud settings need `*.trycloudflare.com`)
 - [x] Named tunnel: `remote on --provider cloudflare --hostname relay.example.com` runs `cloudflared tunnel login` (browser once), creates the tunnel and DNS route, and stores the config under the data dir
-- [ ] Optional Cloudflare Access service token in front (`--access`), injected as two headers by the cloud environment's secret
+- [x] Optional Cloudflare Access service token in front (`--access`), injected as two headers by the cloud environment's secret
 
 ### ngrok
 - [x] `remote on --provider ngrok`: check the authtoken, then `ngrok http --url=<dev domain> 47820`
@@ -116,7 +116,7 @@ Labels: cli, ux
 - [x] `agent-relay remote status`: URL, provider, tunnel health, gateway uptime, connected cloud agents, pending pairings, token count
 - [x] `agent-relay remote off`: stop the tunnel, then the gateway; tokens stay unless `--revoke-all`
 - [x] `agent-relay remote doctor`: end-to-end check (tunnel → gateway → broker → room resolution) with one fix per failure
-- [ ] Survive restarts: `agent-relay remote on --persist` installs a launchd (macOS), systemd user (Linux) or Task Scheduler (Windows) entry, and `remote off --persist` removes it
+- [x] Survive restarts: `agent-relay remote on --persist` installs a launchd (macOS), systemd user (Linux) or Task Scheduler (Windows) entry, and `remote off --persist` removes it
 
 ### Cloud environment setup, printed not documented
 - [x] `remote add claude` prints the single Claude cloud environment change and copies it to the clipboard: allow the relay host (Custom network access), or with `--always-on` a network secret for that host with the gateway token
@@ -144,8 +144,6 @@ Labels: docs, release
 
 ## Still to do
 
-- [ ] Surviving a restart (`remote on --persist`).
-- [ ] Cloudflare Access in front of the gateway (`--access`).
 - [ ] Marking cloud agents in the tower, and showing pending pairings there.
 - [ ] An end-to-end test with a fake tunnel provider.
 

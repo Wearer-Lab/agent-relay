@@ -138,6 +138,27 @@ test token again.
 | `No local room matches …` | The repository does not match a local checkout | `agent-relay remote room add <alias> <path>` |
 | `Too many agents are waiting for approval` | Five pairings are already waiting | Approve or deny one |
 
+## Surviving a restart, and Cloudflare Access
+
+```sh
+agent-relay remote on --persist    # a launchd job, a systemd user unit or a Task Scheduler entry
+agent-relay remote off --persist   # and it is gone again
+```
+
+`--persist` installs the entry that starts the gateway again when the machine
+boots or you log in, so the public URL comes back by itself.
+
+With Cloudflare in front, the public URL can also ask for an Access service
+token, so the gateway is not reachable by anyone who has only the URL:
+
+```sh
+agent-relay remote on --access     # reads AGENT_RELAY_ACCESS_CLIENT_ID and _SECRET
+```
+
+The cloud environment then sends `CF-Access-Client-Id` and
+`CF-Access-Client-Secret` with every request, and the gateway refuses
+everything else.
+
 ## The dashboard over the same URL
 
 ```sh
@@ -153,8 +174,6 @@ message, claim a resource or acknowledge anything.
 
 - An always-on host, so cloud agents keep working while this computer sleeps.
 - A threat-model review of the public endpoint.
-- Surviving a restart automatically (`remote on --persist` installs a launchd,
-  systemd or Task Scheduler entry).
 
 See [the roadmap](roadmaps/remote-agents.md) for the full plan and what is
 still to do.
