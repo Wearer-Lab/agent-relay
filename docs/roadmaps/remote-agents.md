@@ -140,14 +140,20 @@ Labels: docs, release
 - [x] `docs/remote-agents.md`: the six commands above, how pairing works, security model, provider table, troubleshooting
 - [ ] End-to-end test with a fake tunnel provider: pair, approve, send, wait, claim and revoke through the gateway on macOS, Linux and Windows CI
 - [ ] Threat-model review: public endpoint abuse, token leakage, prompt-injected agents, room confusion across forks
-- [ ] Release as a minor version with a changelog entry and a short "connect a cloud agent in two minutes" section in the README
+- [x] Release as a minor version with a changelog entry and a short "connect a cloud agent in two minutes" section in the README
 
 ## Still to do
 
-- [ ] The dashboard over the same public URL (Phase 5).
+- [ ] Surviving a restart (`remote on --persist`).
+- [ ] Cloudflare Access in front of the gateway (`--access`).
+- [ ] Marking cloud agents in the tower, and showing pending pairings there.
+- [ ] An end-to-end test with a fake tunnel provider.
+
+
+- [x] The dashboard over the same public URL (Phase 5).
 - [ ] An always-on host, so cloud agents keep working while this computer sleeps.
 - [ ] A threat-model review of the public endpoint.
-- [ ] A release with the changelog entry and the README section.
+- [x] A release with the changelog entry and the README section.
 
 ## Later: relay without this machine
 Labels: future
