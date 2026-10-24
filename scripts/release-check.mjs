@@ -6,7 +6,7 @@ import {fileURLToPath} from 'node:url';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 const exec=promisify(execFile),root=fileURLToPath(new URL('../',import.meta.url));
-const PUBLIC_DOCS=['docs/branches.md','docs/broker-notes.md','docs/ci-workflow.md','docs/claude-channel.md','docs/dashboard.md','docs/opencode.md','docs/process-ownership.md','docs/publishing.md','docs/registry.md','docs/validation.md','docs/work-items.md'];
+const PUBLIC_DOCS=['docs/branches.md','docs/broker-notes.md','docs/ci-workflow.md','docs/claude-channel.md','docs/dashboard.md','docs/opencode.md','docs/process-ownership.md','docs/publishing.md','docs/registry.md','docs/remote-agents.md','docs/validation.md','docs/work-items.md'];
 const tmp=await fs.mkdtemp(path.join(os.tmpdir(),'relay-release-'));
 const npm=process.platform==='win32'?'npm.cmd':'npm',npmCli=process.env.npm_execpath;
 const run=async(args,cwd=root)=>exec(npmCli?process.execPath:npm,npmCli?[npmCli,...args]:args,{cwd,env:{...process.env,npm_config_cache:path.join(tmp,'cache')},timeout:120000,maxBuffer:4*1024*1024});
@@ -18,7 +18,7 @@ try{
  assert.equal(shrinkwrap.version,pkg.version);
  assert.equal(shrinkwrap.packages[''].version,pkg.version,'Lockfile root package version must match package.json');
  assert.equal(pkg.publishConfig?.provenance,true,'publishConfig.provenance must be true');
- assert.equal(pkg.homepage,'https://wearer-lab.github.io/agent-relay/');
+ assert.equal(pkg.homepage,'https://relay.next-notes.com/');
  assert.equal(pkg.repository?.url,'git+https://github.com/Wearer-Lab/agent-relay.git');
  const changelog=await fs.readFile(path.join(root,'CHANGELOG.md'),'utf8');
  assert.ok(changelog.split(/\r?\n/).some(l=>l.startsWith(`## [${pkg.version}] - `)),`CHANGELOG.md needs a dated "## [${pkg.version}] - YYYY-MM-DD" section`);

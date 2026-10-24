@@ -14,7 +14,7 @@ if(raw.includes('--help')||raw.includes('-h')){command='help';raw.length=0;}
 const opts={},positional=[];let tail=[];
 for(let i=0;i<raw.length;i++){
  if(raw[i]==='--'){tail=raw.slice(i+1);break;}
-  if(raw[i].startsWith('--')){const key=raw[i].slice(2);if(['channel','json','no-open','unread','json-lines','all','force','gate','active','detail','dry-run','accept','decline','arrived','missing','gate-strict','blocked','set','ack','register','remove','check','refresh','offline','allow-incomplete','relinquish','ephemeral','apply','include-test','drop-identities','cascade','pretty','hide-done','if-idle'].includes(key))opts[key]=true;else {if(!raw[i+1]||raw[i+1].startsWith('--'))throw new Error(`Missing value for --${key}`);if(key==='attach')(opts.attach??=[]).push(raw[++i]);else opts[key]=raw[++i];}}
+  if(raw[i].startsWith('--')){const key=raw[i].slice(2);if(['channel','json','no-open','unread','json-lines','all','force','gate','active','detail','dry-run','accept','decline','arrived','missing','gate-strict','blocked','set','ack','register','remove','check','refresh','offline','allow-incomplete','relinquish','ephemeral','apply','include-test','drop-identities','cascade','pretty','hide-done','if-idle','yes','always-on','url-in-env','revoke-all','revoke','persist','quick','keep'].includes(key))opts[key]=true;else {if(!raw[i+1]||raw[i+1].startsWith('--'))throw new Error(`Missing value for --${key}`);if(key==='attach')(opts.attach??=[]).push(raw[++i]);else opts[key]=raw[++i];}}
  else positional.push(raw[i]);
 }
 const project=path.resolve(opts.project||process.cwd()),dataDir=opts['data-dir']||defaultDataDir(),options={dataDir};
@@ -29,6 +29,11 @@ function gateReport(result){
  if(result.ok&&result.assessed&&result.assessed!=='pass')console.error(`Gate is not a measured pass: ${result.assessed} (coverage ${JSON.stringify(result.coverage)}).`);
  return result;
 }
+const question=async prompt=>{
+  const rl=await import('node:readline/promises');
+  const input=rl.createInterface({input:process.stdin,output:process.stdout});
+  try{return (await input.question(prompt)).trim();}finally{input.close();}
+};
 const flagBool=(name)=>opts[name]===undefined?undefined:opts[name]==='true'?true:opts[name]==='false'?false:(()=>{throw new Error(`Use --${name} true|false`)})();
 const splitList=(value)=>value===undefined?undefined:value.split(',').map(s=>s.trim()).filter(Boolean);
 const daemonAlive=pid=>{try{process.kill(pid,0);return true;}catch(e){return e.code==='EPERM';}};
@@ -98,7 +103,7 @@ async function main(){
    print({package:pkg.version,protocol,schema:SCHEMA_VERSION,build:{node:process.version,cli:fileURLToPath(new URL(import.meta.url))},broker:live?{running:true,url:live.url,pid:live.pid,package:brokerPackage}:{running:false},dataDir});break;
   }
  case 'help':
- console.log(`Agent Relay — local communication between coding agents\n\n  npx --yes @wearer-haitch/agent-relay launch codex|claude|opencode\n  agent-relay --version\n  agent-relay dashboard [--no-open] [--port PORT]\n\n  agent-relay setup [--project PATH] [--runners codex,claude,opencode] [--check|--refresh]\n  agent-relay launch claude|codex|opencode [-- runner arguments]\n  agent-relay join --as ID --runner NAME [--session ID] [--group ID] [--ephemeral]\n  agent-relay mcp [--runner NAME] [--session ID] [--as ID] [--channel] [--ephemeral]\n  agent-relay agents [--active --within MIN] [--stale-minutes MIN] [--transport STATE] [--test true|false]\n  agent-relay leave --as ID [--if-idle]\n  agent-relay send --as ID --to ID|*|*all --message TEXT [--within MIN] [--reply-to ID] [--id ID] [--summary TEXT] [--attach PATH ...]\n  agent-relay inbox --as ID [--unread] [--since CURSOR] [--from ID] [--limit N]\n  agent-relay fetch --as ID --id MESSAGE_ID [--out DIR]\n  agent-relay ack --as ID --id MESSAGE_ID|--all|--through CURSOR\n  agent-relay watch --as ID [--json-lines --max-chars N] [--unread]\n  agent-relay claim --as ID [--scope machine] [--gate] [--meta JSON] RESOURCE...\n  agent-relay release --as ID [--scope machine] [RESOURCE...] [--force]\n  agent-relay status [--as ID --state TEXT --task TEXT]\n  agent-relay attach codex --thread ID [--as ID] [--socket PATH|--url ws://loopback]\n  agent-relay diagnose-codex [--socket PATH] [--url ws://loopback] [--thread ID]\n  agent-relay outbox --as FROM [--id MESSAGE_ID] [--since CURSOR] [--limit N]\n  agent-relay receipt --id MESSAGE_ID\n  agent-relay history [--as ID] [--since CURSOR] [--before CURSOR] [--limit N] [--acked true|false] [--from ID] [--to ID] [--thread MESSAGE_ID]\n  agent-relay followup --as ID --id MESSAGE_ID [--note TEXT]\n  agent-relay bulletin [--set --title TEXT --body TEXT|--body - --source TEXT [--version N] --as ID] [--ack --as ID [--version N] [--hash H]]\n  agent-relay claim-narrow --as ID --resource PATH [--meta JSON] CHILD...\n  agent-relay handoffs\n  agent-relay handoff-request --as ID [--to ID] --reason TEXT [--meta JSON] RESOURCE...\n  agent-relay handoff-respond --as ID --id HANDOFF_ID [--accept|--decline] [--resources a,b]\n  agent-relay blocked\n  agent-relay tasks [--state open|complete] [--blocked] [--owner ID]\n  agent-relay task-upsert --as ID --title TEXT [--id ID] [--owner ID] [--blocked-by a,b] [--resources a,b] [--source-rev REV] [--verification TEXT] [--to ID] [--handoff ID]\n  agent-relay task-complete --as ID --id TASK_ID [--verification TEXT]\n  agent-relay processes [--owner ID] | --register --pid N --as ID [--command C] [--cwd D] [--port P] [--deployment D] [--note N] | --remove [--id ID] [--pid N] [--owner ID]\n  agent-relay usage\n  agent-relay export [--out FILE]\n  agent-relay restore --in FILE [--dry-run] [--offline --allow-incomplete]\n  agent-relay audit-attachments\n  agent-relay group-agents [--group ID]\n  agent-relay detect-group\n  agent-relay work tree [--root ID] [--kind K] [--hide-done] [--pretty]\n  agent-relay work list [--kind K] [--status S] [--parent ID|root] [--branch B] [--label L] [--owner ID]\n  agent-relay work add --as ID --kind roadmap|phase|epic|task|todo --title T [--id ID] [--parent ID] [--owner A] [--branch B] [--priority p0-p3] [--label x,y] [--status S] [--desc TEXT] [--order N] [--artifacts a,b] [--due ISO] [--blocked-by a,b]\n  agent-relay work set --as ID --id ID [--status in-progress] [--title T] [...same fields]\n  agent-relay work move --as ID --id ID --parent ID|root [--order N]\n  agent-relay work rm --as ID --id ID [--cascade]\n  agent-relay work import --file ROADMAP.md [--as ID] [--parent ID] [--dry-run]\n  agent-relay branches [--stale-minutes MIN]\n  agent-relay branch claim NAME --as ID [--note TEXT] [--meta JSON] | release [NAME] --as ID | list | force-release NAME --as HUMAN --reason TEXT\n  agent-relay compact [--older-than-days N] [--drop-identities] [--apply]\n  agent-relay retire --as ID [--relinquish]\n  agent-relay prune [--idle-minutes N] [--ephemeral-idle-minutes N] [--include-test] [--apply]\n  agent-relay reconcile --as ID --id MESSAGE_ID [--arrived|--missing]\n  agent-relay gate [--gate-strict] [--max-swap-gb 8] [--max-load 40] [--min-free-gb 10] [--path /]\n  agent-relay doctor\n  agent-relay stop\n  agent-relay restart\n  agent-relay version [--detail]\n  agent-relay start\n  agent-relay daemon [--prune-after-minutes N] [--ephemeral-prune-minutes N] [--compact-after-days N]\n\nCommands use the current project; --project PATH and --data-dir PATH override it.\nMessages persist locally. Setup does not publish anything or change permissions.`);break;
+ console.log(`Agent Relay — local communication between coding agents\n\n  npx --yes @wearer-haitch/agent-relay launch codex|claude|opencode\n  agent-relay --version\n  agent-relay dashboard [--no-open] [--port PORT]\n  agent-relay remote on [--provider tailscale|cloudflare|ngrok] [--hostname HOST] | off [--revoke-all] | status | doctor | approve <code> | deny <code> | revoke <id|all> | add claude|codex [--always-on] | test claude|codex | room add <alias> [path]\n\n  agent-relay setup [--project PATH] [--runners codex,claude,opencode] [--check|--refresh]\n  agent-relay launch claude|codex|opencode [-- runner arguments]\n  agent-relay join --as ID --runner NAME [--session ID] [--group ID] [--ephemeral]\n  agent-relay mcp [--runner NAME] [--session ID] [--as ID] [--channel] [--ephemeral]\n  agent-relay agents [--active --within MIN] [--stale-minutes MIN] [--transport STATE] [--test true|false]\n  agent-relay leave --as ID [--if-idle]\n  agent-relay send --as ID --to ID|*|*all --message TEXT [--within MIN] [--reply-to ID] [--id ID] [--summary TEXT] [--attach PATH ...]\n  agent-relay inbox --as ID [--unread] [--since CURSOR] [--from ID] [--limit N]\n  agent-relay fetch --as ID --id MESSAGE_ID [--out DIR]\n  agent-relay ack --as ID --id MESSAGE_ID|--all|--through CURSOR\n  agent-relay watch --as ID [--json-lines --max-chars N] [--unread]\n  agent-relay claim --as ID [--scope machine] [--gate] [--meta JSON] RESOURCE...\n  agent-relay release --as ID [--scope machine] [RESOURCE...] [--force]\n  agent-relay status [--as ID --state TEXT --task TEXT]\n  agent-relay attach codex --thread ID [--as ID] [--socket PATH|--url ws://loopback]\n  agent-relay diagnose-codex [--socket PATH] [--url ws://loopback] [--thread ID]\n  agent-relay outbox --as FROM [--id MESSAGE_ID] [--since CURSOR] [--limit N]\n  agent-relay receipt --id MESSAGE_ID\n  agent-relay history [--as ID] [--since CURSOR] [--before CURSOR] [--limit N] [--acked true|false] [--from ID] [--to ID] [--thread MESSAGE_ID]\n  agent-relay followup --as ID --id MESSAGE_ID [--note TEXT]\n  agent-relay bulletin [--set --title TEXT --body TEXT|--body - --source TEXT [--version N] --as ID] [--ack --as ID [--version N] [--hash H]]\n  agent-relay claim-narrow --as ID --resource PATH [--meta JSON] CHILD...\n  agent-relay handoffs\n  agent-relay handoff-request --as ID [--to ID] --reason TEXT [--meta JSON] RESOURCE...\n  agent-relay handoff-respond --as ID --id HANDOFF_ID [--accept|--decline] [--resources a,b]\n  agent-relay blocked\n  agent-relay tasks [--state open|complete] [--blocked] [--owner ID]\n  agent-relay task-upsert --as ID --title TEXT [--id ID] [--owner ID] [--blocked-by a,b] [--resources a,b] [--source-rev REV] [--verification TEXT] [--to ID] [--handoff ID]\n  agent-relay task-complete --as ID --id TASK_ID [--verification TEXT]\n  agent-relay processes [--owner ID] | --register --pid N --as ID [--command C] [--cwd D] [--port P] [--deployment D] [--note N] | --remove [--id ID] [--pid N] [--owner ID]\n  agent-relay usage\n  agent-relay export [--out FILE]\n  agent-relay restore --in FILE [--dry-run] [--offline --allow-incomplete]\n  agent-relay audit-attachments\n  agent-relay group-agents [--group ID]\n  agent-relay detect-group\n  agent-relay work tree [--root ID] [--kind K] [--hide-done] [--pretty]\n  agent-relay work list [--kind K] [--status S] [--parent ID|root] [--branch B] [--label L] [--owner ID]\n  agent-relay work add --as ID --kind roadmap|phase|epic|task|todo --title T [--id ID] [--parent ID] [--owner A] [--branch B] [--priority p0-p3] [--label x,y] [--status S] [--desc TEXT] [--order N] [--artifacts a,b] [--due ISO] [--blocked-by a,b]\n  agent-relay work set --as ID --id ID [--status in-progress] [--title T] [...same fields]\n  agent-relay work move --as ID --id ID --parent ID|root [--order N]\n  agent-relay work rm --as ID --id ID [--cascade]\n  agent-relay work import --file ROADMAP.md [--as ID] [--parent ID] [--dry-run]\n  agent-relay branches [--stale-minutes MIN]\n  agent-relay branch claim NAME --as ID [--note TEXT] [--meta JSON] | release [NAME] --as ID | list | force-release NAME --as HUMAN --reason TEXT\n  agent-relay compact [--older-than-days N] [--drop-identities] [--apply]\n  agent-relay retire --as ID [--relinquish]\n  agent-relay prune [--idle-minutes N] [--ephemeral-idle-minutes N] [--include-test] [--apply]\n  agent-relay reconcile --as ID --id MESSAGE_ID [--arrived|--missing]\n  agent-relay gate [--gate-strict] [--max-swap-gb 8] [--max-load 40] [--min-free-gb 10] [--path /]\n  agent-relay doctor\n  agent-relay stop\n  agent-relay restart\n  agent-relay version [--detail]\n  agent-relay start\n  agent-relay daemon [--prune-after-minutes N] [--ephemeral-prune-minutes N] [--compact-after-days N]\n\nCommands use the current project; --project PATH and --data-dir PATH override it.\nMessages persist locally. Setup does not publish anything or change permissions.`);break;
  case 'daemon':{
   const {createBroker}=await import('../lib/broker.mjs');
   const pruneAfter=opts['prune-after-minutes']??process.env.AGENT_RELAY_PRUNE_AFTER_MINUTES,ephemeralPrune=opts['ephemeral-prune-minutes']??process.env.AGENT_RELAY_EPHEMERAL_PRUNE_MINUTES,compactAfter=opts['compact-after-days']??process.env.AGENT_RELAY_COMPACT_AFTER_DAYS;
@@ -108,6 +113,88 @@ async function main(){
   if(opts['startup-lock'])await fs.rm(opts['startup-lock'],{recursive:true,force:true});
   const stop=async()=>{await broker.close();try{const current=JSON.parse(await fs.readFile(discovery,'utf8'));if(current.pid===process.pid)await fs.unlink(discovery);}catch{}process.exit(0);};
   process.once('SIGTERM',stop);process.once('SIGINT',stop);break;
+ }
+ case 'remote':{
+  const [action='status',argument]=positional;
+  if(action==='gateway'){
+   // The gateway runs in the foreground; `remote on` starts it in the background.
+   const {startGateway,DEFAULT_GATEWAY_PORT}=await import('../lib/gateway.mjs');
+   const gateway=await startGateway({dataDir,port:opts.port===undefined?DEFAULT_GATEWAY_PORT:Number(opts.port)});
+   console.log(`Agent Relay gateway: ${gateway.url}`);
+   const stop=async()=>{await gateway.close();};
+   process.once('SIGINT',stop);process.once('SIGTERM',stop);break;
+  }
+  const remote=await import('../lib/remote.mjs');
+  if(action==='on'){
+   const result=await remote.remoteOn({dataDir,provider:opts.provider,port:opts.port===undefined?undefined:Number(opts.port),hostname:opts.hostname,project});
+   if(!result.ok){console.error(result.message);process.exitCode=1;break;}
+   console.log(`${result.message}\nPublic URL: ${result.url}`);
+   if(result.next)console.log(result.next);
+   break;
+  }
+  if(action==='off'){
+   const result=await remote.remoteOff({dataDir,revokeAll:Boolean(opts['revoke-all']||opts.revoke)});
+   console.log(result.message);break;
+  }
+  if(action==='status'){print(await remote.remoteStatus({dataDir}));break;}
+  if(action==='doctor'){
+   const result=await remote.remoteDoctor({dataDir,project});
+   for(const check of result.checks)console.log(`${check.ok?'ok  ':'FAIL'} ${check.name}${check.detail?` — ${check.detail}`:''}`);
+   if(!result.ok)process.exitCode=1;
+   break;
+  }
+  if(action==='approve'){
+   const code=argument??(opts.code??'');
+   if(!code){
+    // No code: list what is waiting and ask about each one.
+    const {TokenStore}=await import('../lib/gateway.mjs');
+    const store=await new TokenStore(dataDir).load();
+    const pending=store.pendingPairings();
+    if(!pending.length){console.log('Nothing is waiting for approval.');break;}
+    for(const row of pending){
+     console.log(`${row.code}  ${row.runner}  ${row.repo}${row.branch?` (${row.branch})`:''}`);
+     if(opts.yes){const ok=await remote.remoteApprove({dataDir,code:row.code,alwaysOn:Boolean(opts['always-on']),ttlMs:opts['ttl-hours']?Number(opts['ttl-hours'])*3600000:undefined,agentPrefix:opts.prefix??'',project});console.log(ok.message);continue;}
+     const answer=await question(`Approve ${row.code} for ${row.repo}? [y/N] `);
+     if(!/^y(es)?$/i.test(answer)){const denied=await remote.remoteDeny({dataDir,code:row.code});console.log(denied.message);continue;}
+     const result=await remote.remoteApprove({dataDir,code:row.code,alwaysOn:Boolean(opts['always-on']),ttlMs:opts['ttl-hours']?Number(opts['ttl-hours'])*3600000:undefined,agentPrefix:opts.prefix??'',project});
+     console.log(result.ok?result.message:result.message);
+    }
+    break;
+   }
+   const result=await remote.remoteApprove({dataDir,code,alwaysOn:Boolean(opts['always-on']),ttlMs:opts['ttl-hours']?Number(opts['ttl-hours'])*3600000:undefined,agentPrefix:opts.prefix??'',project});
+   if(!result.ok){console.error(result.message);process.exitCode=1;break;}
+   console.log(result.message);break;
+  }
+  if(action==='deny'){
+   const code=argument??(opts.code??'');
+   if(!code){console.error('Usage: agent-relay remote deny <code>');process.exitCode=1;break;}
+   const result=await remote.remoteDeny({dataDir,code});
+   if(!result.ok){console.error(result.message);process.exitCode=1;break;}
+   console.log(result.message);break;
+  }
+  if(action==='revoke'){
+   const result=await remote.remoteRevoke({dataDir,id:argument,all:Boolean(opts.all||opts['revoke-all'])});
+   if(!result.ok){console.error(result.message);process.exitCode=1;break;}
+   console.log(result.message);break;
+  }
+  if(action==='room'){
+   if(positional[1]!=='add'){console.error('Usage: agent-relay remote room add <alias> [path]');process.exitCode=1;break;}
+   const result=await remote.remoteRoomAdd({dataDir,alias:positional[2]??'',project:positional[3]??project});
+   console.log(result.message);break;
+  }
+  if(action==='add'){
+   const result=await remote.remoteAdd({dataDir,project,runner:argument??'claude',alwaysOn:Boolean(opts['always-on']),urlInEnv:Boolean(opts['url-in-env'])});
+   console.log(result.message);
+   if(result.clipboard)console.log(result.clipboard);
+   break;
+  }
+  if(action==='test'){
+   const result=await remote.remoteTest({dataDir,runner:argument??'claude',project});
+   if(!result.ok){console.error(result.message);process.exitCode=1;break;}
+   console.log(result.message);break;
+  }
+  console.error(`Unknown remote action: ${action}. Use on, off, status, doctor, approve, deny, revoke, add, test, room or gateway.`);
+  process.exitCode=1;break;
  }
  case 'dashboard':{
   const {startDashboard}=await import('../lib/dashboard.mjs');

@@ -16,6 +16,9 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -24,9 +27,6 @@ jobs:
         with:
           node-version: 22
       - name: Deploy the site
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
             echo "::notice::No Cloudflare credentials in this repository, so nothing was deployed."
@@ -38,7 +38,7 @@ jobs:
           fi
           npx --yes wrangler@3 deploy
       - name: The custom domain answers
-        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        if: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
         run: |
           for i in 1 2 3 4 5 6 7 8 9 10; do
             if curl --fail --silent --show-error --max-time 20 https://relay.next-notes.com/ > /dev/null; then

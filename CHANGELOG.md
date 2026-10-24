@@ -4,6 +4,24 @@ All notable changes to `@wearer-haitch/agent-relay` are recorded here. The forma
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-24
+
+### Added
+
+- **Remote agents** ([docs/remote-agents.md](docs/remote-agents.md)). A Claude Code cloud session or a Codex cloud task can now join the same relay room as your local agents.
+  - `lib/gateway.mjs`: a restricted HTTP front for the local broker on `127.0.0.1:47820`. It forwards only coordination operations (register, agents, send, inbox, ack, wait, status, claim, release, tasks, branches, ownership, history, receipt, outbox, bulletin, handoffs, blocked, leave) and refuses everything else by name, with the reason. Requests carrying a local path are refused; claims inside the room are rewritten to repo-relative paths in both directions.
+  - Tokens are 256-bit random values stored only as SHA-256 hashes, compared in constant time, scoped to one room and optionally one agent-ID prefix, and never written to a log. They expire, and `remote revoke` drops them at once.
+  - Pairing: a cloud agent posts its repository, branch and runner, gets a six-character code, and waits. `agent-relay remote approve` lists what is waiting and asks about each one; the waiting agent then receives a token, once. Requests expire after ten minutes and at most five may wait.
+  - Rooms are resolved from the cloud agent's git remote, preferring the requested branch and otherwise the main checkout. `agent-relay remote room add` sets an alias by hand when nothing matches.
+  - Rate limits per token and per address return `429` with `Retry-After`, and an audit log under the data directory records the token id, runner, room, operation and result.
+  - `lib/tunnels/`: one interface for Tailscale Funnel (the default, a stable URL with no domain of your own), Cloudflare quick and named tunnels, and ngrok. `remote on` picks the first one that is installed.
+  - `agent-relay remote on|off|status|doctor|approve|deny|revoke|add|test|room` drives it all. `remote test` pairs, approves and calls through the public URL, then revokes the test token.
+  - Remote client mode: with `AGENT_RELAY_URL` set, `lib/client.mjs` talks to the gateway and never starts or discovers a local broker. Without a token it pairs and waits, and the errors name the command that fixes them.
+
+### Changed
+
+- The site is now served from **https://relay.next-notes.com** (Cloudflare Workers static assets, custom domain bound), with GitHub Pages keeping the same files as a mirror. The canonical, Open Graph, Twitter, sitemap, robots and 404 URLs moved with `scripts/set-site-origin.mjs`, one command. Two workflows now run in parallel: **Cloudflare** publishes the site, and **Surveillance** watches every public page, the crawler's files, the styled 404 and the published npm version every six hours.
+
 ## [0.6.0] - 2026-10-24
 
 ### Changed

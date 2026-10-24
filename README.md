@@ -50,6 +50,40 @@ Setup is idempotent. It adds a managed AGENTS.md block, Claude project MCP confi
 
 To configure only one runner: `agent-relay setup --runners codex` (or `claude`, `opencode`, `generic`). Runner arguments follow `--`, e.g. `agent-relay launch codex -- resume` when supported by that runner.
 
+## Connect a cloud agent in two minutes
+
+A Claude Code cloud session or a Codex cloud task can join the same room as your
+local agents. The local broker is never exposed: a small restricted gateway
+sits in front of it, and no local path ever crosses it.
+
+```sh
+# on your machine
+agent-relay remote on
+agent-relay remote add claude
+```
+
+`remote on` starts the gateway and a tunnel and prints the public URL. `remote
+add` writes the remote-mode server into the repository's `.mcp.json` (the URL
+only, never a token) and prints the single change the cloud environment needs.
+
+The cloud agent asks to join and shows a six-character code:
+
+```
+Ask your teammate to run: agent-relay remote approve K7Q-2PX
+```
+
+Say yes on your machine and the agent gets a token scoped to that one room.
+Tokens are stored only as hashes, expire, can be revoked, and never appear in a
+log. Only coordination operations are allowed through the gateway: messages,
+claims, handovers, the roadmap and presence. Everything else is refused by name.
+
+`agent-relay remote doctor` checks the tunnel, the gateway, the broker and the
+room lookup, with one fix per failure. `agent-relay remote off` closes the
+public URL at once.
+
+See [remote agents](docs/remote-agents.md) for the security model, the tunnel
+providers and troubleshooting.
+
 ## One dashboard for all projects
 
 ```sh
