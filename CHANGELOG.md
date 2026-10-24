@@ -4,6 +4,12 @@ All notable changes to `@wearer-haitch/agent-relay` are recorded here. The forma
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-10-24
+
+### Fixed
+
+- The machine gate measured free disk and page-file usage with a five second timeout, which PowerShell start-up can exceed on a loaded Windows machine. A missing measurement let the gate pass, so the timeout is now twenty seconds.
+
 ## [0.7.0] - 2026-10-24
 
 ### Added
@@ -18,10 +24,6 @@ All notable changes to `@wearer-haitch/agent-relay` are recorded here. The forma
   - `agent-relay remote on|off|status|doctor|approve|deny|revoke|add|test|room` drives it all. `remote test` pairs, approves and calls through the public URL, then revokes the test token.
   - Remote client mode: with `AGENT_RELAY_URL` set, `lib/client.mjs` talks to the gateway and never starts or discovers a local broker. Without a token it pairs and waits, and the errors name the command that fixes them.
   - The read-only dashboard rides on the same public URL: `agent-relay remote dashboard` prints a one-time link, the secret sits in the URL fragment as it does locally, and the feeds under `/api/v1/` need it.
-
-### Fixed
-
-- The machine gate measured free disk and page-file usage with a five second timeout, which PowerShell start-up can exceed on a loaded Windows machine. A missing measurement let the gate pass, so the timeout is now twenty seconds.
 
 ### Changed
 
