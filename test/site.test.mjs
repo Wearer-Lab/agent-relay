@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {readFile,readdir,stat} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-const site=path.join(path.dirname(fileURLToPath(import.meta.url)),'..','site');
+const root=path.join(path.dirname(fileURLToPath(import.meta.url)),'..');
+const site=path.join(root,'site');
 const PAGES=['index.html','product/index.html','dashboard/index.html','architecture/index.html','security/index.html','start/index.html'];
 const html=await readFile(path.join(site,'index.html'),'utf8');
 const external=ref=>/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(ref);
@@ -160,6 +161,28 @@ test('the site tells crawlers where to go, and ships a way home for a bad URL',a
  assert.equal(manifest.name,'Agent Relay');
  assert.ok(manifest.icons.length>=2,'the manifest needs icons');
  for(const file of ['assets/favicon-32.png','assets/apple-touch-icon.png','assets/icon-512.png'])assert.ok(await exists(site,file),`missing icon: ${file}`);
+});
+
+test('every absolute URL on the site points at the same origin',async()=>{
+ const pkg=JSON.parse(await readFile(path.join(root,'package.json'),'utf8'));
+ const origin=new URL(pkg.homepage).origin+new URL(pkg.homepage).pathname.replace(/\/+$/,'');
+ const files=['robots.txt','sitemap.xml','404.html','site.webmanifest',...PAGES,...VARIANTS];
+ for(const file of files){
+  const source=await readFile(path.join(site,file),'utf8');
+  const found=[...source.matchAll(/https:\/\/[a-z0-9.-]+\/agent-relay/g)].map(m=>m[0]);
+  for(const url of found)assert.equal(url,origin,`${file} points at ${url}, not ${origin}`);
+ }
+ const robots=await readFile(path.join(site,'robots.txt'),'utf8');
+ assert.ok(robots.includes(`Sitemap: ${origin}/sitemap.xml`),'robots.txt must point at the sitemap on the same origin');
+ const sitemap=await readFile(path.join(site,'sitemap.xml'),'utf8');
+ assert.ok(sitemap.includes(`<loc>${origin}/</loc>`),'the sitemap must use the same origin');
+});
+
+test('the origin can be changed with one command',async()=>{
+ const script=await readFile(path.join(root,'scripts','set-site-origin.mjs'),'utf8');
+ assert.match(script,/process\.argv\[2\]/);
+ assert.match(script,/site\/robots\.txt/);
+ assert.match(script,/package\.json/);
 });
 
 test('site assets stay small (under 3 MB) and screenshots exist for both themes',async()=>{
