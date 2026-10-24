@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "agent-relay-site",
+  "compatibility_date": "2026-10-24",
+  // The marketing site is static: no Worker script, just the files in site/.
+  // "404-page" serves site/404.html for any missing path.
+  "assets": {
+    "directory": "./site",
+    "not_found_handling": "404-page"
+  },
+  "routes": [
+    {
+      "pattern": "relay.next-notes.com",
+      "custom_domain": true
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}

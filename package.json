@@ -1,6 +1,6 @@
 {
   "name": "@wearer-haitch/agent-relay",
-  "version": "0.5.0",
+  "version": "0.7.1",
   "description": "Local project-scoped coordination and notifications for coding agents",
   "type": "module",
   "bin": {
@@ -51,7 +51,7 @@
     "type": "git",
     "url": "git+https://github.com/Wearer-Lab/agent-relay.git"
   },
-  "homepage": "https://wearer-lab.github.io/agent-relay/",
+  "homepage": "https://relay.next-notes.com/",
   "bugs": {
     "url": "https://github.com/Wearer-Lab/agent-relay/issues"
   }

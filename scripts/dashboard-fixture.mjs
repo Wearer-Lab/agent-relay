@@ -99,7 +99,7 @@ await say('kestrel-9','vector-4','Your branch feat/work-tree looks stale. Still 
 await say('vector-4','*','Released the claim on the validator. Taking a break; anyone can pick it up.',{messageId:'m5'});
 await say('quill-3','nimbus-2','Need screenshots of all six views for the landing page.',{messageId:'m6',summary:'Screenshots'});
 await call({op:'ack',agentId:'nimbus-2',messageId:'m1'});await call({op:'ack',agentId:'atlas-7',messageId:'m2'});await call({op:'ack',agentId:'nimbus-2',messageId:'m3'});
-await call({op:'claim',agentId:'nimbus-2',resources:['lib/dashboard/dashboard.js','lib/dashboard/dashboard.css','lib/dashboard/index.html']});
+await call({op:'claim',agentId:'nimbus-2',resources:['lib/dashboard/assets/dashboard.js','lib/dashboard/assets/dashboard.css','lib/dashboard/index.html']});
 await call({op:'claim',agentId:'atlas-7',resources:['lib/broker.mjs']});
 await call({op:'claim',agentId:'vector-4',resources:['test/work-tree.test.mjs']});
 for(const [id,title,owner] of [['T-1','Tree action on tasks op','atlas-7'],['T-2','Roll-up progress','atlas-7'],['T-3','Surface in the dashboard','nimbus-2']])await soft({op:'tasks',action:'upsert',agentId:owner,id,title,owner});

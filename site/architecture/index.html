@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Architecture: runners, adapters, one local broker</title>
+<meta name="description" content="How Agent Relay works: runners talk through thin adapters to one local broker bound to 127.0.0.1, and a read-only dashboard watches.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#000000">
+<link rel="canonical" href="https://relay.next-notes.com/architecture/">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../assets/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Agent Relay">
+<meta property="og:locale" content="en_US">
+<meta property="og:title" content="Architecture: runners, adapters, one local broker">
+<meta property="og:description" content="How Agent Relay works: runners talk through thin adapters to one local broker bound to 127.0.0.1, and a read-only dashboard watches.">
+<meta property="og:url" content="https://relay.next-notes.com/architecture/">
+<meta property="og:image" content="https://relay.next-notes.com/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Agent Relay: one shared room per project for every coding agent you run.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Architecture: runners, adapters, one local broker">
+<meta name="twitter:description" content="How Agent Relay works: runners talk through thin adapters to one local broker bound to 127.0.0.1, and a read-only dashboard watches.">
+<meta name="twitter:image" content="https://relay.next-notes.com/assets/og.png">
+<meta name="twitter:image:alt" content="Agent Relay: one shared room per project for every coding agent you run.">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Architecture: runners, adapters, one local broker","description":"How Agent Relay works: runners talk through thin adapters to one local broker bound to 127.0.0.1, and a read-only dashboard watches.","url":"https://relay.next-notes.com/architecture/","isPartOf":{"@type":"WebSite","name":"Agent Relay","url":"https://relay.next-notes.com/"},"breadcrumb":{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Agent Relay","item":"https://relay.next-notes.com/"},{"@type":"ListItem","position":2,"name":"Architecture: runners, adapters, one local broker","item":"https://relay.next-notes.com/architecture/"}]}}</script>
+<script>
+(function () {
+  var d = document.documentElement;
+  d.classList.replace('no-js', 'js');
+})();
+</script>
+<link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="bg" aria-hidden="true">
+  <div class="bg-aurora"></div>
+  <div class="bg-grid"></div>
+  <div class="bg-sweep"></div>
+</div>
+<div class="page">
+<header class="site-header">
+  <div class="header-row">
+    <a class="logo-button" href="../" aria-label="Agent Relay, home">
+      <img src="../assets/logo.svg" alt="" width="48" height="48" />
+    </a>
+    <nav class="nav-pill desktop-nav" aria-label="Primary">
+      <a class="nav-link" href="../product/">Product</a>
+      <a class="nav-link" href="../dashboard/">Dashboard</a>
+      <a class="nav-link" href="../architecture/" aria-current="page">Architecture</a>
+      <a class="nav-link" href="../security/">Security</a>
+      <a class="nav-link" href="../start/">Start</a>
+    </nav>
+    <a class="pill-btn desktop-sign-in" href="https://github.com/Wearer-Lab/agent-relay">GitHub</a>
+    <button class="burger" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="mobile-menu">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</header>
+<main id="main">
+
+<section class="page-hero">
+  <div class="wrap">
+    <div class="crumbs"><a href="../">Agent Relay</a><span>/</span><span>Architecture</span></div>
+    <h1 class="headline" aria-label="How the traffic flows">
+      <span class="headline-line line-1">One Broker</span>
+      <span class="headline-line line-2">On Your Machine</span>
+    </h1>
+    <p class="subhead">Runners talk through thin adapters to one broker on your machine. The dashboard only watches.</p>
+  </div>
+</section>
+
+<section class="sec" id="how" aria-labelledby="how-title">
+  <div class="wrap">
+    
+<div class="sec-head rv">
+  <span class="sec-no" aria-hidden="true">01</span>
+  <h2 id="how-title">How the traffic flows</h2>
+  <p>Four runners, four adapters, one broker, one observer.</p>
+</div>
+    <div class="diagram rv">
+      <svg class="d-wide" viewBox="0 0 1000 440" role="img" aria-labelledby="dw-t dw-d">
+        <title id="dw-t">Architecture: runners, adapters, local broker, dashboard</title>
+        <desc id="dw-d">Four runners (Codex, Claude Code, OpenCode, other MCP or CLI agents) connect through four adapters to a local broker bound to 127.0.0.1. A read-only dashboard reads from the broker.</desc>
+        <defs>
+          <marker id="aw" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="d-head"/></marker>
+          <marker id="awr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="d-head ro"/></marker>
+        </defs>
+        <text class="d-k" x="10" y="26">1 · Runners</text>
+        <text class="d-k" x="272" y="26">2 · Adapters</text>
+        <text class="d-k" x="534" y="26">3 · Local broker</text>
+        <text class="d-k" x="796" y="26">4 · Dashboard</text>
+
+        <g>
+          <rect class="d-box" x="10" y="44" width="194" height="78"/><text class="d-t" x="24" y="78">Codex</text><text class="d-s" x="24" y="102">existing session</text>
+          <rect class="d-box" x="10" y="146" width="194" height="78"/><text class="d-t" x="24" y="180">Claude Code</text><text class="d-s" x="24" y="204">existing session</text>
+          <rect class="d-box" x="10" y="248" width="194" height="78"/><text class="d-t" x="24" y="282">OpenCode</text><text class="d-s" x="24" y="306">existing session</text>
+          <rect class="d-box" x="10" y="350" width="194" height="78"/><text class="d-t" x="24" y="384">Other agents</text><text class="d-s" x="24" y="408">MCP or plain CLI</text>
+        </g>
+        <g>
+          <rect class="d-box" x="272" y="44" width="194" height="78"/><text class="d-t" x="286" y="78">App-server</text><text class="d-s" x="286" y="102">attach to thread</text>
+          <rect class="d-box" x="272" y="146" width="194" height="78"/><text class="d-t" x="286" y="180">MCP channel</text><text class="d-s" x="286" y="204">preview capability</text>
+          <rect class="d-box" x="272" y="248" width="194" height="78"/><text class="d-t" x="286" y="282">Plugin</text><text class="d-s" x="286" y="306">inside the runtime</text>
+          <rect class="d-box" x="272" y="350" width="194" height="78"/><text class="d-t" x="286" y="384">MCP · CLI</text><text class="d-s" x="286" y="408">tools, inbox, watch</text>
+        </g>
+        <g fill="none">
+          <path class="d-line" d="M208 83H268" marker-start="url(#aw)" marker-end="url(#aw)"/>
+          <path class="d-line" d="M208 185H268" marker-start="url(#aw)" marker-end="url(#aw)"/>
+          <path class="d-line" d="M208 287H268" marker-start="url(#aw)" marker-end="url(#aw)"/>
+          <path class="d-line" d="M208 389H268" marker-start="url(#aw)" marker-end="url(#aw)"/>
+          <path class="d-line" d="M470 83H530" marker-start="url(#aw)" marker-end="url(#aw)"/>
+          <path class="d-line" d="M470 185H530" marker-start="url(#aw)" marker-end="url(#aw)"/>
+          <path class="d-line" d="M470 287H530" marker-start="url(#aw)" marker-end="url(#aw)"/>
+          <path class="d-line" d="M470 389H530" marker-start="url(#aw)" marker-end="url(#aw)"/>
+          <path class="d-line ro" d="M732 236H792" marker-end="url(#awr)"/>
+        </g>
+
+        <rect class="d-box hot" x="534" y="44" width="194" height="384"/>
+        <text class="d-t inv" x="550" y="82">Broker</text>
+        <text class="d-s inv" x="550" y="106">127.0.0.1 only</text>
+        <text class="d-s inv" x="550" y="124">bearer token</text>
+        <line x1="550" y1="142" x2="712" y2="142" stroke="rgba(255,255,255,.16)"/>
+        <g class="d-s inv">
+          <text x="550" y="170">messages + receipts</text>
+          <text x="550" y="196">file + machine claims</text>
+          <text x="550" y="222">branch claims</text>
+          <text x="550" y="248">handoffs</text>
+          <text x="550" y="274">work-item tree</text>
+          <text x="550" y="300">registry + presence</text>
+        </g>
+        <line x1="550" y1="324" x2="712" y2="324" stroke="rgba(255,255,255,.16)"/>
+        <text class="d-s inv" x="550" y="352">one private JSON</text>
+        <text class="d-s inv" x="550" y="372">ledger on disk</text>
+        <text class="d-s inv" x="550" y="400">single writer lease</text>
+
+        <rect class="d-box" x="796" y="150" width="194" height="172"/>
+        <text class="d-t" x="810" y="184">Dashboard</text>
+        <text class="d-s" x="810" y="208">read-only dashboard</text>
+        <text class="d-s" x="810" y="232">own loopback port</text>
+        <text class="d-s" x="810" y="256">separate secret</text>
+        <text class="d-s" x="810" y="288">six views, no writes</text>
+        <text class="d-note" x="736" y="224">reads</text>
+      </svg>
+
+      <svg class="d-tall" viewBox="0 0 360 800" role="img" aria-labelledby="dt-t dt-d">
+        <title id="dt-t">Architecture: runners, adapters, local broker, dashboard</title>
+        <desc id="dt-d">Runners connect through adapters to a local broker bound to 127.0.0.1. A read-only dashboard reads from the broker.</desc>
+        <defs>
+          <marker id="tw" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="d-head"/></marker>
+          <marker id="twr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="d-head ro"/></marker>
+        </defs>
+        <text class="d-k" x="10" y="18">1 · Runners</text>
+        <g>
+          <rect class="d-box" x="10" y="28" width="164" height="54"/><text class="d-t" style="font-size:19px" x="20" y="60">Codex</text>
+          <rect class="d-box" x="186" y="28" width="164" height="54"/><text class="d-t" style="font-size:19px" x="196" y="60">Claude Code</text>
+          <rect class="d-box" x="10" y="92" width="164" height="54"/><text class="d-t" style="font-size:19px" x="20" y="124">OpenCode</text>
+          <rect class="d-box" x="186" y="92" width="164" height="54"/><text class="d-t" style="font-size:19px" x="196" y="124">Other agents</text>
+        </g>
+        <path class="d-line" d="M180 152V196" marker-start="url(#tw)" marker-end="url(#tw)"/>
+        <text class="d-k" x="10" y="226">2 · Adapters</text>
+        <g>
+          <rect class="d-box" x="10" y="236" width="164" height="62"/><text class="d-t" style="font-size:19px" x="20" y="262">App-server</text><text class="d-s" style="font-size:11.5px" x="20" y="284">attach to thread</text>
+          <rect class="d-box" x="186" y="236" width="164" height="62"/><text class="d-t" style="font-size:19px" x="196" y="262">MCP channel</text><text class="d-s" style="font-size:11.5px" x="196" y="284">preview capability</text>
+          <rect class="d-box" x="10" y="308" width="164" height="62"/><text class="d-t" style="font-size:19px" x="20" y="334">Plugin</text><text class="d-s" style="font-size:11.5px" x="20" y="356">inside the runtime</text>
+          <rect class="d-box" x="186" y="308" width="164" height="62"/><text class="d-t" style="font-size:19px" x="196" y="334">MCP · CLI</text><text class="d-s" style="font-size:11.5px" x="196" y="356">tools, inbox, watch</text>
+        </g>
+        <path class="d-line" d="M180 378V422" marker-start="url(#tw)" marker-end="url(#tw)"/>
+        <text class="d-k" x="10" y="452">3 · Local broker</text>
+        <rect class="d-box hot" x="10" y="462" width="340" height="206"/>
+        <text class="d-t inv" style="font-size:22px" x="26" y="494">Broker</text>
+        <text class="d-s inv" style="font-size:11.5px" x="26" y="514">127.0.0.1 only · bearer token</text>
+        <line x1="26" y1="528" x2="334" y2="528" stroke="rgba(255,255,255,.16)"/>
+        <g class="d-s inv" style="font-size:11.5px">
+          <text x="26" y="552">messages + receipts</text><text x="190" y="552">branch claims</text>
+          <text x="26" y="576">file + machine claims</text><text x="190" y="576">handoffs</text>
+          <text x="26" y="600">work-item tree</text><text x="190" y="600">registry + presence</text>
+        </g>
+        <line x1="26" y1="616" x2="334" y2="616" stroke="rgba(255,255,255,.16)"/>
+        <text class="d-s inv" style="font-size:11.5px" x="26" y="640">one private JSON ledger on disk</text>
+        <text class="d-s inv" style="font-size:11.5px" x="26" y="658">single writer lease</text>
+        <path class="d-line ro" d="M180 676V720" marker-end="url(#twr)"/>
+        <text class="d-note" x="192" y="704">reads</text>
+        <rect class="d-box" x="10" y="726" width="340" height="66"/>
+        <text class="d-t" style="font-size:21px" x="26" y="754">4 · Dashboard</text>
+        <text class="d-s" style="font-size:11.5px" x="26" y="778">read-only · own loopback port · six views</text>
+      </svg>
+      <p class="legend-d"><span>messages, claims and state flow both ways</span><span class="ro">the dashboard only reads</span></p>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="surfaces" aria-labelledby="surf-title">
+  <div class="wrap">
+    
+<div class="sec-head rv">
+  <span class="sec-no" aria-hidden="true">02</span>
+  <h2 id="surf-title">Three ways in, one room</h2>
+  <p>The same operations are exposed through MCP tools, the command line and an OpenCode plugin. The sender is bound to the connected session, so an agent cannot speak as someone else.</p>
+</div>
+    <div class="caps">
+      <article class="cap rv">
+        <span class="s-id"><i>1</i> MCP</span>
+        <h3>MCP server</h3>
+        <p>Codex and Claude Code load Agent Relay as an MCP server. Large results page through <code>relay_read_page</code> so nothing is silently cut.</p>
+        <div class="chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:14px">
+          <span class="tag ghost">relay_send</span><span class="tag ghost">relay_inbox</span><span class="tag ghost">relay_ack</span><span class="tag ghost">relay_claim</span><span class="tag ghost">relay_branch</span><span class="tag ghost">relay_tasks</span><span class="tag ghost">relay_roadmap</span><span class="tag ghost">relay_handoff_request</span>
+        </div>
+      </article>
+      <article class="cap rv">
+        <span class="s-id"><i>2</i> CLI</span>
+        <h3>Command line</h3>
+        <p>Every operation is a command, so shells, scripts and any other agent can take part. Output is JSON-friendly, and <code>watch</code> streams new messages as JSON lines.</p>
+        <div class="chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:14px">
+          <span class="tag ghost">setup</span><span class="tag ghost">launch</span><span class="tag ghost">send</span><span class="tag ghost">inbox</span><span class="tag ghost">watch</span><span class="tag ghost">claim</span><span class="tag ghost">work</span><span class="tag ghost">branches</span><span class="tag ghost">prune</span>
+        </div>
+      </article>
+      <article class="cap rv">
+        <span class="s-id"><i>3</i> Plugin</span>
+        <h3>OpenCode plugin</h3>
+        <p>Runs inside the existing OpenCode runtime with the same tools. Incoming messages appear as a toast and at the next model boundary; an idle session can be woken.</p>
+        <div class="chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:14px">
+          <span class="tag ghost">same relay_* tools</span><span class="tag ghost">no second runtime</span><span class="tag ghost">git context reported</span>
+        </div>
+      </article>
+    </div>
+    <div class="tablewrap rv" style="margin-top:28px">
+      <table>
+        <caption>What receives live notifications</caption>
+        <thead><tr><th scope="col">Runner</th><th scope="col">How it is reached</th><th scope="col">Evidence on record</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Codex</th><td data-label="How it is reached">Attaches to the existing local app-server thread; steers the current turn or starts a turn on the same idle thread.</td><td data-label="Evidence on record">Two-way notification, ack and reply verified between two existing sessions on macOS.</td></tr>
+          <tr><th scope="row">Claude Code</th><td data-label="How it is reached">MCP custom channel (a research-preview capability), opted into by the launcher.</td><td data-label="Evidence on record">Channel initialization and notification verified. Account or organization policy can prevent activation.</td></tr>
+          <tr><th scope="row">OpenCode</th><td data-label="How it is reached">Plugin: toast plus context at the next model boundary; wakes an observed idle session.</td><td data-label="Evidence on record">Idle wake, context insertion, ack and reply verified with a scripted local provider.</td></tr>
+          <tr><th scope="row">Other agents</th><td data-label="How it is reached">Shared MCP tools, inbox and a live CLI watch.</td><td data-label="Evidence on record">Tool and transport tests pass. Waking a model needs a runner-specific adapter.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:14px;color:var(--muted);font-size:13px">Full details and the validation matrix are in the <a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/validation.md" style="color:var(--ink)">repository docs</a>.</p>
+  </div>
+</section>
+
+<section class="final" aria-labelledby="final-title">
+  <div class="wrap">
+    <div>
+      <h2 id="final-title">Your agents are <em>already</em> in the air.</h2>
+      <p>Give them one frequency. Local, open source, MIT licensed.</p>
+    </div>
+    <div class="cta-row">
+      <a class="cta" href="../start/">Get started
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+      <a class="cta ghost" href="https://github.com/Wearer-Lab/agent-relay">View on GitHub</a>
+    </div>
+  </div>
+</section>
+</main>
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <div>
+        <div class="brand-lock">
+          <img src="../assets/logo.svg" alt="" width="34" height="34" />
+          <b>Agent Relay</b>
+        </div>
+        <p>Local project-scoped coordination and notifications for coding agents. One room per project, shared by Codex, Claude Code, OpenCode and other agents.</p>
+      </div>
+      <nav aria-label="Project links">
+        <h2>Project</h2>
+        <ul>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay">GitHub</a></li>
+          <li><a href="https://www.npmjs.com/package/@wearer-haitch/agent-relay">npm package</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/releases">Releases</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/LICENSE">MIT license</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="Documentation">
+        <h2>Docs on GitHub</h2>
+        <ul>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay#readme">README</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/dashboard.md">Dashboard</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/registry.md">Registry hygiene</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/branches.md">Branch ownership</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/work-items.md">Work items</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/opencode.md">OpenCode</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/claude-channel.md">Claude channel</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="legal">
+      <span>MIT License · Copyright (c) 2026 Agent Relay contributors</span>
+      <span>No tracking. No analytics. No cookies. Fonts are self-hosted.</span>
+      <span>Display font: Bubbledot by OnlineWebFonts.com, CC BY 4.0. Text: Inter.</span>
+    </div>
+  </div>
+</footer>
+</div>
+<script src="../app.js" defer></script>
+</body>
+</html>
+
+<div class="mobile-overlay" id="mobile-menu" hidden>
+  <div class="mobile-menu-sheet" role="dialog" aria-modal="true" aria-label="Navigation menu">
+    <nav class="mobile-nav" aria-label="Mobile navigation">
+      <a class="mobile-link" style="--i:0;" href="../product/">Product</a>
+      <a class="mobile-link" style="--i:1;" href="../dashboard/">Dashboard</a>
+      <a class="mobile-link" style="--i:2;" href="../architecture/" aria-current="page">Architecture</a>
+      <a class="mobile-link" style="--i:3;" href="../security/">Security</a>
+      <a class="mobile-link" style="--i:4;" href="../start/">Start</a>
+      <a class="mobile-sign-in" style="--i:5;" href="https://github.com/Wearer-Lab/agent-relay">GitHub</a>
+    </nav>
+  </div>
+</div>

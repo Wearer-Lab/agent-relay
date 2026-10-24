@@ -15,25 +15,25 @@ test('observability summarizes all rooms and isolates, bounds, and clones a proj
 });
 function harness({getHistory}={}){
  const calls=[],state=fixture();
- const handler=createDashboardHandler({project:'/work/alpha',secret:'dashboard-secret',origin:()=> 'http://127.0.0.1:1234',assets:new Map([['/',{type:'text/html',body:'<h1>Dashboard</h1>'}]]),getRooms:async()=>({rooms:projectSummaries(state)}),getSnapshot:async project=>{calls.push(project);return roomSnapshot(project,state.rooms.find(r=>r.project===project));},getHistory});
+ const handler=createDashboardHandler({project:'/work/alpha',secret:'dashboard-secret',origin:()=> 'http://127.0.0.1:1234',assets:new Map([['/index.html',{type:'text/html',body:'<h1>Dashboard</h1>'}]]),getRooms:async()=>({rooms:projectSummaries(state)}),getSnapshot:async project=>{calls.push(project);return roomSnapshot(project,state.rooms.find(r=>r.project===project));},getHistory});
  const request=async(url,options={})=>{const response={headers:{},status:0,body:'',setHeader(k,v){this.headers[k.toLowerCase()]=v;},writeHead(status,headers={}){this.status=status;for(const [k,v] of Object.entries(headers))this.setHeader(k,v);},end(body=''){this.body=body;}};await handler({url,method:'GET',headers:{host:'127.0.0.1:1234',authorization:'Bearer dashboard-secret',...options.headers},...options,headers:{host:'127.0.0.1:1234',authorization:'Bearer dashboard-secret',...options.headers}},response);return response;};
  return {request,calls};
 }
 test('dashboard requires its own read-only token and trusted origin; refuses writes and unknown projects',async()=>{
  const h=harness();
- assert.equal((await h.request('/api/projects',{headers:{authorization:''}})).status,401);
- assert.equal((await h.request('/api/projects',{headers:{host:'attacker.example'}})).status,403);
- assert.equal((await h.request('/api/projects',{headers:{origin:'https://attacker.example'}})).status,403);
- assert.equal((await h.request('/api/snapshot',{method:'POST'})).status,405);
- assert.equal((await h.request('/api/snapshot?project=%2Fprivate%2Funregistered')).status,404);assert.deepEqual(h.calls,[]);
- const projects=await h.request('/api/projects');assert.equal(projects.status,200);assert.equal(JSON.parse(projects.body).rooms.length,2);
+ assert.equal((await h.request('/api/v1/projects',{headers:{authorization:''}})).status,401);
+ assert.equal((await h.request('/api/v1/projects',{headers:{host:'attacker.example'}})).status,403);
+ assert.equal((await h.request('/api/v1/projects',{headers:{origin:'https://attacker.example'}})).status,403);
+ assert.equal((await h.request('/api/v1/snapshot',{method:'POST'})).status,405);
+ assert.equal((await h.request('/api/v1/snapshot?project=%2Fprivate%2Funregistered')).status,404);assert.deepEqual(h.calls,[]);
+ const projects=await h.request('/api/v1/projects');assert.equal(projects.status,200);assert.equal(JSON.parse(projects.body).rooms.length,2);
  assert.equal((await h.request('/')).status,200);assert.match((await h.request('/')).headers['content-security-policy'],/frame-ancestors 'none'/);
  assert.equal((await h.request('/../token')).status,404);
 });
 test('one dashboard switches projects and returns conditional snapshots with no writes',async()=>{
- const h=harness();const alpha=await h.request('/api/snapshot?project=%2Fwork%2Falpha');assert.equal(alpha.status,200);assert.equal(JSON.parse(alpha.body).messages.length,2);
- const beta=await h.request('/api/snapshot?project=%2Fwork%2Fbeta');assert.equal(JSON.parse(beta.body).messages.length,0);assert.deepEqual(h.calls,['/work/alpha','/work/beta']);
- assert.equal((await h.request('/api/snapshot?project=%2Fwork%2Falpha',{headers:{'if-none-match':alpha.headers.etag}})).status,304);
+ const h=harness();const alpha=await h.request('/api/v1/snapshot?project=%2Fwork%2Falpha');assert.equal(alpha.status,200);assert.equal(JSON.parse(alpha.body).messages.length,2);
+ const beta=await h.request('/api/v1/snapshot?project=%2Fwork%2Fbeta');assert.equal(JSON.parse(beta.body).messages.length,0);assert.deepEqual(h.calls,['/work/alpha','/work/beta']);
+ assert.equal((await h.request('/api/v1/snapshot?project=%2Fwork%2Falpha',{headers:{'if-none-match':alpha.headers.etag}})).status,304);
 });
 
 test('legacy observer reads committed history without restarting, writing, or swallowing broker faults',async t=>{
@@ -54,18 +54,18 @@ test('legacy observer reads committed history without restarting, writing, or sw
 test('history endpoint pages older messages with durable cursors and falls back to the window when history is absent',async()=>{
  const asked=[];
  const h=harness({getHistory:async(project,{before,limit})=>{asked.push([project,before,limit]);return {available:true,messages:[{messageId:'old',cursor:before-1}],nextCursor:before-1,done:false};}});
- const page=await h.request('/api/history?project=%2Fwork%2Falpha&before=2&limit=1');
+ const page=await h.request('/api/v1/history?project=%2Fwork%2Falpha&before=2&limit=1');
  assert.equal(page.status,200);assert.deepEqual(JSON.parse(page.body),{available:true,messages:[{messageId:'old',cursor:1}],nextCursor:1,done:false});
  assert.deepEqual(asked,[['/work/alpha',2,1]]);
- const defaults=await h.request('/api/history?project=%2Fwork%2Falpha');assert.deepEqual(asked.at(-1),['/work/alpha',Number.MAX_SAFE_INTEGER,100]);
- assert.equal((await h.request('/api/history?project=%2Fwork%2Falpha&before=2',{headers:{authorization:''}})).status,401);
- assert.equal((await h.request('/api/history?project=%2Fwork%2Falpha&before=x')).status,400);
- assert.equal((await h.request('/api/history?project=%2Fwork%2Falpha&limit=201')).status,400);
- assert.equal((await h.request('/api/history?project=%2Fprivate%2Funregistered')).status,404);
- assert.equal((await h.request('/api/history?project=%2Fwork%2Falpha',{method:'POST'})).status,405);
+ const defaults=await h.request('/api/v1/history?project=%2Fwork%2Falpha');assert.deepEqual(asked.at(-1),['/work/alpha',Number.MAX_SAFE_INTEGER,100]);
+ assert.equal((await h.request('/api/v1/history?project=%2Fwork%2Falpha&before=2',{headers:{authorization:''}})).status,401);
+ assert.equal((await h.request('/api/v1/history?project=%2Fwork%2Falpha&before=x')).status,400);
+ assert.equal((await h.request('/api/v1/history?project=%2Fwork%2Falpha&limit=201')).status,400);
+ assert.equal((await h.request('/api/v1/history?project=%2Fprivate%2Funregistered')).status,404);
+ assert.equal((await h.request('/api/v1/history?project=%2Fwork%2Falpha',{method:'POST'})).status,405);
  assert.equal(defaults.status,200);
  const plain=harness();
- assert.deepEqual(JSON.parse((await plain.request('/api/history?project=%2Fwork%2Falpha')).body),{available:false,messages:[],nextCursor:null,done:true});
+ assert.deepEqual(JSON.parse((await plain.request('/api/v1/history?project=%2Fwork%2Falpha')).body),{available:false,messages:[],nextCursor:null,done:true});
 });
 
 test('observer feature-detects broker history paging and falls back to the labeled window when the op is absent',async t=>{
@@ -94,13 +94,13 @@ test('observer feature-detects broker history paging and falls back to the label
  assert.deepEqual(older.messages.map(m=>m.messageId),['two','one']);assert.equal(older.nextCursor,1);assert.equal(older.done,true);
 });
 
-const dashboardSource=await readFile(new URL('../lib/dashboard/dashboard.js',import.meta.url),'utf8');
-const modelSource=await readFile(new URL('../lib/dashboard/model.js',import.meta.url),'utf8');
+const dashboardSource=await readFile(new URL('../lib/dashboard/assets/dashboard.js',import.meta.url),'utf8');
+const modelSource=await readFile(new URL('../lib/dashboard/assets/model.js',import.meta.url),'utf8');
 const textOf=el=>(el.textContent??'')+(el.children??[]).map(textOf).join('');
 const findAll=(root,pred)=>{const out=[];const walk=n=>{for(const child of n.children??[]){if(pred(child))out.push(child);walk(child);}};walk(root);return out;};
 const findButton=(root,label)=>findAll(root,el=>el.tag==='button'&&el.textContent===label)[0];
 const plain=value=>JSON.parse(JSON.stringify(value));
-function boot({projects,snapshot,history,work,ownership,usage,search='?view=log'}={}){
+function boot({projects,snapshot,history,work,ownership,usage,path='/messages/'}={}){
  const elements=new Map();
  const make=tag=>{
   const el={tag,children:[],parent:null,dataset:{},listeners:{},textContent:'',className:'',type:'',value:'',checked:false,hidden:false,disabled:false,title:'',dateTime:'',open:false,scrollTop:0,scrolled:false,
@@ -124,14 +124,14 @@ function boot({projects,snapshot,history,work,ownership,usage,search='?view=log'
  const response=(body,status=200)=>({status,ok:status<400,headers:{get:()=>null},json:async()=>body});
  const fetch=async url=>{
   fetchLog.push(url);
-  if(url.startsWith('/api/projects'))return response(projects??{rooms:[],preferredProject:''});
-  if(url.startsWith('/api/snapshot'))return response(typeof snapshot==='function'?snapshot(url):snapshot??{project:'',agents:[],claims:[],messages:[],totalMessages:0,pendingDeliveries:0,pendingByAgent:{},cursor:0});
-  if(url.startsWith('/api/history'))return response(typeof history==='function'?history(url):history??{available:false,messages:[],nextCursor:null,done:true});
+  if(url.startsWith('/api/v1/projects'))return response(projects??{rooms:[],preferredProject:''});
+  if(url.startsWith('/api/v1/snapshot'))return response(typeof snapshot==='function'?snapshot(url):snapshot??{project:'',agents:[],claims:[],messages:[],totalMessages:0,pendingDeliveries:0,pendingByAgent:{},cursor:0});
+  if(url.startsWith('/api/v1/history'))return response(typeof history==='function'?history(url):history??{available:false,messages:[],nextCursor:null,done:true});
   const feeds={work,ownership,usage};
-  for(const key of Object.keys(feeds))if(url.startsWith('/api/'+key)&&feeds[key]!==undefined)return response(typeof feeds[key]==='function'?feeds[key](url):feeds[key]);
+  for(const key of Object.keys(feeds))if(url.startsWith('/api/v1/'+key)&&feeds[key]!==undefined)return response(typeof feeds[key]==='function'?feeds[key](url):feeds[key]);
   return response({error:'Not found.'},404);
  };
- const sandbox={document,location:{hash:'#dashboard-test-secret',pathname:'/',search},URLSearchParams,history:{replaceState(){}},sessionStorage:{getItem:()=>null,setItem(){}},fetch,AbortSignal:{timeout:()=>({})},Option,setInterval:()=>0,queueMicrotask,setTimeout,clearTimeout};
+ const sandbox={document,location:{hash:'#dashboard-test-secret',pathname:path,search:''},URLSearchParams,history:{replaceState(){}},sessionStorage:{getItem:()=>null,setItem(){}},fetch,AbortSignal:{timeout:()=>({})},Option,setInterval:()=>0,queueMicrotask,setTimeout,clearTimeout};
  createContext(sandbox);runInContext(modelSource,sandbox);runInContext(dashboardSource,sandbox);
  const flush=async()=>{for(let i=0;i<30;i++)await Promise.resolve();await new Promise(resolve=>setImmediate(resolve));await new Promise(resolve=>setImmediate(resolve));};
  return {elements,sandbox,fetchLog,flush,$:id=>elements.get(id)};
@@ -161,11 +161,11 @@ test('load older pulls prior pages into the searchable window and falls back whe
  const button=findButton(page.$('messages'),'Load older messages');assert.ok(button);assert.equal(button.parent.hidden,false);
  assert.equal(textOf(page.$('message-range')),'Showing 100 of 250 messages (window: latest 100) · search covers this window only');
  button.listeners.click();await page.flush();
- assert.ok(page.fetchLog.some(url=>url.startsWith('/api/history')&&url.includes('before=151')));
+ assert.ok(page.fetchLog.some(url=>url.startsWith('/api/v1/history')&&url.includes('before=151')));
  assert.equal(textOf(page.$('message-range')),'Showing 150 of 250 messages (window: latest 150) · search covers this window only, older history can be loaded');
  assert.equal(findButton(page.$('messages'),'Load older messages').parent.hidden,false);
  findButton(page.$('messages'),'Load older messages').listeners.click();await page.flush();
- assert.ok(page.fetchLog.some(url=>url.startsWith('/api/history')&&url.includes('before=101')));
+ assert.ok(page.fetchLog.some(url=>url.startsWith('/api/v1/history')&&url.includes('before=101')));
  assert.equal(textOf(page.$('message-range')),'Showing 250 of 250 messages (window: latest 250) · search covers the full retained history');
  assert.equal(findButton(page.$('messages'),'Load older messages').parent.hidden,true);
  const fallback=boot({projects:projectsOf(250),snapshot:windowSnapshot(100,250),history:{available:false,messages:[],nextCursor:null,done:true}});
@@ -289,12 +289,14 @@ test('real dashboard serves packaged assets and discovers two broker rooms throu
  await write({op:'register',agentId:'a',runner:'test'});await write({op:'register',agentId:'b',runner:'test'},other);
  const before=await fs.readFile(path.join(dataDir,'state.json'),'utf8');dashboard=await startDashboard({project,dataDir});
  const link=new URL(dashboard.url),headers={authorization:'Bearer '+link.hash.slice(1)};
- assert.equal((await fetch(link.origin+'/api/projects')).status,401);
- const projects=await (await fetch(link.origin+'/api/projects',{headers})).json();assert.equal(projects.rooms.length,2);
+ assert.equal((await fetch(link.origin+'/api/v1/projects')).status,401);
+ const projects=await (await fetch(link.origin+'/api/v1/projects',{headers})).json();assert.equal(projects.rooms.length,2);
  const beta=projects.rooms.find(r=>r.project.endsWith(path.sep+'two'));
- const view=await (await fetch(link.origin+'/api/snapshot?project='+encodeURIComponent(beta.project),{headers})).json();assert.equal(view.agents[0].agentId,'b');
- const history=await (await fetch(link.origin+'/api/history?project='+encodeURIComponent(beta.project)+'&before=5&limit=5',{headers})).json();
+ const view=await (await fetch(link.origin+'/api/v1/snapshot?project='+encodeURIComponent(beta.project),{headers})).json();assert.equal(view.agents[0].agentId,'b');
+ const history=await (await fetch(link.origin+'/api/v1/history?project='+encodeURIComponent(beta.project)+'&before=5&limit=5',{headers})).json();
  assert.equal(typeof history.available,'boolean');
- for(const file of ['/','/dashboard.js','/dashboard.css','/theme.js','/model.js','/?view=plan']){const response=await fetch(link.origin+file);assert.equal(response.status,200);assert.ok((await response.text()).length>100);}
+  for(const file of ['/','/roadmap/','/branches/','/agents/','/messages/','/claims/','/assets/dashboard.js','/assets/dashboard.css','/assets/theme.js','/assets/model.js','/assets/logo.svg']){const response=await fetch(link.origin+file);assert.equal(response.status,200,file);assert.ok((await response.text()).length>100,file);}
+  const missing=await fetch(link.origin+'/assets/nope.js');assert.equal(missing.status,404);
+  const redirect=await fetch(link.origin+'/branches',{redirect:'manual'});assert.equal(redirect.status,301);assert.equal(redirect.headers.get('location'),'/branches/');
  assert.equal(await fs.readFile(path.join(dataDir,'state.json'),'utf8'),before);
 });

@@ -1,0 +1,49 @@
+name: Cloudflare
+# Publishes site/ to Cloudflare Workers static assets at https://relay.next-notes.com.
+# It runs in parallel with the GitHub Pages workflow: both read the same site/ directory,
+# and the Cloudflare copy is the canonical one.
+on:
+  push:
+    branches: [main]
+    paths: ['site/**', 'wrangler.jsonc', '.github/workflows/cloudflare.yml']
+  workflow_dispatch:
+concurrency:
+  group: cloudflare-deploy
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Deploy the site
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::notice::No Cloudflare credentials in this repository, so nothing was deployed."
+            echo "Add them as repository secrets to publish on every push:"
+            echo "  CLOUDFLARE_API_TOKEN  an API token with Workers Scripts:Edit, Workers Routes:Edit and DNS:Edit for next-notes.com"
+            echo "  CLOUDFLARE_ACCOUNT_ID  d534728dd8656056d2feef1bf282724d"
+            echo "Until then, publish with: npx wrangler@3 deploy"
+            exit 0
+          fi
+          npx --yes wrangler@3 deploy
+      - name: The custom domain answers
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        run: |
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            if curl --fail --silent --show-error --max-time 20 https://relay.next-notes.com/ > /dev/null; then
+              echo "relay.next-notes.com is serving the new version"; exit 0
+            fi
+            sleep 6
+          done
+          echo "::error::relay.next-notes.com did not answer after the deploy"; exit 1
