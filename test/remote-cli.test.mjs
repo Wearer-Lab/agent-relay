@@ -126,6 +126,28 @@ test('the read-only dashboard rides on the same public URL, behind its own secre
   assert.equal(wrong.status, 401);
 });
 
+test('remote add writes the URL into the repository, or keeps it out with --url-in-env', async t => {
+  const dataDir = await temp(t);
+  const project = path.join(dataDir, 'repo');
+  await fs.mkdir(project, {recursive: true});
+  const {remoteAdd} = await import('../lib/remote.mjs');
+  const {writeState} = await import('../lib/remote.mjs');
+  await writeState(dataDir, {url: 'https://relay.example', provider: 'tailscale'});
+
+  const inRepo = await remoteAdd({dataDir, project, runner: 'claude'});
+  assert.equal(inRepo.ok, true);
+  const config = JSON.parse(await fs.readFile(path.join(project, '.mcp.json'), 'utf8'));
+  assert.equal(config.mcpServers['agent-relay'].env.AGENT_RELAY_URL, 'https://relay.example');
+
+  const other = path.join(dataDir, 'other');
+  await fs.mkdir(other, {recursive: true});
+  const keptOut = await remoteAdd({dataDir, project: other, runner: 'claude', urlInEnv: true});
+  assert.equal(keptOut.ok, true);
+  const kept = JSON.parse(await fs.readFile(path.join(other, '.mcp.json'), 'utf8'));
+  assert.equal(kept.mcpServers['agent-relay'].env, undefined, 'the URL stays out of git');
+  assert.match(keptOut.clipboard, /AGENT_RELAY_URL=https:\/\/relay\.example/);
+});
+
 test('the remote status reports the gateway, the tunnel and the live tokens', async t => {
   const dataDir = await temp(t);
   const gateway = await startGateway({dataDir, port: 0, call: async () => ({ok: true})});

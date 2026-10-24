@@ -4,6 +4,17 @@ All notable changes to `@wearer-haitch/agent-relay` are recorded here. The forma
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-10-24
+
+### Fixed
+
+- **The gateway no longer returns a local path.** A response that named the room's directory is rewritten so the room reads as `.` and everything inside it becomes repo-relative, in both directions.
+- The gateway's audit log rotates once it passes a megabyte, keeping one previous file beside it.
+- `remote add --url-in-env` now really keeps the URL out of the repository: nothing in the configuration points at it, and it is printed for the cloud environment instead.
+- A token obtained by pairing is kept in memory for the session, so a cloud agent pairs once rather than on every call.
+- `remote approve` without a code shows the room each waiting request would join.
+- A named Cloudflare tunnel now logs in, creates the tunnel when it is not there, routes the hostname to it and keeps its configuration under the data directory.
+
 ## [0.7.1] - 2026-10-24
 
 ### Fixed

@@ -155,8 +155,11 @@ async function main(){
     const store=await new TokenStore(dataDir).load();
     const pending=store.pendingPairings();
     if(!pending.length){console.log('Nothing is waiting for approval.');break;}
+    let rooms=[];
+    try{rooms=(await (await import('../lib/client.mjs')).rpc(project,{op:'rooms'})).rooms??[];}catch{}
     for(const row of pending){
-     console.log(`${row.code}  ${row.runner}  ${row.repo}${row.branch?` (${row.branch})`:''}`);
+     const resolved=await remote.resolveRoomFor({dataDir,repo:row.repo,branch:row.branch,rooms});
+     console.log(`${row.code}  ${row.runner}  ${row.repo}${row.branch?` (${row.branch})`:''}  →  ${resolved.room??'no matching room'}`);
      if(opts.yes){const ok=await remote.remoteApprove({dataDir,code:row.code,alwaysOn:Boolean(opts['always-on']),ttlMs:opts['ttl-hours']?Number(opts['ttl-hours'])*3600000:undefined,agentPrefix:opts.prefix??'',project});console.log(ok.message);continue;}
      const answer=await question(`Approve ${row.code} for ${row.repo}? [y/N] `);
      if(!/^y(es)?$/i.test(answer)){const denied=await remote.remoteDeny({dataDir,code:row.code});console.log(denied.message);continue;}

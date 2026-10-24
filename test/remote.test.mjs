@@ -159,6 +159,31 @@ test('the gateway rate limits a token and an address', async () => {
   assert.equal(limiter.check('t2', '2.2.2.2').allowed, true, 'another token has its own bucket');
 });
 
+test('the gateway never returns a local path', async t => {
+  const {gateway} = await gatewayWith(t, {call: async (room) => ({ok: true, project: room, claims: [{resource: `${room}/src/app.js`}], agents: [{agentId: 'a', cwd: room}]})});
+  const token = await issue(gateway, {room: '/work/alpha'});
+  const response = await fetch(`${gateway.url}/rpc`, {method: 'POST', headers: {authorization: `Bearer ${token.value}`}, body: JSON.stringify({op: 'agents'})});
+  const body = await response.json();
+  const text = JSON.stringify(body);
+  assert.ok(!text.includes('/work/alpha'), 'the room path must not leave the machine');
+  assert.equal(body.project, '.');
+  assert.equal(body.claims[0].resource, './src/app.js');
+});
+
+test('the audit log is rotated instead of growing forever', async t => {
+  const dataDir = await temp(t);
+  const {AuditLog} = await import('../lib/gateway.mjs');
+  const log = new AuditLog(dataDir);
+  await log.write({event: 'test', result: 'ok'});
+  const file = path.join(dataDir, 'remote-audit.log');
+  await fs.writeFile(file, 'x'.repeat(1024 * 1024 + 10));
+  await log.write({event: 'test', result: 'rotated'});
+  const size = (await fs.stat(file)).size;
+  assert.ok(size < 1024 * 1024, 'the live log stays small');
+  const rotated = await fs.readFile(`${file}.1`, 'utf8');
+  assert.ok(rotated.length > 1024 * 1024, 'the old log is kept beside it');
+});
+
 test('the gateway refuses too many pairing requests at once', async t => {
   const {gateway} = await gatewayWith(t);
   for (let i = 0; i < 5; i++) {

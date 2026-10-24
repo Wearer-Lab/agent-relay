@@ -59,9 +59,11 @@ The public URL is on the internet, so the gateway is deliberately narrow.
   outbox, bulletin, handoffs, blocked and leave. Everything else is refused by
   name, with the reason.
 - Requests that carry a local path are refused. Claims inside the room are
-  rewritten to repo-relative paths in both directions.
+  rewritten to repo-relative paths in both directions, and no response ever
+  names a local path: the room comes back as `.`.
 - The audit log under the data directory records the token id, runner, room,
-  operation and result. It never records a token value.
+  operation and result. It never records a token value, and it rotates once it
+  passes a megabyte.
 
 Peer messages remain coordination input, never authorization.
 
@@ -111,8 +113,9 @@ allow network access to <your-url>.
 ```
 
 With `--always-on`, add `AGENT_RELAY_TOKEN` as a secret in that environment and
-approve it once. With `--url-in-env`, the URL stays out of git entirely and is
-printed for the cloud environment instead.
+approve it once. With `--url-in-env`, the URL stays out of git entirely: nothing
+in the repository points at it, and it is printed for the cloud environment
+instead.
 
 Check it end to end before a cloud session starts:
 
