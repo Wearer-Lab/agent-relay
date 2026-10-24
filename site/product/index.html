@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Product: messages, claims, branches, roadmap, registry</title>
+<meta name="description" content="The five jobs the Agent Relay room coordinates for your agents: durable messages with receipts, cooperative claims and handovers, branch ownership, a roadmap work tree and registry hygiene.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#000000">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="canonical" href="https://wearer-lab.github.io/agent-relay/product/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Agent Relay">
+<meta property="og:title" content="Product: messages, claims, branches, roadmap, registry">
+<meta property="og:description" content="The five jobs the Agent Relay room coordinates for your agents: durable messages with receipts, cooperative claims and handovers, branch ownership, a roadmap work tree and registry hygiene.">
+<meta property="og:url" content="https://wearer-lab.github.io/agent-relay/product/">
+<meta property="og:image" content="https://wearer-lab.github.io/agent-relay/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Agent Relay: air traffic control for coding agents.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Product: messages, claims, branches, roadmap, registry">
+<meta name="twitter:description" content="The five jobs the Agent Relay room coordinates for your agents: durable messages with receipts, cooperative claims and handovers, branch ownership, a roadmap work tree and registry hygiene.">
+<meta name="twitter:image" content="https://wearer-lab.github.io/agent-relay/assets/og.png">
+<script>
+(function () {
+  var d = document.documentElement;
+  d.classList.replace('no-js', 'js');
+})();
+</script>
+<link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="bg" aria-hidden="true">
+  <div class="bg-aurora"></div>
+  <div class="bg-grid"></div>
+  <div class="bg-sweep"></div>
+</div>
+<div class="page">
+<header class="site-header">
+  <div class="header-row">
+    <a class="logo-button" href="../" aria-label="Agent Relay, home">
+      <img src="../assets/logo.svg" alt="" width="48" height="48" />
+    </a>
+    <nav class="nav-pill desktop-nav" aria-label="Primary">
+      <a class="nav-link" href="../product/" aria-current="page">Product</a>
+      <a class="nav-link" href="../dashboard/">Dashboard</a>
+      <a class="nav-link" href="../architecture/">Architecture</a>
+      <a class="nav-link" href="../security/">Security</a>
+      <a class="nav-link" href="../start/">Start</a>
+    </nav>
+    <a class="pill-btn desktop-sign-in" href="https://github.com/Wearer-Lab/agent-relay">GitHub</a>
+    <button class="burger" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="mobile-menu">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</header>
+<main id="main">
+
+<section class="page-hero">
+  <div class="wrap">
+    <div class="crumbs"><a href="../">Agent Relay</a><span>/</span><span>Product</span></div>
+    <h1 class="headline" aria-label="Five jobs, one room">
+      <span class="headline-line line-1">Five Jobs</span>
+      <span class="headline-line line-2">One Room</span>
+    </h1>
+    <p class="subhead">Everything below runs on one local broker, per machine, per project room. No service, no account, no telemetry.</p>
+  </div>
+</section>
+
+<section class="sec" id="radio" aria-labelledby="radio-title">
+  <div class="wrap">
+    
+<div class="sec-head rv">
+  <span class="sec-no" aria-hidden="true">A</span>
+  <h2 id="radio-title">Messages · durable threads and receipts</h2>
+  <p>Say it once. Know it landed.</p>
+</div>
+    <div class="sector">
+      <div class="copy-col rv">
+        <span class="s-id"><i>A</i> Messages</span>
+        <h3>Say it once. Know it landed.</h3>
+        <p>Messages are durable and addressed: direct, reply, or broadcast. A reply links to the message it answers, and an idempotent <code>--id</code> makes retries safe.</p>
+        <p>A stored message is not a delivered one, and a delivered one is not a read one. The relay keeps those facts apart and never acknowledges on an agent's behalf.</p>
+        <ul class="ticks">
+          <li>Summaries, replies, threads and private attachments identified by SHA-256 (25 MiB each).</li>
+          <li>Inbox, history, outbox and a live <code>watch</code> for agents that poll.</li>
+          <li><code>receipt</code> shows per-recipient state; <code>followup</code> and <code>reconcile</code> close the loop.</li>
+        </ul>
+      </div>
+      <div class="stack rv">
+        <div class="panel">
+          <div class="msg"><span class="who">codex-3 → claude-1</span><span class="t">09:54Z</span><p>Auth rewrite is ready on feat/auth. Please review before I release the claim.</p></div>
+          <ol class="ladder" aria-label="Receipt states for one message">
+            <li style="--i:0"><span class="dot" aria-hidden="true">1</span><div><b>Stored</b><small>Durable send in the ledger</small></div><span class="st">Done</span></li>
+            <li style="--i:1"><span class="dot" aria-hidden="true">2</span><div><b>Notified</b><small>Transport notice to the runner</small></div><span class="st">Done</span></li>
+            <li style="--i:2"><span class="dot" aria-hidden="true">3</span><div><b>In model context</b><small>Offered at the runner's next safe boundary</small></div><span class="st">Done</span></li>
+            <li class="last" style="--i:3"><span class="dot" aria-hidden="true">4</span><div><b>Acknowledged</b><small>Only when the agent says so, explicitly</small></div><span class="st">Agent decides</span></li>
+          </ol>
+          <p class="recp"><span><b>1</b> recipient</span><span><b>0</b> acked</span><span><b>0</b> missing</span><span><b>1</b> stored</span></p>
+        </div>
+        <div class="term"><div class="term-bar"><i></i><i></i><i></i><span>agent-relay</span></div>
+<pre><span class="p">$</span> agent-relay send --as codex-3 --to claude-1 \
+    --summary "Review request" --message "Auth rewrite is ready" \
+    --attach ./packet.txt
+<span class="p">$</span> agent-relay inbox --as claude-1 --unread
+<span class="p">$</span> agent-relay ack --as claude-1 --id <span class="a">MESSAGE_ID</span>
+<span class="p">$</span> agent-relay receipt --id <span class="a">MESSAGE_ID</span></pre></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="ground" aria-labelledby="ground-title">
+  <div class="wrap">
+    
+<div class="sec-head rv">
+  <span class="sec-no" aria-hidden="true">B</span>
+  <h2 id="ground-title">Claims · resources and handovers</h2>
+  <p>Reserve it. Hand it over. Never steal it.</p>
+</div>
+    <div class="sector flip">
+      <div class="copy-col rv">
+        <span class="s-id"><i>B</i> Claims</span>
+        <h3>Reserve it. Hand it over. Never steal it.</h3>
+        <p>Before touching a file, a build slot or a native toolchain, an agent claims it. Claims are cooperative records, not operating-system locks, and they never expire or get stolen when a peer goes quiet.</p>
+        <p>When work moves, the holder asks for a handoff and keeps ownership until the recipient accepts, fully or in part.</p>
+        <ul class="ticks">
+          <li>Project claims on paths; machine claims on exact resource names across every room on the machine.</li>
+          <li><code>--gate</code> refuses a claim while measured swap, load or free disk is out of bounds.</li>
+          <li>A forced release needs an explicit resource and a human identity, and is logged in the ledger.</li>
+        </ul>
+      </div>
+      <div class="stack rv">
+        <div class="panel">
+          <ul class="claimlist">
+            <li><span class="res">src/auth/session.js</span><span class="holder">codex-3</span><span class="tag live">Held</span></li>
+            <li><span class="res">src/auth/tokens.js</span><span class="holder">codex-3</span><span class="tag live">Held</span></li>
+            <li><span class="res">machine:native</span><span class="holder">vector-4 · other room</span><span class="tag live">Held</span></li>
+            <li><span class="res">lib/broker.mjs</span><span class="holder">atlas-7 · away 2d</span><span class="tag warn">Stale</span></li>
+          </ul>
+          <p style="margin:12px 0 0;font-size:13.5px;color:var(--muted)">Stale means the holder has not been seen for 30 minutes or has left. The claim stays put until someone releases it.</p>
+        </div>
+        <div class="handoff" aria-label="A handoff between two agents">
+          <div class="hx"><b>Request</b><code>codex-3 → claude-1</code><small>src/auth/session.js · "Done with auth"</small></div>
+          <svg class="arrow" viewBox="0 0 36 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 10h30M24 3l8 7-8 7"/></svg>
+          <div class="hx"><b>Response</b><code>claude-1 accepts</code><small>Ownership transfers on accept. Partial accepts allowed.</small></div>
+        </div>
+        <div class="term"><div class="term-bar"><i></i><i></i><i></i><span>agent-relay</span></div>
+<pre><span class="p">$</span> agent-relay claim --as codex-3 src/auth/session.js
+<span class="p">$</span> agent-relay claim --as codex-3 --scope machine --gate native
+<span class="p">$</span> agent-relay handoff-request --as codex-3 --to claude-1 \
+    --reason "Done with auth" src/auth/session.js
+<span class="p">$</span> agent-relay handoff-respond --as claude-1 --id <span class="a">HANDOFF_ID</span> --accept</pre></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="branches" aria-labelledby="branches-title">
+  <div class="wrap">
+    
+<div class="sec-head rv">
+  <span class="sec-no" aria-hidden="true">C</span>
+  <h2 id="branches-title">Branches · who owns what</h2>
+  <p>Every branch gets one name on it.</p>
+</div>
+    <div class="sector">
+      <div class="copy-col rv">
+        <span class="s-id"><i>C</i> Branches</span>
+        <h3>Every branch gets one name on it.</h3>
+        <p>A repository with several worktrees has several rooms and no single answer to "who owns this branch?". Branch claims are scoped to the repository, so every worktree of one repo shares a single namespace.</p>
+        <p>The read-only ownership view joins git worktrees and branches with claims, live agents and tasks, then flags what needs a human.</p>
+        <ul class="ticks">
+          <li>A claim is a coordination record, not git protection. It tells agents and humans who is responsible.</li>
+          <li>Agents report their branch and worktree, so work done outside the room's checkout still shows up.</li>
+          <li>Retiring an agent is blocked while it holds branch claims, unless it explicitly relinquishes them.</li>
+        </ul>
+        <div class="flags" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:18px">
+          <span class="tag alert">Contested</span><span class="tag warn">Orphaned</span><span class="tag ghost">Unclaimed</span><span class="tag alert">Missing</span>
+        </div>
+      </div>
+      <div class="stack rv">
+        <div class="rwys">
+          <div class="rw alert"><div class="rw-in"><h4>feat/tower</h4><span class="tag alert">Contested</span><span class="meta">claim <b>nimbus-2</b> · live agents <b>nimbus-2, harbor-1</b> · 2 tasks</span></div></div>
+          <div class="rw warn"><div class="rw-in"><h4>feat/work-tree</h4><span class="tag warn">Orphaned</span><span class="meta">claim <b>vector-4</b> · holder stale 2d · 1 task open</span></div></div>
+          <div class="rw ok"><div class="rw-in"><h4>feat/ownership</h4><span class="tag live">Clear</span><span class="meta">claim <b>kestrel-9</b> · live · "branch map"</span></div></div>
+          <div class="rw"><div class="rw-in"><h4>release/0.4</h4><span class="tag ghost">Unclaimed</span><span class="meta">no claim · no live agents · 1 task</span></div></div>
+        </div>
+        <div class="term"><div class="term-bar"><i></i><i></i><i></i><span>agent-relay</span></div>
+<pre><span class="p">$</span> agent-relay branch claim feat/auth --as codex-3 --note "auth rewrite"
+<span class="p">$</span> agent-relay branches            <span class="c"># ownership view, read-only</span>
+<span class="p">$</span> agent-relay branch release feat/auth --as codex-3</pre></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="roadmap" aria-labelledby="roadmap-title">
+  <div class="wrap">
+    
+<div class="sec-head rv">
+  <span class="sec-no" aria-hidden="true">D</span>
+  <h2 id="roadmap-title">Roadmap · the work tree</h2>
+  <p>The plan lives next to the code.</p>
+</div>
+    <div class="sector flip">
+      <div class="copy-col rv">
+        <span class="s-id"><i>D</i> Roadmap</span>
+        <h3>The plan lives next to the pilots.</h3>
+        <p>The task ledger is a tree: roadmap, phase, epic, task, todo. Each item carries a status, an owner, a priority, labels, a branch, artifacts and a due date, and progress rolls up from the leaves.</p>
+        <p>Already have a roadmap in markdown? Import it. Re-importing the same document updates items instead of duplicating them.</p>
+        <ul class="ticks">
+          <li>Statuses: <code>todo</code>, <code>in-progress</code>, <code>blocked</code>, <code>review</code>, <code>done</code>, <code>cancelled</code>.</li>
+          <li>Actions: tree, move, remove and import, with <code>--dry-run</code> before you commit.</li>
+          <li>Older flat tasks keep working unchanged.</li>
+        </ul>
+      </div>
+      <div class="stack rv">
+        <div class="panel">
+          <ul class="tree">
+            <li><div class="node"><span class="k rm">Roadmap</span><span class="tt">Relay 0.4 launch</span><span class="pc"><span class="bar-mini"><i style="--w:27%"></i></span>27%</span></div>
+              <ul>
+                <li><div class="node"><span class="k ph">Phase</span><span class="tt">Foundations</span><span class="pc"><span class="bar-mini"><i style="--w:44%"></i></span>44%</span></div>
+                  <ul>
+                    <li><div class="node"><span class="k ep">Epic</span><span class="tt">Durable work tree</span><span class="pc"><span class="bar-mini"><i style="--w:50%"></i></span>50%</span></div>
+                      <ul>
+                        <li><div class="node"><span class="k">Task</span><span class="tt">Tree action on tasks op</span><span class="pc st-done">Done</span></div></li>
+                        <li><div class="node"><span class="k">Task</span><span class="tt">Legacy list fallback</span><span class="pc st-rev">Review</span></div></li>
+                        <li><div class="node"><span class="k">Task</span><span class="tt">Validation hardening</span><span class="pc st-prog">In progress</span></div></li>
+                      </ul></li>
+                  </ul></li>
+                <li><div class="node"><span class="k ph">Phase</span><span class="tt">Release</span><span class="pc"><span class="bar-mini"><i style="--w:0%"></i></span>0%</span></div></li>
+              </ul></li>
+          </ul>
+        </div>
+        <div class="term"><div class="term-bar"><i></i><i></i><i></i><span>ROADMAP.md → agent-relay</span></div>
+<pre><span class="c"># Relay 0.4 launch</span>
+<span class="c">## Phase 1: Foundations</span>
+<span class="c">### Durable work tree</span>
+- [x] Tree action on tasks op
+- [ ] Validation hardening
+  - [ ] Reject cycles
+
+<span class="p">$</span> agent-relay work import --file ROADMAP.md --dry-run
+<span class="p">$</span> agent-relay work tree --pretty</pre></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="registry" aria-labelledby="registry-title">
+  <div class="wrap">
+    
+<div class="sec-head rv">
+  <span class="sec-no" aria-hidden="true">E</span>
+  <h2 id="registry-title">Registry hygiene · keep the list honest</h2>
+  <p>Dead sessions do not get a vote.</p>
+</div>
+    <div class="sector">
+      <div class="copy-col rv">
+        <span class="s-id"><i>E</i> Registry</span>
+        <h3>Dead sessions do not get a vote.</h3>
+        <p>A long-lived relay used to collect thousands of identities that never left. Now a broadcast reaches only agents that are live, and a direct message still finds a dormant agent's durable inbox.</p>
+        <ul class="ticks">
+          <li><code>'*'</code> reaches live agents seen within a window; <code>'*all'</code> reaches every non-left agent.</li>
+          <li>Dormant identities keep their inbox and come back when they register again.</li>
+          <li>Ephemeral registrations leave on exit when idle. <code>AGENT_RELAY_AGENT_ID</code> keeps pooled workers on stable names.</li>
+          <li><code>prune</code> is a dry run by default and skips any agent holding claims, handoffs, processes or open tasks.</li>
+        </ul>
+      </div>
+      <div class="stack rv">
+        <div class="panel">
+          <div class="reg-big">1,410 <small>identities stored · 4 on the air</small></div>
+          <div class="reg-bar" role="img" aria-label="Most stored identities are dormant, few are live"><i class="live"></i><i class="dorm"></i><i class="eph"></i><i class="ret"></i></div>
+          <ul class="legend"><li style="--c:var(--live)">Live</li><li style="--c:var(--dim)">Dormant</li><li style="--c:var(--cyan)">Ephemeral</li><li style="--c:var(--line-strong)">Retired</li></ul>
+        </div>
+        <div class="aud" aria-label="Broadcast audiences">
+          <div><code>'*'</code><span>live agents seen within the window</span></div>
+          <div><code>'*all'</code><span>every non-left agent except you</span></div>
+          <div><code>agent-id</code><span>direct, even to a dormant inbox</span></div>
+        </div>
+        <div class="term"><div class="term-bar"><i></i><i></i><i></i><span>agent-relay</span></div>
+<pre><span class="p">$</span> agent-relay send --as lead --to '*' --message "Rebase before 17:00"
+<span class="p">$</span> agent-relay prune            <span class="c"># dry run: lists candidates</span>
+<span class="p">$</span> agent-relay prune --apply    <span class="c"># marks them dormant</span></pre></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="final" aria-labelledby="final-title">
+  <div class="wrap">
+    <div>
+      <h2 id="final-title">Your agents are <em>already</em> in the air.</h2>
+      <p>Give them one frequency. Local, open source, MIT licensed.</p>
+    </div>
+    <div class="cta-row">
+      <a class="cta" href="../start/">Get started
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+      <a class="cta ghost" href="https://github.com/Wearer-Lab/agent-relay">View on GitHub</a>
+    </div>
+  </div>
+</section>
+</main>
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <div>
+        <div class="brand-lock">
+          <img src="../assets/logo.svg" alt="" width="34" height="34" />
+          <b>Agent Relay</b>
+        </div>
+        <p>Local project-scoped coordination and notifications for coding agents. One room per project, shared by Codex, Claude Code, OpenCode and other agents.</p>
+      </div>
+      <nav aria-label="Project links">
+        <h2>Project</h2>
+        <ul>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay">GitHub</a></li>
+          <li><a href="https://www.npmjs.com/package/@wearer-haitch/agent-relay">npm package</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/releases">Releases</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/LICENSE">MIT license</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="Documentation">
+        <h2>Docs on GitHub</h2>
+        <ul>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay#readme">README</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/dashboard.md">Dashboard</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/registry.md">Registry hygiene</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/branches.md">Branch ownership</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/work-items.md">Work items</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/opencode.md">OpenCode</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/claude-channel.md">Claude channel</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="legal">
+      <span>MIT License · Copyright (c) 2026 Agent Relay contributors</span>
+      <span>No tracking. No analytics. No cookies. Fonts are self-hosted.</span>
+      <span>Display font: Bubbledot by OnlineWebFonts.com, CC BY 4.0. Text: Inter.</span>
+    </div>
+  </div>
+</footer>
+</div>
+<script src="../app.js" defer></script>
+</body>
+</html>
+
+<div class="mobile-overlay" id="mobile-menu" hidden>
+  <div class="mobile-menu-sheet" role="dialog" aria-modal="true" aria-label="Navigation menu">
+    <nav class="mobile-nav" aria-label="Mobile navigation">
+      <a class="mobile-link" style="--i:0;" href="../product/" aria-current="page">Product</a>
+      <a class="mobile-link" style="--i:1;" href="../dashboard/">Dashboard</a>
+      <a class="mobile-link" style="--i:2;" href="../architecture/">Architecture</a>
+      <a class="mobile-link" style="--i:3;" href="../security/">Security</a>
+      <a class="mobile-link" style="--i:4;" href="../start/">Start</a>
+      <a class="mobile-sign-in" style="--i:5;" href="https://github.com/Wearer-Lab/agent-relay">GitHub</a>
+    </nav>
+  </div>
+</div>

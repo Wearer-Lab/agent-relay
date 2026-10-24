@@ -4,6 +4,23 @@ All notable changes to `@wearer-haitch/agent-relay` are recorded here. The forma
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-24
+
+### Changed
+
+- **One design language for the website, the dashboard and the mark.** The landing page, the dashboard and the favicon now share one design system: a black canvas, floating white pills, a dot-matrix display face for headings (Bubbledot, with Geist Pixel Circle as the local fallback), Inter for prose and a monospaced face for data. Every font is self-hosted, so nothing is fetched from a third party. The mark is an SVG (a white relay cross on black) instead of an inline radar drawing.
+- **The tower vocabulary is gone.** The dashboard views are now **Overview** (`/`), **Roadmap** (`/roadmap/`), **Branches** (`/branches/`), **Agents** (`/agents/`), **Messages** (`/messages/`) and **Claims** (`/claims/`). The room picker says *Project*, the clock says *UTC*, and "on the air" is now "running". The product name, Agent Relay, is unchanged: a relay is a relay.
+- **Real URLs everywhere.**
+  - The website is six pages instead of one long page: `/`, `/product/`, `/dashboard/`, `/architecture/`, `/security/` and `/start/`. It is still a static site with no build step and no router.
+  - Every dashboard view is its own path: `/`, `/roadmap/`, `/branches/`, `/agents/`, `/messages/` and `/claims/`. The shell is served for all of them, so a reload, a copied link and browser Back and Forward land on the same view. A path without its trailing slash redirects to the canonical one.
+  - The dashboard serves its assets from `/assets/*` and its read-only feeds from `/api/v1/*` (`projects`, `snapshot`, `history`, `work`, `ownership`, `usage`).
+  - The broker answers `POST /api/v1/rpc`. `/rpc` still works, so a broker started by an older release keeps serving the clients it already has; the discovery file records which endpoint a broker speaks and the CLI follows it.
+
+### Added
+
+- `site/assets/logo.svg` and `lib/dashboard/assets/logo.svg`: the Agent Relay mark, used by the page header, the dashboard header and the favicon.
+- Three landing page directions under `site/variants/` for review: problem-first, the first-person story, and one-workspace. They are marked `noindex` and are drafts, not published pages.
+
 ## [0.5.0] - 2026-10-17
 
 ### Changed

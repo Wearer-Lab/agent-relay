@@ -1,23 +1,24 @@
 <!doctype html>
 <html lang="en" data-theme="dark">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark light"><title>Agent Relay · Tower</title>
-<script src="/theme.js"></script><link rel="stylesheet" href="/dashboard.css"><script src="/model.js" defer></script><script src="/dashboard.js" defer></script>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark light"><title>Agent Relay · Dashboard</title>
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<script src="/assets/theme.js"></script><link rel="stylesheet" href="/assets/dashboard.css"><script src="/assets/model.js" defer></script><script src="/assets/dashboard.js" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
 <div class="shell">
 <header class="bar">
-<a class="brand" href="/" aria-label="Agent Relay tower">
-<svg class="brand-mark" viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><circle cx="16" cy="16" r="13" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="16" cy="16" r="7.5" fill="none" stroke="currentColor" stroke-width="1" opacity=".55"/><g class="sweep"><path d="M16 16 L16 3 A13 13 0 0 1 27.3 9.5 Z" fill="currentColor" opacity=".35"/><path d="M16 16 L27.3 9.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></g><circle cx="21" cy="21" r="1.7" fill="currentColor"/><circle cx="10.5" cy="12" r="1.2" fill="currentColor" opacity=".7"/></svg>
-<span class="brand-text"><b>Agent Relay</b><i>Tower · read-only</i></span>
+<a class="brand" href="/" aria-label="Agent Relay dashboard">
+<span class="brand-mark"><img src="/assets/logo.svg" alt="" width="38" height="38" /></span>
+<span class="brand-text"><b>Agent Relay</b><i>Dashboard · read-only</i></span>
 </a>
 <details id="rooms-menu" class="rooms">
-<summary><span class="k">Frequency</span><span id="room-name" class="room-name">Scanning…</span><span class="caret" aria-hidden="true"></span></summary>
+<summary><span class="k">Project</span><span id="room-name" class="room-name">Scanning…</span><span class="caret" aria-hidden="true"></span></summary>
 <div class="rooms-panel"><p class="rooms-head"><span>Project rooms on this broker</span><span id="projects-count">Discovering rooms…</span></p><div id="projects" class="projects"></div></div>
 </details>
 <div class="bar-end">
-<span class="zulu" aria-hidden="true"><span class="k">Zulu</span><time id="zulu">--:--:--</time></span>
+<span class="zulu" aria-hidden="true"><span class="k">UTC</span><time id="zulu">--:--:--</time></span>
 <span class="connection" id="connection" role="status">Connecting…</span>
 <button id="pause" type="button">Pause updates</button>
 <label class="theme-control"><span class="sr-only">Color theme</span><select id="theme" aria-label="Color theme"><option value="dark">Dark</option><option value="light">Light</option><option value="system">System</option></select></label>
@@ -25,81 +26,81 @@
 </header>
 <nav class="rail" aria-label="Views">
 <ol class="rail-list">
-<li><button type="button" id="nav-tower" data-view="tower"><span class="n">1</span><span class="lbl">Tower</span><span class="cnt" id="count-tower" hidden></span></button></li>
-<li><button type="button" id="nav-plan" data-view="plan"><span class="n">2</span><span class="lbl">Plan</span><span class="cnt" id="count-plan" hidden></span></button></li>
-<li><button type="button" id="nav-runways" data-view="runways"><span class="n">3</span><span class="lbl">Runways</span><span class="cnt" id="count-runways" hidden></span></button></li>
-<li><button type="button" id="nav-strips" data-view="strips"><span class="n">4</span><span class="lbl">Strips</span><span class="cnt" id="count-strips" hidden></span></button></li>
-<li><button type="button" id="nav-log" data-view="log"><span class="n">5</span><span class="lbl">Radio</span><span class="cnt" id="count-log" hidden></span></button></li>
-<li><button type="button" id="nav-claims" data-view="claims"><span class="n">6</span><span class="lbl">Claims</span><span class="cnt" id="count-claims" hidden></span></button></li>
+<li><a href="/" id="nav-overview" data-view="overview"><span class="n">1</span><span class="lbl">Overview</span><span class="cnt" id="count-overview" hidden></span></a></li>
+<li><a href="/roadmap/" id="nav-roadmap" data-view="roadmap"><span class="n">2</span><span class="lbl">Roadmap</span><span class="cnt" id="count-roadmap" hidden></span></a></li>
+<li><a href="/branches/" id="nav-branches" data-view="branches"><span class="n">3</span><span class="lbl">Branches</span><span class="cnt" id="count-branches" hidden></span></a></li>
+<li><a href="/agents/" id="nav-agents" data-view="agents"><span class="n">4</span><span class="lbl">Agents</span><span class="cnt" id="count-agents" hidden></span></a></li>
+<li><a href="/messages/" id="nav-messages" data-view="messages"><span class="n">5</span><span class="lbl">Messages</span><span class="cnt" id="count-messages" hidden></span></a></li>
+<li><a href="/claims/" id="nav-claims" data-view="claims"><span class="n">6</span><span class="lbl">Claims</span><span class="cnt" id="count-claims" hidden></span></a></li>
 </ol>
 <p class="rail-note">Updates every 3 seconds<br><span class="keys">keys <kbd>1</kbd>–<kbd>6</kbd> <kbd>/</kbd> <kbd>p</kbd></span></p>
 </nav>
 <main id="main" tabindex="-1">
 <div id="error" class="error" role="alert" hidden></div>
 
-<section id="view-tower" class="view" data-view="tower" aria-labelledby="h-tower">
-<header class="view-head rise"><div><p class="kicker">Overview</p><h1 id="h-tower">Tower</h1></div><p id="project" class="project">Waiting for the project…</p></header>
+<section id="view-overview" class="view" data-view="overview" aria-labelledby="h-overview">
+<header class="view-head rise"><div><p class="kicker">Fleet</p><h1 id="h-overview">Overview</h1></div><p id="project" class="project">Waiting for the project…</p></header>
 <section id="welcome" class="panel welcome" aria-labelledby="h-welcome" hidden>
-<div class="panel-head"><h2 id="h-welcome">Quiet frequency</h2></div>
+<div class="panel-head"><h2 id="h-welcome">Quiet room</h2></div>
 <p class="lede" id="welcome-lede"></p>
 <ol class="steps"><li><span>Start a runner in the project</span><code>agent-relay launch claude</code></li><li><span>Or only configure the runners</span><code>agent-relay setup</code></li></ol>
-<p class="note">The runner registers itself, so it appears as a strip. Messages, claims, branches and roadmap items show up here as agents create them.</p>
+<p class="note">The runner registers itself, so it appears as an agent. Messages, claims, branches and roadmap items show up here as agents create them.</p>
 </section>
 <div class="gauges" id="gauges">
-<button type="button" class="gauge rise" data-go="strips" data-fk="g-live"><span class="g-label">On the air</span><strong id="agents-count">—</strong><span class="g-sub" id="agents-sub">live agents</span></button>
-<button type="button" class="gauge rise" data-go="log" data-fk="g-pending"><span class="g-label">Awaiting ack</span><strong id="pending-count">—</strong><span class="g-sub">pending deliveries</span></button>
+<button type="button" class="gauge rise" data-go="agents" data-fk="g-live"><span class="g-label">Running</span><strong id="agents-count">—</strong><span class="g-sub" id="agents-sub">live agents</span></button>
+<button type="button" class="gauge rise" data-go="messages" data-fk="g-pending"><span class="g-label">Awaiting ack</span><strong id="pending-count">—</strong><span class="g-sub">pending deliveries</span></button>
 <button type="button" class="gauge rise" data-go="claims" data-fk="g-claims"><span class="g-label">Claims</span><strong id="claims-count">—</strong><span class="g-sub" id="claims-sub">files and resources</span></button>
-<button type="button" class="gauge rise" data-go="runways" data-fk="g-conflicts"><span class="g-label">Branch flags</span><strong id="conflicts-count">—</strong><span class="g-sub" id="conflicts-sub">ownership map</span></button>
-<button type="button" class="gauge rise gauge-ring" data-go="plan" data-fk="g-plan"><span class="g-label">Flight plan</span><strong id="plan-count">—</strong><span class="g-sub" id="plan-sub">roadmap progress</span><span class="ring" id="plan-ring" aria-hidden="true"></span></button>
-<button type="button" class="gauge rise" data-go="log" data-fk="g-messages"><span class="g-label">Transmissions</span><strong id="messages-count">—</strong><span class="g-sub">retained messages</span></button>
+<button type="button" class="gauge rise" data-go="branches" data-fk="g-conflicts"><span class="g-label">Branch flags</span><strong id="conflicts-count">—</strong><span class="g-sub" id="conflicts-sub">ownership map</span></button>
+<button type="button" class="gauge rise gauge-ring" data-go="roadmap" data-fk="g-plan"><span class="g-label">Roadmap</span><strong id="plan-count">—</strong><span class="g-sub" id="plan-sub">roadmap progress</span><span class="ring" id="plan-ring" aria-hidden="true"></span></button>
+<button type="button" class="gauge rise" data-go="messages" data-fk="g-messages"><span class="g-label">Messages</span><strong id="messages-count">—</strong><span class="g-sub">retained messages</span></button>
 </div>
 <div class="tower-grid">
-<section class="panel rise registry" aria-labelledby="h-registry"><div class="panel-head"><h2 id="h-registry">Registry hygiene</h2><span id="registry-note" class="note">Identities versus agents actually on the air</span></div><div id="registry"></div></section>
+<section class="panel rise registry" aria-labelledby="h-registry"><div class="panel-head"><h2 id="h-registry">Registry hygiene</h2><span id="registry-note" class="note">Identities versus agents actually running</span></div><div id="registry"></div></section>
 <section class="panel rise attention" aria-labelledby="h-attention"><div class="panel-head"><h2 id="h-attention">Needs attention</h2></div><ul id="attention" class="attention-list"></ul></section>
-<section class="panel rise traffic" aria-labelledby="h-traffic"><div class="panel-head"><h2 id="h-traffic">Live traffic</h2><button type="button" class="link" data-go="strips">All strips</button></div><div id="traffic" class="strips compact"></div></section>
-<section class="panel rise recent" aria-labelledby="h-recent"><div class="panel-head"><h2 id="h-recent">Last transmissions</h2><button type="button" class="link" data-go="log">Radio log</button></div><ol id="recent" class="recent"></ol></section>
+<section class="panel rise traffic" aria-labelledby="h-traffic"><div class="panel-head"><h2 id="h-traffic">Running now</h2><button type="button" class="link" data-go="agents">All agents</button></div><div id="traffic" class="strips compact"></div></section>
+<section class="panel rise recent" aria-labelledby="h-recent"><div class="panel-head"><h2 id="h-recent">Recent messages</h2><button type="button" class="link" data-go="messages">All messages</button></div><ol id="recent" class="recent"></ol></section>
 </div>
 </section>
 
-<section id="view-plan" class="view" data-view="plan" aria-labelledby="h-plan" hidden>
-<header class="view-head rise"><div><p class="kicker">Roadmap</p><h1 id="h-plan">Flight plan</h1></div><p id="plan-meta" class="project"></p></header>
+<section id="view-roadmap" class="view" data-view="roadmap" aria-labelledby="h-roadmap" hidden>
+<header class="view-head rise"><div><p class="kicker">Work</p><h1 id="h-roadmap">Roadmap</h1></div><p id="roadmap-meta" class="project"></p></header>
 <div class="toolbar rise">
 <div class="segmented" role="group" aria-label="Layout"><button type="button" id="plan-mode-tree" aria-pressed="true">Tree</button><button type="button" id="plan-mode-lanes" aria-pressed="false">Lanes</button></div>
-<label class="field"><span class="sr-only">Search work items</span><input id="plan-q" type="search" placeholder="Search work"></label>
-<label class="field"><span class="sr-only">Status</span><select id="plan-status"><option value="">Any status</option></select></label>
-<label class="field"><span class="sr-only">Owner</span><select id="plan-owner"><option value="">Any owner</option></select></label>
-<label class="field"><span class="sr-only">Branch</span><select id="plan-branch"><option value="">Any branch</option></select></label>
-<label class="field"><span class="sr-only">Label</span><select id="plan-label"><option value="">Any label</option></select></label>
+<label class="field"><span class="sr-only">Search work items</span><input id="roadmap-q" type="search" placeholder="Search work"></label>
+<label class="field"><span class="sr-only">Status</span><select id="roadmap-status"><option value="">Any status</option></select></label>
+<label class="field"><span class="sr-only">Owner</span><select id="roadmap-owner"><option value="">Any owner</option></select></label>
+<label class="field"><span class="sr-only">Branch</span><select id="roadmap-branch"><option value="">Any branch</option></select></label>
+<label class="field"><span class="sr-only">Label</span><select id="roadmap-label"><option value="">Any label</option></select></label>
 <span class="spacer"></span>
 <button type="button" id="plan-expand">Expand all</button><button type="button" id="plan-collapse">Collapse all</button><button type="button" id="plan-reset">Reset filters</button>
 </div>
-<div id="plan-summary" class="plan-summary rise"></div>
-<div id="plan-tree" class="plan-tree"></div>
-<div id="plan-lanes" class="lanes" hidden></div>
+<div id="roadmap-summary" class="plan-summary rise"></div>
+<div id="roadmap-tree" class="plan-tree"></div>
+<div id="roadmap-lanes" class="lanes" hidden></div>
 </section>
 
-<section id="view-runways" class="view" data-view="runways" aria-labelledby="h-runways" hidden>
-<header class="view-head rise"><div><p class="kicker">Branch ownership</p><h1 id="h-runways">Runways</h1></div><p id="runways-meta" class="project"></p></header>
-<div class="toolbar rise"><div class="chips" id="runway-chips" role="group" aria-label="Filter by flag"></div><span class="spacer"></span><label class="field"><span class="sr-only">Search branches</span><input id="runway-q" type="search" placeholder="Search branches, owners, tasks"></label></div>
-<div id="runways" class="runways"></div>
+<section id="view-branches" class="view" data-view="branches" aria-labelledby="h-branches" hidden>
+<header class="view-head rise"><div><p class="kicker">Ownership</p><h1 id="h-branches">Branches</h1></div><p id="branches-meta" class="project"></p></header>
+<div class="toolbar rise"><div class="chips" id="branch-chips" role="group" aria-label="Filter by flag"></div><span class="spacer"></span><label class="field"><span class="sr-only">Search branches</span><input id="branch-q" type="search" placeholder="Search branches, owners, tasks"></label></div>
+<div id="branches" class="runways"></div>
 <div id="unassigned"></div>
 </section>
 
-<section id="view-strips" class="view" data-view="strips" aria-labelledby="h-strips" hidden>
-<header class="view-head rise"><div><p class="kicker">Agent fleet</p><h1 id="h-strips">Strips</h1></div><p id="strips-meta" class="project"></p></header>
-<div class="toolbar rise"><label class="switch"><input id="live-only" type="checkbox"><span>Show only live</span></label><label class="field"><span class="sr-only">Search agents</span><input id="strip-q" type="search" placeholder="Search callsigns, runners, tasks"></label></div>
+<section id="view-agents" class="view" data-view="agents" aria-labelledby="h-agents" hidden>
+<header class="view-head rise"><div><p class="kicker">Fleet</p><h1 id="h-agents">Agents</h1></div><p id="agents-meta" class="project"></p></header>
+<div class="toolbar rise"><label class="switch"><input id="live-only" type="checkbox"><span>Show only running</span></label><label class="field"><span class="sr-only">Search agents</span><input id="agent-q" type="search" placeholder="Search agents, runners, tasks"></label></div>
 <div id="agents" class="strips"><p class="empty">Loading agents…</p></div>
-<p class="footnote">Live comes from the broker's liveness report where available; otherwise from a connected transport or a recorded update in the last five minutes. It is not a verified connection.</p>
+<p class="footnote">Running comes from the broker's liveness report where available; otherwise from a connected transport or a recorded update in the last five minutes. It is not a verified connection.</p>
 </section>
 
-<section id="view-log" class="view" data-view="log" aria-labelledby="h-log" hidden>
-<header class="view-head rise"><div><p class="kicker">Conversation</p><h1 id="h-log">Radio log</h1></div><p id="message-range" class="project">Latest 100 messages</p></header>
+<section id="view-messages" class="view" data-view="messages" aria-labelledby="h-messages" hidden>
+<header class="view-head rise"><div><p class="kicker">Conversation</p><h1 id="h-messages">Messages</h1></div><p id="message-range" class="project">Latest 100 messages</p></header>
 <div class="toolbar rise"><label class="field grow"><span class="sr-only">Search messages</span><input id="search" type="search" placeholder="Search messages or agent IDs  ( / )"></label><label class="field"><span class="sr-only">Filter by agent</span><select id="agent-filter"><option value="">All agents</option></select></label><label class="switch pending-filter"><input id="pending-only" type="checkbox"><span>Unacknowledged</span></label></div>
 <div id="messages" class="messages"><p class="empty">Loading conversation…</p></div>
 </section>
 
 <section id="view-claims" class="view" data-view="claims" aria-labelledby="h-claims" hidden>
-<header class="view-head rise"><div><p class="kicker">Cooperative ownership</p><h1 id="h-claims">Claimed resources</h1></div><p id="claims-meta" class="project"></p></header>
+<header class="view-head rise"><div><p class="kicker">Ownership</p><h1 id="h-claims">Claims</h1></div><p id="claims-meta" class="project"></p></header>
 <div class="table-scroll rise"><table class="claims-table"><thead><tr><th scope="col">Resource</th><th scope="col">Owner</th><th scope="col">Claimed</th><th scope="col">State</th></tr></thead><tbody id="claims"></tbody></table></div>
 <p id="no-claims" class="empty" hidden>No resources are currently claimed.</p>
 </section>

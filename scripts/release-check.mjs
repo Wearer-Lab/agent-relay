@@ -34,7 +34,7 @@ try{
   }
   for(const file of packed.files.filter(f=>/^docs\/[^/]+\.md$/.test(f.path)))assert.ok(PUBLIC_DOCS.includes(file.path),`Unexpected published doc: ${file.path}`);
   for(const doc of PUBLIC_DOCS)assert.ok(packed.files.some(f=>f.path===doc),`Missing public doc ${doc}`);
- for(const required of ['bin/agent-relay.mjs','lib/setup.mjs','lib/tool-pages.mjs','lib/dashboard.mjs','lib/observability.mjs','lib/dashboard/index.html','lib/dashboard/dashboard.css','lib/dashboard/dashboard.js','lib/dashboard/theme.js','lib/dashboard/model.js','lib/registry.mjs','lib/ownership.mjs','lib/workitems.mjs','CHANGELOG.md','npm-shrinkwrap.json'])assert.ok(packed.files.some(f=>f.path===required),`Missing ${required}`);
+ for(const required of ['bin/agent-relay.mjs','lib/setup.mjs','lib/tool-pages.mjs','lib/dashboard.mjs','lib/observability.mjs','lib/dashboard/index.html','lib/dashboard/assets/dashboard.css','lib/dashboard/assets/dashboard.js','lib/dashboard/assets/theme.js','lib/dashboard/assets/model.js','lib/dashboard/assets/logo.svg','lib/dashboard/assets/favicon.svg','lib/dashboard/assets/fonts/BubbledotICG-FinePos.woff2','lib/dashboard/assets/fonts/GeistPixel-Circle.woff2','lib/dashboard/assets/fonts/Inter-latin.woff2','lib/registry.mjs','lib/ownership.mjs','lib/workitems.mjs','CHANGELOG.md','npm-shrinkwrap.json'])assert.ok(packed.files.some(f=>f.path===required),`Missing ${required}`);
  // Validate the extracted artifact, rather than loading the source checkout.
  await exec('tar',['-xzf',path.join(tmp,packed.filename),'-C',tmp]);
  const cli=path.join(tmp,'package','bin','agent-relay.mjs');
@@ -42,7 +42,7 @@ try{
  // is a separate registry/dependency-resolution check in the publishing guide.
  await fs.symlink(path.join(root,'node_modules'),path.join(tmp,'package','node_modules'),process.platform==='win32'?'junction':'dir');
  const version=await exec(process.execPath,[cli,'--version']);assert.equal(version.stdout.trim(),pkg.version);
- for(const script of ['dashboard.js','theme.js','model.js'])await exec(process.execPath,['--check',path.join(tmp,'package','lib','dashboard',script)]);
+ for(const script of ['dashboard.js','theme.js','model.js'])await exec(process.execPath,['--check',path.join(tmp,'package','lib','dashboard','assets',script)]);
  const help=await exec(process.execPath,[cli,'--help']);assert.ok(help.stdout.includes('npx --yes @wearer-haitch/agent-relay launch'));
  console.log(`Verified ${packed.filename}: ${packed.files.length} files, ${(packed.size/1024).toFixed(1)} KiB, CLI help/version pass.`);
 }finally{await fs.rm(tmp,{recursive:true,force:true});}

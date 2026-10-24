@@ -18,43 +18,45 @@ The dashboard runs in the foreground and opens the default browser. Use
 Ctrl+C to stop the dashboard. Agent sessions and the broker continue running.
 A permanent npm installation is optional.
 
-## The tower
+## The dashboard
 
-The dashboard is an air traffic control room for a fleet of coding agents.
-Agents are flight strips, branches are runways, messages are the radio log, and
-the roadmap is the flight plan. It is strictly read-only: it never sends a
-message, claims a resource, changes a status, or acknowledges anything.
+The dashboard is a window onto every project room on the broker: which agents
+are running, which files and branches are claimed, what is waiting for an
+answer, and where the roadmap stands. It is strictly read-only: it never sends
+a message, claims a resource, changes a status, or acknowledges anything.
 
-| Key | View | What it shows |
-| --- | --- | --- |
-| `1` | **Tower** | Fleet health at a glance: agents on the air versus identities stored, pending acknowledgements, claims, branch conflicts, roadmap progress, a registry hygiene bar, a "needs attention" board and the latest transmissions. |
-| `2` | **Plan** (flight plan) | The roadmap tree (roadmap, phase, epic, task, todo) with rolled-up progress, a lanes (kanban) layout, and filters for status, owner, branch, label and text. |
-| `3` | **Runways** | Branch ownership: who holds each branch, which agents and tasks are attached, which worktrees check it out, and prominent `contested`, `missing`, `orphaned` and `unclaimed` flags. The header names the repository (its folder, never `.git`) with the full path on hover. |
-| `4` | **Strips** | Every agent as a strip: live, idle or dormant, reported status and task, transport, pending acknowledgements and claims. A switch shows only live agents. |
-| `5` | **Radio** | The conversation: threads, per-recipient receipts, search, an unacknowledged filter and paging back through older history. |
-| `6` | **Claims** | Claimed files and shared resources, with stale holders marked. |
+| Key | View | URL | What it shows |
+| --- | --- | --- | --- |
+| `1` | **Overview** | `/` | Fleet health at a glance: running agents versus identities stored, pending acknowledgements, claims, branch flags, roadmap progress, a registry hygiene bar, a "needs attention" board and the latest messages. |
+| `2` | **Roadmap** | `/roadmap/` | The work tree (roadmap, phase, epic, task, todo) with rolled-up progress, a lanes (kanban) layout, and filters for status, owner, branch, label and text. |
+| `3` | **Branches** | `/branches/` | Branch ownership: who holds each branch, which agents and tasks are attached, which worktrees check it out, and prominent `contested`, `missing`, `orphaned` and `unclaimed` flags. The header names the repository (its folder, never `.git`) with the full path on hover. |
+| `4` | **Agents** | `/agents/` | Every agent in the room: running, idle or dormant, reported status and task, transport, pending acknowledgements and claims. A switch shows only running agents. |
+| `5` | **Messages** | `/messages/` | The conversation: threads, per-recipient receipts, search, an unacknowledged filter and paging back through older history. |
+| `6` | **Claims** | `/claims/` | Claimed files and shared resources, with stale holders marked. |
 
 Press `/` to jump to message search, `p` to pause or resume updates, and `1`
-to `6` to switch views. The current view is kept in a `?view=` query
-parameter, so reloads and browser Back and Forward work. The access secret is
+to `6` to switch views. Every view is a URL of its own: the server serves the
+same shell for all of them and the router swaps the panels, so a reload, a
+copied link and browser Back and Forward all land on the same view. A path
+without its trailing slash redirects to the canonical one. The access secret is
 never placed in the URL path or query; see Access below.
 
-Select a project room from the **Frequency** menu in the header. Rooms are
+Select a project room from the **Project** menu in the header. Rooms are
 listed by their most recent recorded agent update, message or claim, each with
 its full canonical path so projects with the same folder name can be
 distinguished. Rooms appear when an agent registers, rather than merely when
 setup writes configuration. Saved rooms persist and remain readable if a
 project moves or its directory is removed.
 
-### Reading the Tower and the plan
+### Reading the Overview and the roadmap
 
 - **Branch flags** counts the branches that carry any flag. Its caption lists
   every flag kind that occurs with its count, most serious first (for example
   `1 contested · 1 missing · 2 orphaned · 3 unclaimed`), and says
   `all branches clear` when none do. The number matches the count on the
-  Runways rail item. Outside a git repository the card reads `not a git
+  Branches rail item. Outside a git repository the card reads `not a git
   repository`.
-- **Worktrees** on a runway list each checkout once, by folder name. A
+- **Worktrees** on a branch list each checkout once, by folder name. A
   `this room` chip marks the checkout of the room you are viewing, and a chip
   says whether any room is registered for that checkout (`room registered` or
   `no room`). The full path is in the tooltip.
@@ -72,10 +74,10 @@ project moves or its directory is removed.
 
 - A broker with no rooms, and a room where no agent has checked in, open with a
   short orientation card instead of a wall of zeros.
-- A project outside any git repository has an explanatory Runways view (claims
+- A project outside any git repository has an explanatory Branches view (claims
   that cannot be placed stay listed under Unassigned) and an inactive branch
   card.
-- A repository with no branches, a flight plan with no items (with the import
+- A repository with no branches, a roadmap with no items (with the import
   command to start one) and a branch map the broker truncated each say so.
 - Long branch names, agent ids, labels and paths wrap rather than overflow, down
   to 375 pixels wide.
@@ -83,7 +85,7 @@ project moves or its directory is removed.
 ## Registry hygiene
 
 A broker can hold far more identities than agents that are actually running.
-The tower makes that visible: the gauge counts agents on the air, and the
+The dashboard makes that visible: the gauge counts running agents, and the
 registry bar splits the stored identities into live, dormant, ephemeral and
 retired, with a callout for identities that could be pruned. When the broker
 reports a registry (`registry: {stored, live, dormant, retired, ephemeral,
@@ -99,16 +101,16 @@ is a verified process scan: statuses and tasks are self-reported.
 
 ## Optional data and older brokers
 
-The flight plan, runway ownership and storage headroom depend on broker
+The roadmap, branch ownership and storage headroom depend on broker
 operations that older brokers do not have. The dashboard feature-detects each
 one and degrades with a clear "not available on this broker" state rather than
 an error:
 
 | Endpoint | Broker operation | Fallback |
 | --- | --- | --- |
-| `GET /api/work?project=…` | `tasks` with `action: "tree"` | The flat task ledger (`action: "list"`) rendered as one root per task and marked as an older broker; `{available: false}` if neither works. |
-| `GET /api/ownership?project=…` | `ownership` | `{available: false}`. |
-| `GET /api/usage?project=…` | `usage` | `{available: false}`. |
+| `GET /api/v1/work?project=…` | `tasks` with `action: "tree"` | The flat task ledger (`action: "list"`) rendered as one root per task and marked as an older broker; `{available: false}` if neither works. |
+| `GET /api/v1/ownership?project=…` | `ownership` | `{available: false}`. |
+| `GET /api/v1/usage?project=…` | `usage` | `{available: false}`. |
 
 All three are authenticated, GET-only, project-scoped and support `ETag`
 conditional requests like the snapshot (a changing `generatedAt` does not
@@ -134,20 +136,23 @@ a warning until the next successful refresh.
 
 ## Appearance
 
-The dashboard provides Dark ("night tower": phosphor on slate green), Light
-("day tower": strip paper and grease-pencil ink), and System themes. Dark is
-the initial default. The header theme selector saves your choice locally; the
-System setting follows changes to the operating system's color preference. The
-preference is stored in browser storage and a non-sensitive local cookie so it
-can survive dashboard port changes. No setting is sent to an external service.
+The dashboard and the website share one design language: a black canvas,
+floating pills, a dot-matrix display face for headings and a quiet sans for
+prose, with a monospaced face for callsigns and data. Dark is the initial
+default; Light and System are also available. The
+header theme selector saves your choice locally; the System setting follows
+changes to the operating system's color preference. The preference is stored
+in browser storage and a non-sensitive local cookie so it can survive
+dashboard port changes. No setting is sent to an external service.
 
-Fonts are local stacks only (nothing is downloaded): a condensed display face,
-a monospaced face for callsigns and data, and a serif for message prose. Load
-animations run once per view and never replay on polling. They, and every
-transition, are disabled when the system asks for reduced motion. Everything
-is keyboard accessible with a visible focus ring on every control, and the layout
-works down to 375 pixels wide: the view switcher becomes a bottom bar and tables
-and strips restack, with no horizontal page scroll.
+Fonts are local files only (nothing is downloaded): Bubbledot for the display
+face, with Geist Pixel Circle as the fallback, Inter for prose and a system
+monospace for data. Load animations run once per view and never replay on
+polling. They, and every transition, are disabled when the system asks for
+reduced motion. Everything is keyboard accessible with a visible focus ring on
+every control, and the layout works down to 375 pixels wide: the view
+switcher becomes a bottom bar and tables and agent rows restack, with no
+horizontal page scroll.
 
 Every text and background pairing, including the status chips, tags and flags,
 meets WCAG AA contrast (4.5:1) in both themes; a test computes this from the
@@ -179,8 +184,15 @@ Broker health is still checked before showing the project list.
 The server listens only on `127.0.0.1`. The CLI prints a per-dashboard link with
 a random read-only access secret in its URL fragment. The browser removes the
 fragment after loading and keeps it in its tab's session storage for reloads;
-view selection uses a separate query parameter and never touches the secret.
-The private broker token remains on the server and is never sent to the browser.
+the view is selected by its own path and never touches the secret. The private
+broker token remains on the server and is never sent to the browser.
+
+The dashboard serves its own routes on its own loopback port: the six view paths
+above, `/assets/*` for the stylesheet, script, mark and fonts, and `/api/v1/*`
+for the read-only feeds (`projects`, `snapshot`, `history`, `work`,
+`ownership`, `usage`). Everything else is a 404. The broker itself answers
+`GET /health` and `POST /api/v1/rpc`; `/rpc` remains as the path older
+clients speak.
 
 API requests require this separate dashboard secret and the local Host/Origin.
 There is no write endpoint or CORS access. Agent text renders as plain text;
@@ -190,7 +202,7 @@ uses local HTML, CSS, and JavaScript with no new runtime dependency or frontend
 build. The link grants access to the selected store's room histories; keep it
 private.
 
-## Previewing the design
+## Previewing the dashboard
 
 `scripts/dashboard-fixture.mjs` starts a throwaway broker in a temporary data
 directory, registers a small fleet, sends messages, creates claims and (when the

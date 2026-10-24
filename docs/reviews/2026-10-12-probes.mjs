@@ -124,9 +124,9 @@ try{
  const dashboard=http.createServer(createDashboardHandler({project:f.project,secret:token,origin:()=>base,assets:new Map(),getRooms:async()=>({rooms:[{project:f.project}]}),getSnapshot:async()=>roomSnapshot(f.project,snapState.rooms[0],100,snapState)}));
  await new Promise(resolve=>dashboard.listen(0,'127.0.0.1',()=>{base='http://127.0.0.1:'+dashboard.address().port;resolve();}));
  try{
-  const first=await fetch(base+'/api/snapshot',{headers:{authorization:'Bearer '+token}});const tag=first.headers.get('etag');const a=await first.json();
+  const first=await fetch(base+'/api/v1/snapshot',{headers:{authorization:'Bearer '+token}});const tag=first.headers.get('etag');const a=await first.json();
   await new Promise(resolve=>setTimeout(resolve,20));
-  const second=await fetch(base+'/api/snapshot',{headers:{authorization:'Bearer '+token,'if-none-match':tag}});const b=await second.json();
+  const second=await fetch(base+'/api/v1/snapshot',{headers:{authorization:'Bearer '+token,'if-none-match':tag}});const b=await second.json();
   assert.equal(second.status,200);assert.notEqual(second.headers.get('etag'),tag);assert.deepEqual(a.agents[0].transport,b.agents[0].transport);
   record('transport-age-invalidates-snapshot-etag','open',{statusWithMatchingPreviousTag:second.status,etagChanged:true,transportReportUnchanged:true,ageBefore:a.agents[0].readiness.transport.ageMs,ageAfter:b.agents[0].readiness.transport.ageMs});
  }finally{dashboard.closeAllConnections();await new Promise(resolve=>dashboard.close(resolve));}

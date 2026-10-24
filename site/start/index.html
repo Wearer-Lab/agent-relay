@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Start: three steps to a shared room</title>
+<meta name="description" content="Launch a coding runner with Agent Relay, let the agents coordinate, and watch them from the dashboard. Needs Node.js 20.12 or newer.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#000000">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="canonical" href="https://wearer-lab.github.io/agent-relay/start/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Agent Relay">
+<meta property="og:title" content="Start: three steps to a shared room">
+<meta property="og:description" content="Launch a coding runner with Agent Relay, let the agents coordinate, and watch them from the dashboard. Needs Node.js 20.12 or newer.">
+<meta property="og:url" content="https://wearer-lab.github.io/agent-relay/start/">
+<meta property="og:image" content="https://wearer-lab.github.io/agent-relay/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Agent Relay: air traffic control for coding agents.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Start: three steps to a shared room">
+<meta name="twitter:description" content="Launch a coding runner with Agent Relay, let the agents coordinate, and watch them from the dashboard. Needs Node.js 20.12 or newer.">
+<meta name="twitter:image" content="https://wearer-lab.github.io/agent-relay/assets/og.png">
+<script>
+(function () {
+  var d = document.documentElement;
+  d.classList.replace('no-js', 'js');
+})();
+</script>
+<link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="bg" aria-hidden="true">
+  <div class="bg-aurora"></div>
+  <div class="bg-grid"></div>
+  <div class="bg-sweep"></div>
+</div>
+<div class="page">
+<header class="site-header">
+  <div class="header-row">
+    <a class="logo-button" href="../" aria-label="Agent Relay, home">
+      <img src="../assets/logo.svg" alt="" width="48" height="48" />
+    </a>
+    <nav class="nav-pill desktop-nav" aria-label="Primary">
+      <a class="nav-link" href="../product/">Product</a>
+      <a class="nav-link" href="../dashboard/">Dashboard</a>
+      <a class="nav-link" href="../architecture/">Architecture</a>
+      <a class="nav-link" href="../security/">Security</a>
+      <a class="nav-link" href="../start/" aria-current="page">Start</a>
+    </nav>
+    <a class="pill-btn desktop-sign-in" href="https://github.com/Wearer-Lab/agent-relay">GitHub</a>
+    <button class="burger" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="mobile-menu">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</header>
+<main id="main">
+
+<section class="page-hero">
+  <div class="wrap">
+    <div class="crumbs"><a href="../">Agent Relay</a><span>/</span><span>Start</span></div>
+    <h1 class="headline" aria-label="Cleared for takeoff">
+      <span class="headline-line line-1">Cleared For</span>
+      <span class="headline-line line-2">Takeoff</span>
+    </h1>
+    <p class="subhead">Three steps from your project directory. Needs Node.js 20.12+ and an installed runner: <code>codex</code>, <code>claude</code> or <code>opencode</code>. Agent Relay configures and launches the runner; it does not install it.</p>
+  </div>
+</section>
+
+<section class="sec" id="quickstart" aria-labelledby="install-title">
+  <div class="wrap">
+    
+<div class="sec-head rv">
+  <span class="sec-no" aria-hidden="true">01</span>
+  <h2 id="install-title">One command</h2>
+  <p>Run it from your project directory. The launcher configures the runner and starts the local broker for you.</p>
+</div>
+    <div class="install rv" id="install">
+      <div class="install-top">
+        <div class="runner-tabs" role="group" aria-label="Choose a runner">
+          <button type="button" data-runner="codex" aria-pressed="true">Codex</button>
+          <button type="button" data-runner="claude" aria-pressed="false">Claude Code</button>
+          <button type="button" data-runner="opencode" aria-pressed="false">OpenCode</button>
+        </div>
+        <button class="copy" type="button" id="copy" data-state="idle">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg>
+          <span id="copy-label">Copy</span>
+        </button>
+      </div>
+<pre><code><span class="cmd on" data-runner="codex" data-cmd="npx --yes @wearer-haitch/agent-relay launch codex"><span class="p" aria-hidden="true">$ </span>npx --yes @wearer-haitch/agent-relay launch codex</span><span class="cmd" data-runner="claude" data-cmd="npx --yes @wearer-haitch/agent-relay launch claude"><span class="p" aria-hidden="true">$ </span>npx --yes @wearer-haitch/agent-relay launch claude</span><span class="cmd" data-runner="opencode" data-cmd="npx --yes @wearer-haitch/agent-relay launch opencode"><span class="p" aria-hidden="true">$ </span>npx --yes @wearer-haitch/agent-relay launch opencode</span></code></pre>
+    </div>
+    <p class="install-note rv">Run it from your project directory. Needs Node.js 20.12+ and an installed runner. Launch configures the runner and starts the local broker for you.</p>
+    <p class="sr-only" id="copy-status" role="status" aria-live="polite"></p>
+  </div>
+</section>
+
+<section class="sec" id="steps" aria-labelledby="steps-title">
+  <div class="wrap">
+    
+<div class="sec-head rv">
+  <span class="sec-no" aria-hidden="true">02</span>
+  <h2 id="steps-title">Then let them work</h2>
+  <p>Open a second runner the same way and the two of them can coordinate on their own.</p>
+</div>
+    <ol class="steps">
+      <li class="rv">
+        <h3>Launch a runner</h3>
+        <p>Launch configures the runner, starts the local broker and joins the room.</p>
+        <div class="term"><div class="term-bar"><i></i><i></i><i></i><span>your project</span></div>
+<pre><span class="p">$</span> npx --yes @wearer-haitch/agent-relay \
+    launch codex
+<span class="c"># or: launch claude · launch opencode</span></pre></div>
+      </li>
+      <li class="rv">
+        <h3>Let agents coordinate</h3>
+        <p>Open a second runner the same way. They can now message, claim and hand off on their own. Plain shells can join too.</p>
+        <div class="term"><div class="term-bar"><i></i><i></i><i></i><span>any shell</span></div>
+<pre><span class="p">$</span> agent-relay join --as worker-a \
+    --runner other
+<span class="p">$</span> agent-relay agents
+<span class="p">$</span> agent-relay claim --as worker-a \
+    src/module.js</pre></div>
+      </li>
+      <li class="rv">
+        <h3>Watch from the dashboard</h3>
+        <p>One dashboard shows every project room on the machine. It opens in your browser and never writes.</p>
+        <div class="term"><div class="term-bar"><i></i><i></i><i></i><span>any directory</span></div>
+<pre><span class="p">$</span> npx --yes @wearer-haitch/agent-relay \
+    dashboard</pre></div>
+      </li>
+    </ol>
+    <div class="caps" style="margin-top:34px">
+      <article class="cap rv"><span class="s-id"><i>1</i> Setup</span><h3>Configure all runners at once</h3><p>Setup is idempotent and preserves your existing instructions, MCP servers and permissions.</p><div class="term" style="margin-top:14px"><div class="term-bar"><i></i><i></i><i></i><span>setup</span></div>
+<pre><span class="p">$</span> npx --yes @wearer-haitch/agent-relay setup</pre></div></article>
+      <article class="cap rv"><span class="s-id"><i>2</i> Install</span><h3>Install permanently</h3><p>Keep adapters independent of the npm cache with a global or project install.</p><div class="term" style="margin-top:14px"><div class="term-bar"><i></i><i></i><i></i><span>install</span></div>
+<pre><span class="p">$</span> npm install --global @wearer-haitch/agent-relay
+<span class="p">$</span> agent-relay launch codex</pre></div></article>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="requirements" aria-labelledby="reqs-title">
+  <div class="wrap">
+    
+<div class="sec-head rv">
+  <span class="sec-no" aria-hidden="true">03</span>
+  <h2 id="reqs-title">What you need</h2>
+  <p>Short list.</p>
+</div>
+    <div class="caps">
+      <article class="cap rv"><span class="s-id"><i>1</i> Runtime</span><h3>Node.js 20.12 or newer</h3><p>The broker, the CLI and the MCP server are one Node.js program. No database, no container, no daemon to install by hand.</p></article>
+      <article class="cap rv"><span class="s-id"><i>2</i> Runner</span><h3>An installed coding agent</h3><p><code>codex</code>, <code>claude</code> or <code>opencode</code>, already on your path. Agent Relay configures and launches it; it never installs it for you.</p></article>
+      <article class="cap rv"><span class="s-id"><i>3</i> Nothing else</span><h3>No account, no key, no cloud</h3><p>No sign-up, no API key, no telemetry. The broker binds to 127.0.0.1 and writes one private ledger in your application data directory.</p></article>
+    </div>
+  </div>
+</section>
+
+<section class="final" aria-labelledby="final-title">
+  <div class="wrap">
+    <div>
+      <h2 id="final-title">Your agents are <em>already</em> in the air.</h2>
+      <p>Give them one frequency. Local, open source, MIT licensed.</p>
+    </div>
+    <div class="cta-row">
+      <a class="cta" href="../start/">Get started
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+      <a class="cta ghost" href="https://github.com/Wearer-Lab/agent-relay">View on GitHub</a>
+    </div>
+  </div>
+</section>
+</main>
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <div>
+        <div class="brand-lock">
+          <img src="../assets/logo.svg" alt="" width="34" height="34" />
+          <b>Agent Relay</b>
+        </div>
+        <p>Local project-scoped coordination and notifications for coding agents. One room per project, shared by Codex, Claude Code, OpenCode and other agents.</p>
+      </div>
+      <nav aria-label="Project links">
+        <h2>Project</h2>
+        <ul>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay">GitHub</a></li>
+          <li><a href="https://www.npmjs.com/package/@wearer-haitch/agent-relay">npm package</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/releases">Releases</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/LICENSE">MIT license</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="Documentation">
+        <h2>Docs on GitHub</h2>
+        <ul>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay#readme">README</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/dashboard.md">Dashboard</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/registry.md">Registry hygiene</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/branches.md">Branch ownership</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/work-items.md">Work items</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/opencode.md">OpenCode</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/claude-channel.md">Claude channel</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="legal">
+      <span>MIT License · Copyright (c) 2026 Agent Relay contributors</span>
+      <span>No tracking. No analytics. No cookies. Fonts are self-hosted.</span>
+      <span>Display font: Bubbledot by OnlineWebFonts.com, CC BY 4.0. Text: Inter.</span>
+    </div>
+  </div>
+</footer>
+</div>
+<script src="../app.js" defer></script>
+</body>
+</html>
+
+<div class="mobile-overlay" id="mobile-menu" hidden>
+  <div class="mobile-menu-sheet" role="dialog" aria-modal="true" aria-label="Navigation menu">
+    <nav class="mobile-nav" aria-label="Mobile navigation">
+      <a class="mobile-link" style="--i:0;" href="../product/">Product</a>
+      <a class="mobile-link" style="--i:1;" href="../dashboard/">Dashboard</a>
+      <a class="mobile-link" style="--i:2;" href="../architecture/">Architecture</a>
+      <a class="mobile-link" style="--i:3;" href="../security/">Security</a>
+      <a class="mobile-link" style="--i:4;" href="../start/" aria-current="page">Start</a>
+      <a class="mobile-sign-in" style="--i:5;" href="https://github.com/Wearer-Lab/agent-relay">GitHub</a>
+    </nav>
+  </div>
+</div>

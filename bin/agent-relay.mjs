@@ -104,7 +104,7 @@ async function main(){
   const pruneAfter=opts['prune-after-minutes']??process.env.AGENT_RELAY_PRUNE_AFTER_MINUTES,ephemeralPrune=opts['ephemeral-prune-minutes']??process.env.AGENT_RELAY_EPHEMERAL_PRUNE_MINUTES,compactAfter=opts['compact-after-days']??process.env.AGENT_RELAY_COMPACT_AFTER_DAYS;
   const broker=await createBroker({dataDir,staleMinutes:opts['stale-minutes']===undefined?Number(process.env.AGENT_RELAY_STALE_MINUTES??30):Number(opts['stale-minutes']),...(pruneAfter===undefined?{}:{pruneAfterMinutes:Number(pruneAfter)}),...(ephemeralPrune===undefined?{}:{ephemeralPruneMinutes:Number(ephemeralPrune)}),...(compactAfter===undefined?{}:{compactAfterDays:Number(compactAfter)})});
   const discovery=path.join(dataDir,'broker.json'),tmp=discovery+`.${process.pid}.tmp`;
-  await fs.writeFile(tmp,JSON.stringify({pid:process.pid,url:broker.url,token:broker.token}),{mode:0o600});await fs.rename(tmp,discovery);
+  await fs.writeFile(tmp,JSON.stringify({pid:process.pid,url:broker.url,token:broker.token,api:'/api/v1/rpc'}),{mode:0o600});await fs.rename(tmp,discovery);
   if(opts['startup-lock'])await fs.rm(opts['startup-lock'],{recursive:true,force:true});
   const stop=async()=>{await broker.close();try{const current=JSON.parse(await fs.readFile(discovery,'utf8'));if(current.pid===process.pid)await fs.unlink(discovery);}catch{}process.exit(0);};
   process.once('SIGTERM',stop);process.once('SIGINT',stop);break;

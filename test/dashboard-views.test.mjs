@@ -22,7 +22,7 @@ const ownershipPayload=()=>({available:true,repo:'/w',rooms:['/w'],branches:bran
 
 // ---- HTTP surface ---------------------------------------------------------------------
 function api(feeds={}){
- const handler=createDashboardHandler({project:'/w',secret:'s3cret',origin:()=>'http://127.0.0.1:9',assets:new Map([['/',{type:'text/html',body:'<h1>Tower</h1>'}]]),
+ const handler=createDashboardHandler({project:'/w',secret:'s3cret',origin:()=>'http://127.0.0.1:9',assets:new Map([['/index.html',{type:'text/html',body:'<h1>Tower</h1>'}]]),
   getRooms:async()=>({rooms:[{project:'/w',agentCount:0,messageCount:0,pendingDeliveries:0,lastActivityAt:null}]}),getSnapshot:async()=>({}),...feeds});
  return async(url,{method='GET',headers={}}={})=>{
   const response={headers:{},status:0,body:'',setHeader(k,v){this.headers[k.toLowerCase()]=v;},writeHead(status,h={}){this.status=status;for(const [k,v] of Object.entries(h))this.setHeader(k,v);},end(body=''){this.body=body;}};
@@ -33,26 +33,26 @@ test('work, ownership and usage endpoints are read-only, authenticated, project-
  const calls=[],stable=ownershipPayload();
  const request=api({getWork:async p=>{calls.push(['work',p]);return workPayload();},getOwnership:async p=>{calls.push(['ownership',p]);return {...stable,generatedAt:new Date().toISOString()};},getUsage:async()=>({available:true,agents:{stored:3,active:2,left:1}})});
  for(const feed of ['work','ownership','usage']){
-  const url=`/api/${feed}?project=%2Fw`;
+  const url=`/api/v1/${feed}?project=%2Fw`;
   assert.equal((await request(url,{headers:{authorization:''}})).status,401);
   assert.equal((await request(url,{headers:{host:'attacker.example'}})).status,403);
   assert.equal((await request(url,{method:'POST'})).status,405);
-  assert.equal((await request(`/api/${feed}?project=%2Fprivate%2Fnope`)).status,404);
+  assert.equal((await request(`/api/v1/${feed}?project=%2Fprivate%2Fnope`)).status,404);
  }
  assert.deepEqual(calls,[]);
- const first=await request('/api/work?project=%2Fw');assert.equal(first.status,200);assert.equal(JSON.parse(first.body).roots[0].id,'RM');
+ const first=await request('/api/v1/work?project=%2Fw');assert.equal(first.status,200);assert.equal(JSON.parse(first.body).roots[0].id,'RM');
  assert.deepEqual(calls,[['work','/w']]);
- assert.equal((await request('/api/work?project=%2Fw',{headers:{'if-none-match':first.headers.etag}})).status,304);
- const owned=await request('/api/ownership');assert.equal(owned.status,200);assert.equal(JSON.parse(owned.body).available,true);assert.deepEqual(calls.at(-1),['ownership','/w']);
+ assert.equal((await request('/api/v1/work?project=%2Fw',{headers:{'if-none-match':first.headers.etag}})).status,304);
+ const owned=await request('/api/v1/ownership');assert.equal(owned.status,200);assert.equal(JSON.parse(owned.body).available,true);assert.deepEqual(calls.at(-1),['ownership','/w']);
  await new Promise(resolve=>setTimeout(resolve,5));
- assert.equal((await request('/api/ownership',{headers:{'if-none-match':owned.headers.etag}})).status,304,'generatedAt alone must not defeat conditional requests');
- assert.equal(JSON.parse((await request('/api/usage')).body).agents.stored,3);
+ assert.equal((await request('/api/v1/ownership',{headers:{'if-none-match':owned.headers.etag}})).status,304,'generatedAt alone must not defeat conditional requests');
+ assert.equal(JSON.parse((await request('/api/v1/usage')).body).agents.stored,3);
 });
 test('feeds the broker cannot supply answer available:false and static routes ignore the query string',async()=>{
  const request=api();
- for(const feed of ['work','ownership','usage'])assert.deepEqual(JSON.parse((await request(`/api/${feed}`)).body),{available:false});
- assert.equal((await request('/?view=plan')).status,200);assert.equal((await request('/?view=plan')).body,'<h1>Tower</h1>');
- assert.equal((await request('/api/other')).status,404);
+ for(const feed of ['work','ownership','usage'])assert.deepEqual(JSON.parse((await request(`/api/v1/${feed}`)).body),{available:false});
+ assert.equal((await request('/roadmap/')).status,200);assert.equal((await request('/roadmap/')).body,'<h1>Tower</h1>');
+ assert.equal((await request('/api/v1/other')).status,404);
 });
 
 // ---- Observer fallbacks -----------------------------------------------------------------
@@ -172,12 +172,12 @@ test('attention items rank alerts first, name the destination and say all-clear 
  const snapshot={pendingDeliveries:4,claims:[{stale:true},{stale:false}],messages:[{recipients:['b'],ackedBy:[],notified:[{agentId:'b',adapter:'push-failed',at:'2026-10-05T01:00:00Z'}]}],agents:[]};
  const items=plain(M.attentionItems({snapshot,work:workPayload(),ownership:ownershipPayload(),usage:{nearLimit:['messages']}}));
  assert.deepEqual(items.map(i=>i.level),['alert','alert','alert','warn','warn','warn','warn','warn','info']);
- assert.equal(items[0].text,'1 contested branch: more than one owner attached');assert.deepEqual([items[0].view,items[0].flag],['runways','contested']);
- assert.ok(items.some(i=>i.view==='log'&&i.unacked&&/4 deliveries awaiting/.test(i.text)));
- assert.ok(items.some(i=>i.view==='plan'&&i.status==='blocked'&&i.text==='1 blocked work item'));
+ assert.equal(items[0].text,'1 contested branch: more than one owner attached');assert.deepEqual([items[0].view,items[0].flag],['branches','contested']);
+ assert.ok(items.some(i=>i.view==='messages'&&i.unacked&&/4 deliveries awaiting/.test(i.text)));
+ assert.ok(items.some(i=>i.view==='roadmap'&&i.status==='blocked'&&i.text==='1 blocked work item'));
  assert.ok(items.some(i=>/1 stale claim/.test(i.text)));assert.ok(items.some(i=>/Storage headroom is low: messages/.test(i.text)));
  assert.ok(items.some(i=>i.level==='info'&&/1 unclaimed branch/.test(i.text)));
- assert.deepEqual(plain(M.attentionItems({snapshot:{pendingDeliveries:0,claims:[],messages:[],agents:[]}})),[{level:'ok',text:'All quiet. Nothing needs attention.',view:'tower'}]);
+ assert.deepEqual(plain(M.attentionItems({snapshot:{pendingDeliveries:0,claims:[],messages:[],agents:[]}})),[{level:'ok',text:'All quiet. Nothing needs attention.',view:'overview'}]);
  assert.equal(M.attentionItems({snapshot:{pendingDeliveries:1,claims:[],messages:[],agents:[],registry:{stored:5,live:1,prunable:3}}}).at(-1).text,'3 identities could be pruned from the registry');
 });
 
@@ -201,7 +201,7 @@ test('tower shows the registry hygiene story, attention items and degraded state
  assert.equal(textOf(page.$('plan-count')),'—');assert.equal(textOf(page.$('plan-sub')),'not available on this broker');
  const attention=findAll(page.$('attention'),el=>el.tag==='button').map(textOf);
  assert.ok(attention.some(t=>/3 deliveries awaiting acknowledgement/.test(t)));assert.ok(attention.some(t=>/300 identities could be pruned/.test(t)));
- assert.equal(page.$('view-tower').hidden,false);assert.equal(page.$('view-plan').hidden,true);
+ assert.equal(page.$('view-overview').hidden,false);assert.equal(page.$('view-roadmap').hidden,true);
  assert.deepEqual(findAll(page.$('traffic'),el=>el.tag==='article').map(el=>el.dataset.agent),['atlas']);
 });
 test('tower summarizes the flight plan and branch conflicts when the broker supplies them',async()=>{
@@ -209,83 +209,84 @@ test('tower summarizes the flight plan and branch conflicts when the broker supp
  await page.flush();
  assert.equal(textOf(page.$('conflicts-count')),'3','the number counts branches with any flag');assert.equal(textOf(page.$('conflicts-sub')),'1 contested · 1 missing · 1 orphaned · 1 unclaimed');
  assert.equal(textOf(page.$('plan-count')),'40%');assert.equal(textOf(page.$('plan-sub')),'2/5 items done');
- assert.equal(textOf(page.$('count-runways')),'3');assert.equal(textOf(page.$('count-plan')),'40%');
+ assert.equal(textOf(page.$('count-branches')),'3');assert.equal(textOf(page.$('count-roadmap')),'40%');
  assert.equal(textOf(page.$('registry')).includes('Source: broker storage usage'),true);
  const first=findAll(page.$('attention'),el=>el.tag==='button').map(textOf)[0];assert.match(first,/ALERT1 contested branch/);
 });
-test('navigation switches views, records ?view= without touching the hash, and follows attention links',async()=>{
+test('navigation switches views, records the view path without touching the hash, and follows attention links',async()=>{
  const page=boot({projects:rooms,snapshot:fleetSnapshot(),work:workPayload(),ownership:ownershipPayload()});await page.flush();
- page.sandbox.go('runways');assert.equal(page.$('view-runways').hidden,false);assert.equal(page.$('view-tower').hidden,true);assert.equal(page.$('nav-runways').attributes['aria-current'],'page');assert.equal(page.$('nav-tower').attributes['aria-current'],'false');
- assert.deepEqual(page.pushed,['/?view=runways']);assert.equal(page.document.title,'Agent Relay · Runways');
- page.sandbox.go('nope');assert.equal(page.$('view-runways').hidden,false);
- page.sandbox.go('tower');assert.deepEqual(page.pushed,['/?view=runways','/']);
+ page.sandbox.go('branches');assert.equal(page.$('view-branches').hidden,false);assert.equal(page.$('view-overview').hidden,true);assert.equal(page.$('nav-branches').attributes['aria-current'],'page');assert.equal(page.$('nav-overview').attributes['aria-current'],'false');
+ assert.deepEqual(page.pushed,['/branches/']);assert.equal(page.document.title,'Agent Relay · Branches');
+ page.sandbox.go('nope');assert.equal(page.$('view-branches').hidden,false);
+ page.sandbox.go('overview');assert.deepEqual(page.pushed,['/branches/','/']);
  const blocked=findAll(page.$('attention'),el=>el.tag==='button').find(el=>/blocked work item/.test(textOf(el)));blocked.listeners.click();
- assert.equal(page.$('view-plan').hidden,false);assert.equal(page.$('plan-status').value,'blocked');
- page.$('nav-log').listeners.click();assert.equal(page.$('view-log').hidden,false);
- const deep=boot({projects:rooms,snapshot:fleetSnapshot(),search:'?view=strips'});await deep.flush();assert.equal(deep.$('view-strips').hidden,false);assert.equal(deep.$('view-tower').hidden,true);
- const junk=boot({projects:rooms,snapshot:fleetSnapshot(),search:'?view=%3Cscript%3E'});await junk.flush();assert.equal(junk.$('view-tower').hidden,false);
+ assert.equal(page.$('view-roadmap').hidden,false);assert.equal(page.$('roadmap-status').value,'blocked');
+ page.$('nav-messages').listeners.click();assert.equal(page.$('view-messages').hidden,false);
+ const deep=boot({projects:rooms,snapshot:fleetSnapshot(),path:'/agents/'});await deep.flush();assert.equal(deep.$('view-agents').hidden,false);assert.equal(deep.$('view-overview').hidden,true);
+ const junk=boot({projects:rooms,snapshot:fleetSnapshot(),path:'/%3Cscript%3E/'});await junk.flush();assert.equal(junk.$('view-overview').hidden,false);
+ const noslash=boot({projects:rooms,snapshot:fleetSnapshot(),path:'/claims/'});await noslash.flush();assert.equal(noslash.$('view-claims').hidden,false);
 });
 test('flight plan renders the tree with roll-ups, collapses, filters, and switches to lanes',async()=>{
- const page=boot({projects:rooms,snapshot:fleetSnapshot(),work:workPayload(),search:'?view=plan'});await page.flush();
- const titles=()=>findAll(page.$('plan-tree'),el=>el.tag==='li').map(el=>el.dataset.id);
+ const page=boot({projects:rooms,snapshot:fleetSnapshot(),work:workPayload(),path:'/roadmap/'});await page.flush();
+ const titles=()=>findAll(page.$('roadmap-tree'),el=>el.tag==='li').map(el=>el.dataset.id);
  assert.deepEqual(titles(),['RM','PH1','EP1','T1','T2','T3','D1','D2','PH2','T4','T5']);
- const root=findAll(page.$('plan-tree'),el=>el.tag==='li'&&el.dataset.id==='RM')[0];
+ const root=findAll(page.$('roadmap-tree'),el=>el.tag==='li'&&el.dataset.id==='RM')[0];
  assert.match(textOf(root),/Launch/);assert.match(textOf(root),/2\/5 · 40%/);assert.ok(byClass(root,'meter').length===1);
  assert.equal(byClass(root,'meter')[0].attributes['aria-valuenow'],'40');
- assert.match(textOf(page.$('plan-meta')),/5 items · 40% complete/);assert.ok(!/older broker/.test(textOf(page.$('plan-meta'))));
- const twist=findAll(page.$('plan-tree'),el=>el.tag==='button'&&el.attributes['aria-label']==='Collapse Foundations')[0];assert.equal(twist.attributes['aria-expanded'],'true');
+ assert.match(textOf(page.$('roadmap-meta')),/5 items · 40% complete/);assert.ok(!/older broker/.test(textOf(page.$('roadmap-meta'))));
+ const twist=findAll(page.$('roadmap-tree'),el=>el.tag==='button'&&el.attributes['aria-label']==='Collapse Foundations')[0];assert.equal(twist.attributes['aria-expanded'],'true');
  twist.listeners.click();assert.deepEqual(titles(),['RM','PH1','PH2','T4','T5']);
  page.$('plan-expand').listeners.click();assert.equal(titles().length,11);page.$('plan-collapse').listeners.click();assert.deepEqual(titles(),['RM']);page.$('plan-expand').listeners.click();
- page.$('plan-owner').value='quill';page.$('plan-owner').listeners.change();assert.deepEqual(titles(),['RM','PH2','T4']);
+ page.$('roadmap-owner').value='quill';page.$('roadmap-owner').listeners.change();assert.deepEqual(titles(),['RM','PH2','T4']);
  page.$('plan-reset').listeners.click();assert.equal(titles().length,11);
- assert.deepEqual(page.$('plan-owner').options.map(o=>o.value),['','atlas','quill','vector']);assert.deepEqual(page.$('plan-label').options.map(o=>o.value),['','broker','compat','release']);
- page.$('plan-q').value='zzz';page.$('plan-q').listeners.input();assert.match(textOf(page.$('plan-tree')),/No work items match these filters/);
+ assert.deepEqual(page.$('roadmap-owner').options.map(o=>o.value),['','atlas','quill','vector']);assert.deepEqual(page.$('roadmap-label').options.map(o=>o.value),['','broker','compat','release']);
+ page.$('roadmap-q').value='zzz';page.$('roadmap-q').listeners.input();assert.match(textOf(page.$('roadmap-tree')),/No work items match these filters/);
  page.$('plan-reset').listeners.click();page.$('plan-mode-lanes').listeners.click();
- assert.equal(page.$('plan-lanes').hidden,false);assert.equal(page.$('plan-tree').hidden,true);
- const lanes=byClass(page.$('plan-lanes'),'lane');assert.equal(lanes.length,6);assert.equal(findAll(lanes[2],el=>el.tag==='article').length,1);assert.match(textOf(lanes[2]),/Launch › Foundations › Work tree/);
+ assert.equal(page.$('roadmap-lanes').hidden,false);assert.equal(page.$('roadmap-tree').hidden,true);
+ const lanes=byClass(page.$('roadmap-lanes'),'lane');assert.equal(lanes.length,6);assert.equal(findAll(lanes[2],el=>el.tag==='article').length,1);assert.match(textOf(lanes[2]),/Launch › Foundations › Work tree/);
 });
 test('flight plan degrades to the flat list note on legacy brokers and to a clear unavailable state otherwise',async()=>{
- const legacy=boot({projects:rooms,snapshot:fleetSnapshot(),work:flatWork([{id:'a',title:'Only task',state:'open'}]),search:'?view=plan'});await legacy.flush();
- assert.match(textOf(legacy.$('plan-meta')),/flat task list \(older broker\)/);assert.match(textOf(legacy.$('plan-tree')),/Only task/);
- const off=boot({projects:rooms,snapshot:fleetSnapshot(),work:{available:false},search:'?view=plan'});await off.flush();
- assert.match(textOf(off.$('plan-tree')),/Flight plan is not available on this broker/);assert.equal(off.$('view-plan').dataset.state,'off');
- const missing=boot({projects:rooms,snapshot:fleetSnapshot(),search:'?view=plan'});await missing.flush();
- assert.match(textOf(missing.$('plan-tree')),/Flight plan is not available on this broker/,'a 404 from the dashboard server counts as unavailable');
- const empty=boot({projects:rooms,snapshot:fleetSnapshot(),work:{available:true,roots:[],counts:{}},search:'?view=plan'});await empty.flush();
- assert.match(textOf(empty.$('plan-tree')),/No work items yet/);
+ const legacy=boot({projects:rooms,snapshot:fleetSnapshot(),work:flatWork([{id:'a',title:'Only task',state:'open'}]),path:'/roadmap/'});await legacy.flush();
+ assert.match(textOf(legacy.$('roadmap-meta')),/flat task list \(older broker\)/);assert.match(textOf(legacy.$('roadmap-tree')),/Only task/);
+ const off=boot({projects:rooms,snapshot:fleetSnapshot(),work:{available:false},path:'/roadmap/'});await off.flush();
+ assert.match(textOf(off.$('roadmap-tree')),/The roadmap is not available on this broker/);assert.equal(off.$('view-roadmap').dataset.state,'off');
+ const missing=boot({projects:rooms,snapshot:fleetSnapshot(),path:'/roadmap/'});await missing.flush();
+ assert.match(textOf(missing.$('roadmap-tree')),/The roadmap is not available on this broker/,'a 404 from the dashboard server counts as unavailable');
+ const empty=boot({projects:rooms,snapshot:fleetSnapshot(),work:{available:true,roots:[],counts:{}},path:'/roadmap/'});await empty.flush();
+ assert.match(textOf(empty.$('roadmap-tree')),/No work items yet/);
 });
 test('runways put flags first, filter by flag, and degrade when ownership is unavailable',async()=>{
- const page=boot({projects:rooms,snapshot:fleetSnapshot(),ownership:ownershipPayload(),search:'?view=runways'});await page.flush();
- const names=()=>findAll(page.$('runways'),el=>el.tag==='article').map(el=>el.dataset.branch);
+ const page=boot({projects:rooms,snapshot:fleetSnapshot(),ownership:ownershipPayload(),path:'/branches/'});await page.flush();
+ const names=()=>findAll(page.$('branches'),el=>el.tag==='article').map(el=>el.dataset.branch);
  assert.deepEqual(names(),['feat/tree','spike','old','main']);
- const cards=findAll(page.$('runways'),el=>el.tag==='article');assert.equal(cards[0].dataset.tone,'alert');assert.equal(cards[2].dataset.tone,'warn');assert.equal(cards[3].dataset.tone,'clear');
+ const cards=findAll(page.$('branches'),el=>el.tag==='article');assert.equal(cards[0].dataset.tone,'alert');assert.equal(cards[2].dataset.tone,'warn');assert.equal(cards[3].dataset.tone,'clear');
  assert.deepEqual(byClass(cards[1],'flag').map(textOf),['Missing','Unclaimed']);assert.deepEqual(byClass(cards[3],'flag').map(textOf),['Clear']);
- assert.match(textOf(cards[0]),/atlas/);assert.match(textOf(cards[0]),/@ 1234567/);assert.match(textOf(page.$('runways-meta')),/4 branches · 3 flagged/);
- const chips=findAll(page.$('runway-chips'),el=>el.tag==='button').map(textOf);assert.deepEqual(chips,['All4','Contested1','Missing1','Orphaned1','Unclaimed1']);
- findButton(page.$('runway-chips'),'Orphaned1').listeners.click();assert.deepEqual(names(),['old']);
- assert.equal(findButton(page.$('runway-chips'),'Orphaned1').attributes['aria-pressed'],'true');
- findButton(page.$('runway-chips'),'Orphaned1').listeners.click();assert.equal(names().length,4);
- page.$('runway-q').value='vector';page.$('runway-q').listeners.input();assert.deepEqual(names(),['feat/tree','old']);
+ assert.match(textOf(cards[0]),/atlas/);assert.match(textOf(cards[0]),/@ 1234567/);assert.match(textOf(page.$('branches-meta')),/4 branches · 3 flagged/);
+ const chips=findAll(page.$('branch-chips'),el=>el.tag==='button').map(textOf);assert.deepEqual(chips,['All4','Contested1','Missing1','Orphaned1','Unclaimed1']);
+ findButton(page.$('branch-chips'),'Orphaned1').listeners.click();assert.deepEqual(names(),['old']);
+ assert.equal(findButton(page.$('branch-chips'),'Orphaned1').attributes['aria-pressed'],'true');
+ findButton(page.$('branch-chips'),'Orphaned1').listeners.click();assert.equal(names().length,4);
+ page.$('branch-q').value='vector';page.$('branch-q').listeners.input();assert.deepEqual(names(),['feat/tree','old']);
  assert.match(textOf(page.$('unassigned')),/Agents not on a branch \(1\)/);assert.match(textOf(page.$('unassigned')),/idle-1/);
- const off=boot({projects:rooms,snapshot:fleetSnapshot(),ownership:{available:false},search:'?view=runways'});await off.flush();
- assert.match(textOf(off.$('runways')),/Branch ownership is not available on this broker/);assert.equal(findAll(off.$('runway-chips'),el=>el.tag==='button').length,0);
+ const off=boot({projects:rooms,snapshot:fleetSnapshot(),ownership:{available:false},path:'/branches/'});await off.flush();
+ assert.match(textOf(off.$('branches')),/Branch ownership is not available on this broker/);assert.equal(findAll(off.$('branch-chips'),el=>el.tag==='button').length,0);
 });
 test('strips group agents by liveness, cap the dormant pile, and filter to live only',async()=>{
- const page=boot({projects:rooms,snapshot:fleetSnapshot({registry:{stored:1410,live:1,dormant:1400,retired:9,ephemeral:0,prunable:0}}),search:'?view=strips'});await page.flush();
+ const page=boot({projects:rooms,snapshot:fleetSnapshot({registry:{stored:1410,live:1,dormant:1400,retired:9,ephemeral:0,prunable:0}}),path:'/agents/'});await page.flush();
  const groups=()=>byClass(page.$('agents'),'strip-group').map(el=>[el.className.split(' ').find(c=>c.startsWith('g-')),findAll(el,e=>e.tag==='article').length]);
  assert.deepEqual(groups(),[['g-live',1],['g-idle',1],['g-dormant',24]]);
- assert.equal(textOf(page.$('strips-meta')),'1 live · 33 in this room · 1,410 stored broker-wide');
+ assert.equal(textOf(page.$('agents-meta')),'1 live · 33 in this room · 1,410 stored broker-wide');
  const more=findButton(page.$('agents'),'Show 7 more dormant');assert.ok(more);more.listeners.click();assert.deepEqual(groups()[2],['g-dormant',31]);
  page.$('live-only').checked=true;page.$('live-only').listeners.change();assert.deepEqual(groups(),[['g-live',1]]);
  const strip=findAll(page.$('agents'),el=>el.tag==='article')[0];assert.match(textOf(strip),/atlas/);assert.match(textOf(strip),/Wire the broker/);assert.match(textOf(strip),/connected · claude · push/);assert.match(textOf(strip),/3 awaiting ack/);assert.match(textOf(strip),/1 claims/);
- page.$('strip-q').value='nomatch';page.$('strip-q').listeners.input();assert.match(textOf(page.$('agents')),/No agents are live right now|No agents match/);
+ page.$('agent-q').value='nomatch';page.$('agent-q').listeners.input();assert.match(textOf(page.$('agents')),/No agents are live right now|No agents match/);
  page.$('live-only').checked=false;page.$('live-only').listeners.change();assert.match(textOf(page.$('agents')),/No agents match this search/);
- page.$('strip-q').value='ghost';page.$('strip-q').listeners.input();assert.equal(findAll(page.$('agents'),el=>el.tag==='article').length,1);
+ page.$('agent-q').value='ghost';page.$('agent-q').listeners.input();assert.equal(findAll(page.$('agents'),el=>el.tag==='article').length,1);
 });
 test('claims render stale state and an empty note',async()=>{
- const page=boot({projects:rooms,snapshot:fleetSnapshot({claims:[{resource:'/w/a.mjs',agentId:'atlas',claimedAt:ago(10),scope:'project',stale:true},{resource:'native',agentId:'vector',project:'/w',claimedAt:ago(3),scope:'machine',stale:false}]}),search:'?view=claims'});await page.flush();
+ const page=boot({projects:rooms,snapshot:fleetSnapshot({claims:[{resource:'/w/a.mjs',agentId:'atlas',claimedAt:ago(10),scope:'project',stale:true},{resource:'native',agentId:'vector',project:'/w',claimedAt:ago(3),scope:'machine',stale:false}]}),path:'/claims/'});await page.flush();
  const rows=findAll(page.$('claims'),el=>el.tag==='tr');assert.equal(rows.length,2);assert.match(textOf(rows[0]),/a\.mjs/);assert.match(textOf(rows[0]),/stale/);assert.match(textOf(rows[1]),/Machine · native/);assert.equal(page.$('no-claims').hidden,true);assert.match(textOf(page.$('claims-meta')),/2 held · 1 stale/);
- const none=boot({projects:rooms,snapshot:fleetSnapshot({claims:[]}),search:'?view=claims'});await none.flush();assert.equal(none.$('no-claims').hidden,false);
+ const none=boot({projects:rooms,snapshot:fleetSnapshot({claims:[]}),path:'/claims/'});await none.flush();assert.equal(none.$('no-claims').hidden,false);
 });
 test('dashboard script only reads: no writes, inline handlers or hash routing',async()=>{
  const {dashboardSource}=await import('./dashboard-dom.mjs');
@@ -295,7 +296,7 @@ test('dashboard script only reads: no writes, inline handlers or hash routing',a
  const html=await readFile(new URL('../lib/dashboard/index.html',import.meta.url),'utf8');
  assert.doesNotMatch(html,/<style|\sstyle=|\son[a-z]+=|<script(?![^>]*\ssrc=)/i,'CSP forbids inline scripts, styles and handlers');
  assert.doesNotMatch(html,/https?:\/\//);
- const css=await readFile(new URL('../lib/dashboard/dashboard.css',import.meta.url),'utf8');
+ const css=await readFile(new URL('../lib/dashboard/assets/dashboard.css',import.meta.url),'utf8');
  assert.doesNotMatch(css,/@import|url\(\s*['"]?(https?:|data:)/i);assert.match(css,/prefers-reduced-motion: reduce/);
 });
 
@@ -313,12 +314,12 @@ test('a real dashboard serves work, ownership and usage from a live broker, degr
  dashboard=await startDashboard({project,dataDir});
  const link=new URL(dashboard.url),headers={authorization:'Bearer '+link.hash.slice(1)},get=async p=>(await fetch(link.origin+p,{headers})).json();
  const q='?project='+encodeURIComponent(await fs.realpath(project));
- const work=await get('/api/work'+q);assert.equal(work.available,true);assert.ok(Array.isArray(work.roots));assert.ok(JSON.stringify(work).includes('First task'));
- const ownership=await get('/api/ownership'+q);assert.equal(typeof ownership.available,'boolean');if(ownership.available)assert.ok(Array.isArray(ownership.branches));
- const usage=await get('/api/usage'+q);assert.equal(usage.available,true);assert.equal(usage.agents.stored,1);
- assert.equal((await fetch(link.origin+'/api/work'+q,{method:'POST',headers})).status,405);assert.equal((await fetch(link.origin+'/api/work'+q)).status,401);
+ const work=await get('/api/v1/work'+q);assert.equal(work.available,true);assert.ok(Array.isArray(work.roots));assert.ok(JSON.stringify(work).includes('First task'));
+ const ownership=await get('/api/v1/ownership'+q);assert.equal(typeof ownership.available,'boolean');if(ownership.available)assert.ok(Array.isArray(ownership.branches));
+ const usage=await get('/api/v1/usage'+q);assert.equal(usage.available,true);assert.equal(usage.agents.stored,1);
+ assert.equal((await fetch(link.origin+'/api/v1/work'+q,{method:'POST',headers})).status,405);assert.equal((await fetch(link.origin+'/api/v1/work'+q)).status,401);
  assert.equal(await fs.readFile(path.join(dataDir,'state.json'),'utf8'),before,'reading the dashboard feeds never changes the ledger');
  decorated=await startDashboard({project,dataDir,decorate:observer=>({...observer,getWork:async()=>({available:true,roots:[node('X','Synthetic','roadmap','todo')],counts:{byKind:{},byStatus:{}}})})});
- const other=new URL(decorated.url),again=await (await fetch(other.origin+'/api/work'+q,{headers:{authorization:'Bearer '+other.hash.slice(1)}})).json();
+ const other=new URL(decorated.url),again=await (await fetch(other.origin+'/api/v1/work'+q,{headers:{authorization:'Bearer '+other.hash.slice(1)}})).json();
  assert.equal(again.roots[0].id,'X');
 });
