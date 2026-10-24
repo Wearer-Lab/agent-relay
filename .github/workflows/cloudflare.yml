@@ -38,7 +38,7 @@ jobs:
           fi
           npx --yes wrangler@3 deploy
       - name: The custom domain answers
-        if: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: |
           for i in 1 2 3 4 5 6 7 8 9 10; do
             if curl --fail --silent --show-error --max-time 20 https://relay.next-notes.com/ > /dev/null; then

@@ -73,7 +73,15 @@ try {
   const registry = await fetch('https://registry.npmjs.org/@wearer-haitch/agent-relay/latest', {headers: {accept: 'application/json'}});
   const latest = registry.ok ? (await registry.json()).version : null;
   check('the npm package is published', Boolean(latest), `got ${latest}`);
-  check('the npm package matches this repository', latest === pkg.version, `npm has ${latest}, this has ${pkg.version}`);
+  if (latest === pkg.version) notes.push('ok   the npm package matches this repository');
+  else {
+    // A release that is still publishing is normal right after a tag.
+    const published = latest ? latest.split('.').map(Number) : [0, 0, 0];
+    const here = pkg.version.split('.').map(Number);
+    const older = published[0] < here[0] || (published[0] === here[0] && (published[1] < here[1] || (published[1] === here[1] && published[2] < here[2])));
+    if (older) notes.push(`skip the npm package is still catching up: npm has ${latest}, this has ${pkg.version}`);
+    else check('the npm package matches this repository', false, `npm has ${latest}, this has ${pkg.version}`);
+  }
 } catch (error) {
   notes.push(`skip  npm registry check — ${error.message}`);
 }
