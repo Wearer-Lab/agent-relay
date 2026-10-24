@@ -27,13 +27,13 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: refs/tags/${{ env.TAG }}
           fetch-depth: 0
           persist-credentials: false
       # No dependency cache here: a release must not restore mutable state.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org

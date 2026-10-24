@@ -33,10 +33,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
           cache: npm
@@ -55,10 +55,10 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: Pack and install into an empty project
