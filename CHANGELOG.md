@@ -17,6 +17,7 @@ All notable changes to `@wearer-haitch/agent-relay` are recorded here. The forma
   - `lib/tunnels/`: one interface for Tailscale Funnel (the default, a stable URL with no domain of your own), Cloudflare quick and named tunnels, and ngrok. `remote on` picks the first one that is installed.
   - `agent-relay remote on|off|status|doctor|approve|deny|revoke|add|test|room` drives it all. `remote test` pairs, approves and calls through the public URL, then revokes the test token.
   - Remote client mode: with `AGENT_RELAY_URL` set, `lib/client.mjs` talks to the gateway and never starts or discovers a local broker. Without a token it pairs and waits, and the errors name the command that fixes them.
+  - The read-only dashboard rides on the same public URL: `agent-relay remote dashboard` prints a one-time link, the secret sits in the URL fragment as it does locally, and the feeds under `/api/v1/` need it.
 
 ### Changed
 

@@ -129,9 +129,9 @@ Labels: dashboard
 People can follow cloud and local agents from any browser. Agents never need the dashboard.
 
 ### Remote read-only dashboard
-- [ ] Serve the dashboard through the gateway at `/dashboard`, read-only, behind a one-time link from `agent-relay remote dashboard` (secret in the URL fragment, as locally)
+- [x] Serve the dashboard through the gateway at `/dashboard`, read-only, behind a one-time link from `agent-relay remote dashboard` (secret in the URL fragment, as locally)
 - [ ] Mark cloud agents in Strips and Radio log (runner badge, "via gateway"), and show pending pairing requests read-only in the Tower view
-- [ ] Links expire after 24 hours; `remote dashboard --revoke` invalidates them all
+- [x] Links expire after 24 hours; `remote dashboard --revoke` invalidates them all
 
 ## Phase 6: Docs, tests and release
 Labels: docs, release

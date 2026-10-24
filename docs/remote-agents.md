@@ -135,11 +135,23 @@ test token again.
 | `No local room matches …` | The repository does not match a local checkout | `agent-relay remote room add <alias> <path>` |
 | `Too many agents are waiting for approval` | Five pairings are already waiting | Approve or deny one |
 
+## The dashboard over the same URL
+
+```sh
+agent-relay remote dashboard
+```
+
+That prints a one-time link to the read-only dashboard through your public URL.
+The secret sits in the URL fragment, exactly like the local dashboard, and the
+feeds under `/api/v1/` need it. The dashboard never writes: it cannot send a
+message, claim a resource or acknowledge anything.
+
 ## What is not here yet
 
-- The dashboard over the same public URL (`remote dashboard`).
 - An always-on host, so cloud agents keep working while this computer sleeps.
 - A threat-model review of the public endpoint.
+- Surviving a restart automatically (`remote on --persist` installs a launchd,
+  systemd or Task Scheduler entry).
 
 See [the roadmap](roadmaps/remote-agents.md) for the full plan and what is
 still to do.

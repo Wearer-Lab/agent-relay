@@ -97,7 +97,31 @@ test('an unmatched repository is refused, and an alias can point at a room by ha
   const added = await remoteRoomAdd({dataDir, alias: 'github.com/fork/repo', project: '/work/alpha'});
   assert.equal(added.ok, true);
   const aliases = await loadAliases(dataDir);
-  assert.equal(aliases.aliases['github.com/fork/repo'], '/work/alpha');
+  assert.equal(aliases.aliases['github.com/fork/repo'], path.resolve('/work/alpha'), 'the alias points at the resolved path');
+});
+
+test('the read-only dashboard rides on the same public URL, behind its own secret', async t => {
+  const dataDir = await temp(t);
+  const origin = 'http://127.0.0.1:47899';
+  const {dashboardFor} = await import('../lib/remote.mjs');
+  const dashboard = await dashboardFor({dataDir, project: process.cwd(), origin});
+  const gateway = await startGateway({dataDir, port: 47899, dashboard, call: async () => ({ok: true})});
+  t.after(() => gateway.close());
+
+  const page = await fetch(`${origin}/`);
+  assert.equal(page.status, 200);
+  assert.match(await page.text(), /view-overview/, 'the dashboard shell is served');
+  const asset = await fetch(`${origin}/assets/dashboard.css`);
+  assert.equal(asset.status, 200);
+  const font = await fetch(`${origin}/assets/fonts/BubbledotICG-FinePos.woff2`);
+  assert.equal(font.status, 200);
+
+  const withSecret = await fetch(`${origin}/api/v1/projects`, {headers: {authorization: `Bearer ${dashboard.secret}`}});
+  assert.equal(withSecret.status, 200);
+  const without = await fetch(`${origin}/api/v1/projects`);
+  assert.equal(without.status, 401, 'the dashboard needs its own secret');
+  const wrong = await fetch(`${origin}/api/v1/projects`, {headers: {authorization: 'Bearer nope'}});
+  assert.equal(wrong.status, 401);
 });
 
 test('the remote status reports the gateway, the tunnel and the live tokens', async t => {
