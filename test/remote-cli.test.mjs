@@ -102,10 +102,12 @@ test('an unmatched repository is refused, and an alias can point at a room by ha
 
 test('the read-only dashboard rides on the same public URL, behind its own secret', async t => {
   const dataDir = await temp(t);
-  const origin = 'http://127.0.0.1:47899';
+  let origin = 'http://127.0.0.1';
   const {dashboardFor} = await import('../lib/remote.mjs');
-  const dashboard = await dashboardFor({dataDir, project: process.cwd(), origin});
-  const gateway = await startGateway({dataDir, port: 47899, dashboard, call: async () => ({ok: true})});
+  // A stub call keeps the test off the local broker.
+  const dashboard = await dashboardFor({dataDir, project: process.cwd(), origin: () => origin, call: async () => ({rooms: []})});
+  const gateway = await startGateway({dataDir, port: 0, dashboard, call: async () => ({ok: true})});
+  origin = gateway.url;
   t.after(() => gateway.close());
 
   const page = await fetch(`${origin}/`);
