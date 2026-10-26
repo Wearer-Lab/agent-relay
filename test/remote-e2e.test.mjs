@@ -244,8 +244,42 @@ test('the pairing round trip hands a working token to the cloud agent', async t 
   assert.equal((await again.json()).token, null, 'the token value is handed over only once');
 });
 
-test('the tools behave the same through the gateway', async t => {
-  const dir = await temp(t);
+test('the pairing code is not a bearer secret, and the token store holds no token value', async t => {
+  const {broker, dataDir} = await brokerFor(t);
+  const gateway = await gatewayFor(t, {dataDir, call: (room, fields) => brokerCall(broker, room, fields)});
+  const paired = await fetch(`${gateway.url}/pair`, {
+    method: 'POST', headers: {'content-type': 'application/json'},
+    body: JSON.stringify({repo: 'github.com/org/repo', runner: 'claude'}),
+  });
+  const request = await paired.json();
+  assert.match(request.code, /^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/);
+
+  // The code is what a person reads off a screen. It must not work as a bearer secret.
+  const byCode = await fetch(`${gateway.url}/pair/${request.code}`);
+  assert.equal(byCode.status, 404, 'the code is not accepted over the wire');
+  assert.equal((await byCode.json()).token, undefined);
+
+  // The approver mints the token; the store keeps only the hash.
+  const store = await new TokenStore(dataDir).load();
+  const row = store.findPairing(request.code);
+  const token = store.issue({room: '/work/alpha', runner: 'claude'});
+  store.approve(row, token, token.value);
+  await store.save();
+  const raw = await fs.readFile(path.join(dataDir, 'remote-tokens.json'), 'utf8');
+  assert.ok(!raw.includes(token.value), 'the token value is never written to the token store');
+  assert.ok(raw.includes(token.row.hash), 'the store keeps the hash');
+  const pending = await fs.readFile(path.join(dataDir, 'remote-pending-tokens.json'), 'utf8');
+  assert.ok(pending.includes(token.value), 'the value waits in the short-lived handover file');
+
+  // The waiting agent collects it once, by request id.
+  const approved = await fetch(`${gateway.url}/pair/${request.requestId}`);
+  assert.equal(approved.status, 200);
+  assert.equal((await approved.json()).token, token.value);
+  const after = await fs.readFile(path.join(dataDir, 'remote-pending-tokens.json'), 'utf8');
+  assert.ok(!after.includes(token.value), 'the value is gone once it has been handed over');
+});
+
+test('the tools behave the same through the gateway', async t => {  const dir = await temp(t);
   const project = await checkout(dir);
   const local = await brokerFor(t);
   const remote = await brokerFor(t);
