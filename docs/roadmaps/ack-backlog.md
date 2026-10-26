@@ -142,7 +142,7 @@ Stop short-lived processes from becoming permanent identities and broadcast reci
 - [x] Tests: two MCP processes of one session share an identity; a restart within the session reuses it
 
 ### Broadcast audience guard
-- [x] Never fan a `*` broadcast to identities registered less than a minute ago with no transport report
+- [x] Never fan a `*` broadcast to identities registered less than a minute ago with no transport report. **Implemented narrower than the wording above**: the guard covers temporary and fallback identities only. The literal rule would leave every agent unable to receive a `*` broadcast during its first minute, which mutes every fresh room.
 - [x] Rate-limit `*all` per sender (for example 5 an hour) with a clear error that suggests a bulletin
 - [x] Tests: a fresh probe identity is excluded; the `*all` limit triggers and recovers
 
