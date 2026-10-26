@@ -6,7 +6,7 @@ import {fileURLToPath} from 'node:url';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 const exec=promisify(execFile),root=fileURLToPath(new URL('../',import.meta.url));
-const PUBLIC_DOCS=['docs/branches.md','docs/broker-notes.md','docs/ci-workflow.md','docs/claude-channel.md','docs/dashboard.md','docs/opencode.md','docs/process-ownership.md','docs/publishing.md','docs/registry.md','docs/remote-agents.md','docs/validation.md','docs/work-items.md'];
+const PUBLIC_DOCS=['docs/branches.md','docs/broker-notes.md','docs/ci-workflow.md','docs/claude-channel.md','docs/dashboard.md','docs/large-rooms.md','docs/opencode.md','docs/process-ownership.md','docs/publishing.md','docs/registry.md','docs/remote-agents.md','docs/runbook-backlog.md','docs/threat-model.md','docs/trust-model.md','docs/validation.md','docs/work-items.md'];
 const tmp=await fs.mkdtemp(path.join(os.tmpdir(),'relay-release-'));
 const npm=process.platform==='win32'?'npm.cmd':'npm',npmCli=process.env.npm_execpath;
 const run=async(args,cwd=root)=>exec(npmCli?process.execPath:npm,npmCli?[npmCli,...args]:args,{cwd,env:{...process.env,npm_config_cache:path.join(tmp,'cache')},timeout:120000,maxBuffer:4*1024*1024});
