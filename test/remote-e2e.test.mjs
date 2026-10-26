@@ -103,6 +103,9 @@ const throughGateway = async (base, token, fields) => {
 const VOLATILE = new Set([
   'createdAt', 'updatedAt', 'registeredAt', 'claimedAt', 'at', 'ts', 'lastSeenAt',
   'statusAt', 'lastSeenAgeMs', 'transportAgeMs', 'ageMs', 'lastActivityAt', 'messageId',
+  // The cloud marker is the one deliberate difference: the gateway says which runner is on
+  // the other side of the tunnel, and a local broker never says it.
+  'cloud',
 ]);
 
 // The same normalisation the gateway applies: the room path becomes a dot.
@@ -273,6 +276,9 @@ test('the tools behave the same through the gateway', async t => {
     normalize(localResults, project),
     'the gateway answers exactly like the broker',
   );
+  // The one deliberate difference: the gateway marks what came through it.
+  assert.equal(remoteResults.register.agent.cloud.runner, 'claude');
+  assert.equal(localResults.register.agent.cloud, undefined);
 });
 
 test('the whole story works through a fake tunnel provider', async t => {
