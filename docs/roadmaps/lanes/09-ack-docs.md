@@ -16,6 +16,20 @@ is the behaviour that shipped.
 
 Do not touch any other file, and never touch the roadmap markdown.
 
+## What already exists (do not rebuild it)
+
+- `agent-relay pending [--by recipient|state|age|sender|kind] [--limit N]` — read-only.
+- `agent-relay leave --stale --idle-hours N [--prefix P] [--runner R] [--apply]`, same for `retire`.
+- `agent-relay compact --broadcast-ttl-days N --direct-ttl-days N [--apply]`.
+- `agent-relay migrate --to 2 [--dry-run]`.
+- `agent-relay remote host`.
+- The MCP and OpenCode tools `relay_pending`, the bulk `relay_leave`/`relay_retire`.
+- The Phase 0 operator report with the real numbers:
+  `docs/roadmaps/reports/phase0-operator.md`.
+
+Check every one of them against the CLI's actual `--help` output before you
+document it: the surfaces lane wrote them in the same wave.
+
 ## What to write
 
 ### 1. A best-practices page for large rooms (`docs/large-rooms.md`)
@@ -63,8 +77,14 @@ Explain plainly:
 - `CHANGELOG.md`: one entry for this release, with the before and after
   numbers from the reported room (the Phase 0 report is at
   `docs/roadmaps/reports/phase0-operator.md`; read it for the real numbers and
-  quote them). If the report is not there yet, say so in your report and write
-  the entry without the numbers.
+  quote them). The numbers in that report are the ones that room on this
+  machine had: pending deliveries 4,016 → 3,979, messages 857 → 624, stored
+  identities 63 → 61, the ledger 903,911 → 714,094 bytes. The investigation's
+  166,526-delivery room is a different machine; say which room the numbers
+  describe and do not present them as the same room.
+- `docs/threat-model.md` already exists (written by the remote-hardening lane):
+  link it from the README or from `docs/remote-agents.md` if you own that file
+  (you do not — report the link instead).
 
 ## Rules
 
