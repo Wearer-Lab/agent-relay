@@ -52,11 +52,13 @@ const message = (cursor, { from = 'ann', to, recipients, ageMs, ackedBy = [] }) 
 
 // ann and bob are live, cat left (dormant), dan is retired, eve is registered but unseen for days.
 // The hand-computed split of this fixture:
-//   live     3  (m1, m2 and the broadcast row for bob)
+//   live     4  (m1, m2, the broadcast row for bob and the ten-day broadcast row for bob)
 //   dormant  3  (the rows for cat and eve, plus the broadcast row for eve)
 //   retired  1  (the row for dan)
-//   expired  1  (the broadcast row for m8, ten days old against a seven-day broadcast TTL)
-//   total    8  (m7 is acknowledged, so it is not pending)
+//   expired  1  (m9, a direct message to the dormant cat, forty days old against a thirty-day TTL)
+//   total    9  (m7 is acknowledged, so it is not pending)
+// A delivery expires only when its recipient cannot read it any more: bob is live, so the
+// ten-day broadcast row is still his backlog, not an expired one.
 const AGENTS = [agent('ann'), agent('bob'), agent('cat', { left: true }), agent('dan', { retired: true }), agent('eve', { seenMs: 5 * DAY })];
 const MESSAGES = [
   message(1, { to: 'bob', recipients: ['bob'], ageMs: 90 * MIN }),
@@ -67,6 +69,7 @@ const MESSAGES = [
   message(6, { to: '*', recipients: ['bob', 'eve'], ageMs: 30 * MIN }),
   message(7, { to: 'bob', recipients: ['bob'], ageMs: 5 * MIN, ackedBy: ['bob'] }),
   message(8, { to: '*', recipients: ['bob'], ageMs: 10 * DAY }),
+  message(9, { to: 'cat', recipients: ['cat'], ageMs: 40 * DAY }),
 ];
 const seeded = project => ({ version: 1, nextCursor: MESSAGES.length + 1,
   rooms: [{ project, agents: AGENTS, messages: MESSAGES, claims: [], cursor: MESSAGES.length }] });
@@ -74,36 +77,36 @@ const seeded = project => ({ version: 1, nextCursor: MESSAGES.length + 1,
 test('the pending split sums to the old total and the headline is the live-recipient count', async t => {
   const f = await fixture(t, { seed: seeded });
   const snapshot = await f.rpc({ op: 'snapshot' });
-  assert.equal(snapshot.pendingDeliveries, 8, 'the old total still counts every pending delivery');
-  assert.deepEqual(snapshot.pending.counts, { live: 3, dormant: 3, retired: 1, expired: 1 });
+  assert.equal(snapshot.pendingDeliveries, 9, 'the old total still counts every pending delivery');
+  assert.deepEqual(snapshot.pending.counts, { live: 4, dormant: 3, retired: 1, expired: 1 });
   assert.equal(snapshot.pending.total, snapshot.pendingDeliveries);
   assert.equal(snapshot.pending.counts.live + snapshot.pending.counts.dormant
     + snapshot.pending.counts.retired + snapshot.pending.counts.expired, snapshot.pending.total);
   assert.equal(snapshot.pending.headline, snapshot.pending.counts.live, 'the headline awaits live agents');
-  assert.equal(snapshot.pending.headline, 3);
+  assert.equal(snapshot.pending.headline, 4);
   // The per-agent split uses the same four groups.
   assert.deepEqual(snapshot.pending.byAgent, {
-    bob: { live: 3, dormant: 0, retired: 0, expired: 1, total: 4 },
-    cat: { live: 0, dormant: 1, retired: 0, expired: 0, total: 1 },
+    bob: { live: 4, dormant: 0, retired: 0, expired: 0, total: 4 },
+    cat: { live: 0, dormant: 1, retired: 0, expired: 1, total: 2 },
     dan: { live: 0, dormant: 0, retired: 1, expired: 0, total: 1 },
     eve: { live: 0, dormant: 2, retired: 0, expired: 0, total: 2 },
   });
   // The old numeric map keeps its shape, so existing readers keep working.
-  assert.deepEqual(snapshot.pendingByAgent, { ann: 0, bob: 4, cat: 1, dan: 1, eve: 2 });
+  assert.deepEqual(snapshot.pendingByAgent, { ann: 0, bob: 4, cat: 2, dan: 1, eve: 2 });
 });
 
 test('the pending breakdown matches a hand-computed table', async t => {
   const f = await fixture(t, { seed: seeded });
   const byState = await f.rpc({ op: 'pending', by: 'state' });
-  assert.equal(byState.total, 8);
-  assert.deepEqual(byState.counts, { live: 3, dormant: 3, retired: 1, expired: 1 });
+  assert.equal(byState.total, 9);
+  assert.deepEqual(byState.counts, { live: 4, dormant: 3, retired: 1, expired: 1 });
   assert.deepEqual(byState.groups, [
-    { key: 'awaiting-live', count: 3 }, { key: 'awaiting-dormant', count: 3 },
+    { key: 'awaiting-live', count: 4 }, { key: 'awaiting-dormant', count: 3 },
     { key: 'awaiting-retired', count: 1 }, { key: 'expired', count: 1 }]);
   assert.deepEqual(byState.rows.map(row => [row.messageId, row.recipient, row.state]), [
     ['m1', 'bob', 'awaiting-live'], ['m2', 'bob', 'awaiting-live'], ['m3', 'cat', 'awaiting-dormant'],
     ['m4', 'dan', 'awaiting-retired'], ['m5', 'eve', 'awaiting-dormant'], ['m6', 'bob', 'awaiting-live'],
-    ['m6', 'eve', 'awaiting-dormant'], ['m8', 'bob', 'expired']]);
+    ['m6', 'eve', 'awaiting-dormant'], ['m8', 'bob', 'awaiting-live'], ['m9', 'cat', 'expired']]);
   assert.equal(byState.rows[0].from, 'ann');
   assert.equal(byState.rows[0].to, 'bob');
   assert.equal(byState.rows[0].kind, 'direct');
@@ -112,22 +115,22 @@ test('the pending breakdown matches a hand-computed table', async t => {
 
   const byRecipient = await f.rpc({ op: 'pending', by: 'recipient' });
   assert.deepEqual(byRecipient.groups, [
-    { key: 'bob', count: 4 }, { key: 'eve', count: 2 }, { key: 'cat', count: 1 }, { key: 'dan', count: 1 }]);
+    { key: 'bob', count: 4 }, { key: 'cat', count: 2 }, { key: 'eve', count: 2 }, { key: 'dan', count: 1 }]);
   const bySender = await f.rpc({ op: 'pending', by: 'sender' });
-  assert.deepEqual(bySender.groups, [{ key: 'ann', count: 8 }]);
+  assert.deepEqual(bySender.groups, [{ key: 'ann', count: 9 }]);
   const byKind = await f.rpc({ op: 'pending', by: 'kind' });
   assert.deepEqual(byKind.groups, [
-    { key: 'broadcast', count: 3 }, { key: 'direct', count: 5 }, { key: 'task', count: 0 },
+    { key: 'broadcast', count: 3 }, { key: 'direct', count: 6 }, { key: 'task', count: 0 },
     { key: 'handoff', count: 0 }, { key: 'bulletin', count: 0 }]);
   const byAge = await f.rpc({ op: 'pending', by: 'age' });
   assert.deepEqual(byAge.groups, [
     { key: 'under-1h', count: 2 }, { key: '1h-to-1d', count: 5 }, { key: '1d-to-7d', count: 0 },
-    { key: '7d-to-30d', count: 1 }, { key: 'over-30d', count: 0 }]);
+    { key: '7d-to-30d', count: 1 }, { key: 'over-30d', count: 1 }]);
   // Every grouping sees the same deliveries.
   for (const by of ['recipient', 'sender', 'kind', 'age']) {
     const grouped = await f.rpc({ op: 'pending', by });
-    assert.equal(grouped.total, 8, by);
-    assert.equal(grouped.groups.reduce((sum, group) => sum + group.count, 0), 8, by);
+    assert.equal(grouped.total, 9, by);
+    assert.equal(grouped.groups.reduce((sum, group) => sum + group.count, 0), 9, by);
   }
 });
 
@@ -240,7 +243,7 @@ test('the kind of a delivery names the work it carries', async t => {
 test('usage reports the pending split of every room', async t => {
   const f = await fixture(t, { seed: seeded });
   const usage = await f.rpc({ op: 'usage' });
-  assert.equal(usage.pending.total, 8);
-  assert.deepEqual(usage.pending.counts, { live: 3, dormant: 3, retired: 1, expired: 1 });
+  assert.equal(usage.pending.total, 9);
+  assert.deepEqual(usage.pending.counts, { live: 4, dormant: 3, retired: 1, expired: 1 });
   assert.deepEqual(usage.warnings, [], 'a quiet room warns about nothing');
 });
