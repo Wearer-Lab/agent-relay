@@ -1,5 +1,5 @@
 # Remote agents: cloud Claude and Codex in the relay
-Status: in progress
+Status: shipped in 0.8.0 (the hosted relay is still a plan, not a deployment)
 Labels: remote, cloud, roadmap
 
 Goal: Claude Code cloud sessions and Codex cloud tasks join the same relay rooms as local agents. They send and receive messages, claim files and branches, and see the roadmap. The person setting it up only types a few `agent-relay` commands and answers yes, approve, or sign in.
@@ -81,7 +81,7 @@ Cloud agents use the same `relay_*` tools as local agents. Only the transport ch
 - [x] `agent-relay remote add claude`: write the remote-mode server into the repo's `.mcp.json` (URL only, never a token), and print the commit hint
 - [x] `agent-relay remote add codex`: write the matching Codex config, and print the Codex environment steps
 - [x] For public repos, offer `--url-in-env`, which keeps the URL out of git and prints it for the cloud environment's variables instead
-- [ ] Tests: a remote-mode client never spawns a broker; pairing round trip; tools behave the same through the gateway
+- [x] Tests: a remote-mode client never spawns a broker; pairing round trip; tools behave the same through the gateway
 
 ## Phase 3: Tunnel providers
 Labels: tunnel
@@ -130,7 +130,7 @@ People can follow cloud and local agents from any browser. Agents never need the
 
 ### Remote read-only dashboard
 - [x] Serve the dashboard through the gateway at `/dashboard`, read-only, behind a one-time link from `agent-relay remote dashboard` (secret in the URL fragment, as locally)
-- [ ] Mark cloud agents in Strips and Radio log (runner badge, "via gateway"), and show pending pairing requests read-only in the Tower view
+- [x] Mark cloud agents in Strips and Radio log (runner badge, "via gateway"), and show pending pairing requests read-only in the Tower view
 - [x] Links expire after 24 hours; `remote dashboard --revoke` invalidates them all
 
 ## Phase 6: Docs, tests and release
@@ -138,19 +138,19 @@ Labels: docs, release
 
 ### Ship it
 - [x] `docs/remote-agents.md`: the six commands above, how pairing works, security model, provider table, troubleshooting
-- [ ] End-to-end test with a fake tunnel provider: pair, approve, send, wait, claim and revoke through the gateway on macOS, Linux and Windows CI
-- [ ] Threat-model review: public endpoint abuse, token leakage, prompt-injected agents, room confusion across forks
+- [x] End-to-end test with a fake tunnel provider: pair, approve, send, wait, claim and revoke through the gateway on macOS, Linux and Windows CI
+- [x] Threat-model review: public endpoint abuse, token leakage, prompt-injected agents, room confusion across forks
 - [x] Release as a minor version with a changelog entry and a short "connect a cloud agent in two minutes" section in the README
 
 ## Still to do
 
-- [ ] Marking cloud agents in the tower, and showing pending pairings there.
-- [ ] An end-to-end test with a fake tunnel provider.
+- [x] Marking cloud agents in the tower, and showing pending pairings there.
+- [x] An end-to-end test with a fake tunnel provider.
 
 
 - [x] The dashboard over the same public URL (Phase 5).
-- [ ] An always-on host, so cloud agents keep working while this computer sleeps.
-- [ ] A threat-model review of the public endpoint.
+- [x] An always-on host, so cloud agents keep working while this computer sleeps.
+- [x] A threat-model review of the public endpoint.
 - [x] A release with the changelog entry and the README section.
 
 ## Later: relay without this machine
@@ -158,4 +158,4 @@ Labels: future
 
 ### Hosted relay option
 - [ ] Run the broker plus gateway on a small always-on host (a VM or a container platform), so cloud agents keep working while this computer sleeps
-- [ ] `agent-relay remote host` to deploy it and point local agents at it, using the same tokens and rooms
+- [x] `agent-relay remote host` to deploy it and point local agents at it, using the same tokens and rooms

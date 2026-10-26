@@ -224,6 +224,17 @@ Pooled jobs that register a fresh agent ID every run used to leave thousands of 
 - **Dormant identities.** An agent that left (but was not retired) still receives direct messages in its durable inbox; they stay pending until it registers again. Broadcasts never reach dormant agents.
 - **Ephemeral and stable IDs.** `join --ephemeral`, `mcp --ephemeral`, `AGENT_RELAY_EPHEMERAL=1`, or a temporary session ID register an ephemeral agent that leaves on exit when it is idle (it stays registered while it holds claims, handoffs, process records or open tasks). `AGENT_RELAY_AGENT_ID` (or `--as` on `agent-relay mcp`) gives pooled workers a stable name such as `codex-worker-3` instead of one identity per thread.
 - **Pruning.** `agent-relay prune` lists identities that are idle, disconnected and hold no obligations; it changes nothing until you add `--apply`. The broker also sweeps automatically (default 24 hours idle, 15 minutes for ephemeral agents; tune with `--prune-after-minutes` and `--ephemeral-prune-minutes` on the daemon, or set the first to 0 to disable). Pruned agents become dormant, not deleted. A pruned agent that is still running gets `UNKNOWN_AGENT` until it registers again.
+- **A connected transport is a claim, not a fact.** An agent counts as live only while its transport report is fresh (five minutes by default) or it was seen in the same window. An old `connected` report no longer makes an identity live, so the sweep can retire it and `*` broadcasts stop reaching it.
+- **The backlog, counted honestly.** `agent-relay pending` breaks the pending deliveries down into the ones a live agent can still read, the ones held for a dormant identity, the ones held for a retired one and the ones that expired. The headline is the first group; the rest are shown with it, because a durable inbox is not a bug.
+- **Sweeping many identities at once.** `agent-relay leave --stale --idle-hours 24` and `agent-relay retire --stale` mark every idle identity that holds nothing. They are a dry run until you add `--apply`, they report what they kept and why, and every applied run is written to an audit log.
+
+```sh
+agent-relay pending --by state
+agent-relay leave --stale --idle-hours 24            # a dry run
+agent-relay leave --stale --idle-hours 24 --apply    # now it changes something
+```
+
+For the guidance that goes with a busy room, see [large rooms](docs/large-rooms.md), the [runbook for a stuck backlog](docs/runbook-backlog.md) and the [trust model](docs/trust-model.md).
 
 ## Branch ownership
 

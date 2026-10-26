@@ -4,6 +4,40 @@ All notable changes to `@wearer-haitch/agent-relay` are recorded here. The forma
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-26
+
+A busy room now cleans itself, and the numbers people read describe what actually needs attention.
+
+### Added
+
+- `agent-relay pending [--by recipient|state|age|sender|kind]` breaks the pending deliveries down into the ones a live agent can still read, the ones held for a dormant identity, the ones held for a retired one and the ones that expired. The `relay_pending` MCP and OpenCode tools do the same.
+- `agent-relay leave --stale --idle-hours N` and `agent-relay retire --stale` sweep many idle identities at once. They are a dry run until `--apply`, they report what they kept and why, and every applied run is written to an audit log.
+- A delivery expires on its own: a broadcast after seven days, a direct message after thirty. An expired delivery is written to the archive with its recipient and its reason, so the history stays explainable. `compact --broadcast-ttl-days` and `--direct-ttl-days` tune it.
+- `agent-relay migrate --to 2` converts a ledger to schema 2 offline: a broadcast is stored once with its audience rule, and each agent keeps a `readThrough` cursor instead of a row per reader. On the room from the 2026-10-25 investigation that is 671,074 delivery rows down to 243,746 and 42.54 MiB down to 15.34 MiB; a bulk ack of a whole backlog costs 61 bytes instead of 5,360.
+- `agent-relay remote host` prints the deployment artifacts and the steps for an always-on host, so cloud agents keep working while this computer sleeps.
+- The dashboard marks cloud agents with a runner badge, and the Tower view lists the pairing requests that wait for a human, read-only.
+- `docs/large-rooms.md`, `docs/runbook-backlog.md`, `docs/trust-model.md` and `docs/threat-model.md`.
+
+### Changed
+
+- **A connected transport is a claim, not a fact.** An identity counts as live only while its transport report is fresh (five minutes by default) or it was seen in the same window. An old `connected` report no longer keeps an identity alive, the sweep rewrites it to the truth, and `*` broadcasts stop reaching it.
+- The headline is "awaiting live agents". The other groups are shown beside it, with a tooltip that explains why a durable inbox is not a bug.
+- `agent-relay compact` and `agent-relay prune` name the identities that block compaction, with their age and their transport age.
+- The broker spawns on a real Node runtime, not on whatever binary happens to host it, and the data directory is cleaned at startup: stale temporary files go, the log is timestamped and rotated, and a refusal to start is written down once.
+
+### Fixed
+
+- The pairing code was a bearer secret: `GET /pair/<code>` handed a token to whoever guessed it. The public endpoint now takes the request id only.
+- The value of an approved token was written to the token store in plain text. It now waits in a short-lived handover file that is emptied the moment the agent collects it.
+- The `send` operation checked the agent id against the token but not the sender, so a cloud agent could post as a local one.
+- The dashboard served through the public URL was missing the Roadmap and Branches views, and `/dashboard` itself.
+- A process that never touched the relay left an identity behind; the adapters now register on the first call, and a fallback identity is remembered for the session.
+- `*all` reached every identity including one that had just registered and proved nothing. A fresh probe is skipped, and `*all` is limited to five an hour per sender, with an error that suggests a bulletin.
+
+### Numbers
+
+The room on the machine where this was built held 4,016 pending deliveries before the operator cleanup and 3,979 after it; `state.json` went from 903,911 to 714,094 bytes. With the delivery TTL in place the same room now resolves to 851 pending deliveries on its own: 3,128 deliveries expire and 118 messages are archived, with no manual step. The investigation that started this work describes a larger room (166,526 pending deliveries, 1,971 identities) that is not on this machine.
+
 ## [0.7.3] - 2026-10-24
 
 ### Added
