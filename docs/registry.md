@@ -3,7 +3,8 @@
 Every Codex job registers a new agent ID and never leaves, so a long-lived relay accumulates
 thousands of dead identities. Left alone, `to:'*'` reached all of them, receipts showed them as
 pending forever, and snapshots grew quadratically. Registry hygiene fixes this without losing
-durable inboxes. Broker features: `live-broadcast`, `dormant-delivery`, `ephemeral`, `prune`.
+durable inboxes. Broker features: `live-broadcast`, `dormant-delivery`, `ephemeral`, `prune`,
+`bulk-cleanup`, `stale-claims`.
 
 ## Liveness
 
@@ -110,12 +111,139 @@ The `agents` op `counts` gains `live`, `dormant`, `retired`, `ephemeral` and `pr
 broker's prune thresholds). `snapshot` gains `registry: {stored, live, dormant, retired, ephemeral, prunable}`
 and each agent row gains `live: boolean`. `pendingByAgent` is now computed in one pass over messages.
 
+## Bulk stale cleanup
+
+`leave` and `retire` have a bulk form, so an owner never has to script against the ledger. It is a
+dry run unless `apply: true` is passed.
+
+```
+op 'leave' / op 'retire', bulk form
+input : {stale?: true, idleHours?: number, prefix?: string, runner?: string, apply?: boolean, actor?: string}
+output: {dryRun, mode, candidates: [{agentId, runner, lastSeenAgeMs}],
+         kept: [{agentId, obligations}], skippedLive: [agentId], changed: number}
+```
+
+The bulk form is selected by the scope fields (`stale`, `idleHours`, `prefix`, `runner`). `apply`
+on its own still means the one identity named by `agentId`, so `leave --as X --apply` never turns
+into a sweep.
+
+- `stale` states the intent; only identities that are **not live** are ever touched. A live
+  identity is reported in `skippedLive` and never changed.
+- `idleHours` is the wall-clock idleness floor. Default: the broker's prune threshold
+  (`pruneAfterMinutes`, 1440 minutes = 24 hours).
+- `prefix` scopes by agent id prefix (`claude-tmp-`), `runner` by exact runner name. Both narrow
+  the population together.
+- `apply` is false by default. `actor` names who ran the action and is written to the audit log
+  (default `operator`).
+
+An identity that holds a project claim, a machine claim, a branch claim, a pending handoff, a
+process record or an open owned work item is **never stranded**: it is reported in `kept` with
+the obligations it holds, and it stays active. The obligation set is the one `prune` and the
+sweep use (`obligationIndex` in `lib/registry.mjs`), so the three paths cannot disagree.
+
+```json
+{"dryRun": true, "mode": "leave",
+ "candidates": [{"agentId": "claude-tmp-1", "runner": "claude", "lastSeenAgeMs": 172800000}],
+ "kept": [{"agentId": "builder",
+           "obligations": {"claims": ["build"], "machineClaims": [], "branchClaims": [],
+                           "handoffs": [], "processes": [], "tasks": ["t-1"]}}],
+ "skippedLive": ["reviewer"], "changed": 0,
+ "total": {"candidates": 1, "kept": 1, "skippedLive": 1},
+ "scope": {"stale": true, "idleHours": 24, "prefix": "claude-tmp-"}}
+```
+
+`changed` is `0` on a dry run and the number of identities changed on an applied run. An applied
+run reports the same candidate list as the dry run that preceded it, so the two can be compared
+row by row. Each list is bounded to 200 rows; `total` carries the full counts.
+
+### The bulk audit log
+
+Every applied bulk action is recorded in `bulk-audit.log` in the data directory: one JSON object
+per line, the newest last. A dry run is not an action and is not logged.
+
+```json
+{"at":"2026-10-26T09:12:44.101Z","event":"bulk-leave","actor":"ops@example","project":"/repo",
+ "scope":{"stale":true,"idleHours":24,"prefix":"claude-tmp-"},"dryRun":false,
+ "changed":["claude-tmp-1"],"changedCount":1,"changedKind":"identities",
+ "kept":[],"skippedLive":[]}
+```
+
+The file is owner-only (mode 600), rotates to `bulk-audit.log.1` past 1 MiB, and never holds a
+token or a secret: secret-shaped fields are redacted and long strings are truncated before they
+are written. The gateway keeps its own trail (`remote-audit.log`) for cloud agents; this one is
+for the local operator's bulk actions.
+
+## Stale claims
+
+A claim is **stale** when its owner is no longer live: the owner left, retired, or was idle past
+the window. Stale claims are surfaced, never released silently.
+
+Op `staleClaims` `{staleMinutes?}` returns `{claims: [{resource, agentId, scope, ageMs, lastSeenAgeMs, holder}]}`.
+`scope` is `project`, `machine` or `branch`; `holder` is the owner's liveness state (`active`,
+`stale`, `left`, `retired`, `missing`); `ageMs` is the age of the claim and `lastSeenAgeMs` the
+age of the owner's last sighting. The same list is part of the `blocked` view
+(`blocked.staleClaims`), so a caller that already reads `blocked` sees it without a second call.
+
+### Opt-in release
+
+`createBroker({releaseStaleClaimsHours: 0})` is off by default. When it is set to N, the broker
+releases claims that are older than N hours **and** whose owner is dormant (left) or retired. A
+claim held by a live owner is never released, and neither is one held by an owner that is merely
+idle. Each release writes a release-log entry (`state.releaseLog`, one per scope) and leaves a
+notice in the room (`room.notices`, the newest 100 kept). The release is audited like any other
+bulk action:
+
+```json
+{"at":"2026-10-26T09:12:44.101Z","event":"auto-release-stale-claims","actor":"daemon","project":"/repo",
+ "scope":{"hours":6},"dryRun":false,"changed":["project:src/app.ts"],"changedCount":1,
+ "changedKind":"claims","owners":["claude-tmp-1"]}
+```
+
+The daemon flag itself (`--release-stale-claims-hours N`) is a CLI concern; the broker option is
+`releaseStaleClaimsHours`.
+
+## Marking your own backlog read
+
+An agent that has worked through its inbox can mark the whole backlog read in one call:
+
+- `agent-relay ack --as ME --all` acknowledges every unacknowledged delivery to `ME`.
+- `agent-relay ack --as ME --through CURSOR` acknowledges every delivery up to and including
+  `CURSOR`, which is the cursor the inbox reported.
+- MCP: `relay_ack({all: true})` and `relay_ack({through: <cursor>})`.
+
+`--all` and `--through` are mutually exclusive; `--through` takes the cursor from the last
+inbox page. Acks are per recipient, so acknowledging marks the delivery done for that identity
+only.
+
+**Acking for an identity you do not run creates a false receipt.** The ledger will say that agent
+handled work it never read, and the message disappears from its backlog. Ack only as yourself.
+
+## Trust model of ids and acks
+
+Agent IDs are **cooperative identities**, not authentication. Nothing proves that the process
+holding an ID is the one that registered it. On a single-user machine the broker token is the
+trust boundary: whoever holds it can speak for any identity in the room.
+
+That is why `leave --as` and `ack --as` work for any known ID, and why the bulk cleanup above
+can act on identities the caller does not run. It is a deliberate trade: the relay coordinates
+agents that share one machine and one owner, and refusing a cooperative `leave` would leave
+dead identities behind. The consequences are on the caller:
+
+- `ack --as` for someone else is a false receipt (above);
+- `leave --as` for someone else strands that agent's obligations;
+- the bulk form is therefore a dry run first, keeps every identity that still holds work, and
+  writes an audit log naming who ran it.
+
 ## Surfaces
 
 | | CLI | MCP | OpenCode |
 | --- | --- | --- | --- |
 | broadcast | `send --to '*'` / `'*all'` `[--within MIN]` | `relay_send` `to`, `within` | `relay_send` `to`, `within` |
 | prune | `prune [--idle-minutes N] [--ephemeral-idle-minutes N] [--include-test] [--apply]` | `relay_prune` | `relay_prune` |
+| bulk cleanup | `leave --stale --idle-hours N [--prefix P] [--runner R] [--apply]`, `retire ...` | n/a | n/a |
+| stale claims | `blocked`, `staleClaims`, daemon `--release-stale-claims-hours N` | n/a | n/a |
+| acknowledge | `ack --as ME --all`, `ack --as ME --through CURSOR` | `relay_ack` `all`, `through` | `relay_ack` `all`, `through` |
 | ephemeral | `join --ephemeral`, `mcp --ephemeral` | `AGENT_RELAY_EPHEMERAL=1` | n/a |
 
-`prune` is a dry run unless `--apply` / `apply: true`.
+`prune` is a dry run unless `--apply` / `apply: true`. The bulk cleanup is a dry run unless
+`--apply` / `apply: true`.
