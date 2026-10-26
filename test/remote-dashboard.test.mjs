@@ -244,3 +244,19 @@ test('the local dashboard answers the pairing route without a gateway and never 
   assert.deepEqual(JSON.parse(answer.body),{available:false});
   assert.equal((await request(PAIRINGS_PATH,{authorization:''})).status,401);
 });
+
+test('the strips show the per-identity split the broker reports', async () => {
+  // The broker reports the split under `pending.byAgent`; the dashboard has to read
+  // that map, not only the older plain total.
+  const snapshot = { pending: { counts: { live: 3, dormant: 2, retired: 1, expired: 4 },
+      byAgent: { atlas: { live: 3, dormant: 2, retired: 1, expired: 4, total: 10 } } },
+    pendingByAgent: { atlas: 10 } };
+  const pending = M.pendingForAgent(snapshot, 'atlas');
+  assert.equal(pending.split, true);
+  assert.deepEqual({ live: pending.live, dormant: pending.dormant, retired: pending.retired, expired: pending.expired },
+    { live: 3, dormant: 2, retired: 1, expired: 4 });
+  // An identity the broker says nothing about still shows a number.
+  const unknown = M.pendingForAgent(snapshot, 'nobody');
+  assert.equal(unknown.split, false);
+  assert.equal(unknown.total, 0);
+});
