@@ -60,26 +60,43 @@ test('liveness: not left and (connected transport or seen within the window)',()
  assert.equal(isDormant({left:true}),true);assert.equal(isDormant({left:true,retired:true}),false);assert.equal(isDormant({}),false);
 });
 
-test("broadcast '*' reaches live agents only, keeps connected-but-old agents, reports excluded; '*all' keeps old semantics",async t=>{
+test('liveness: a connected transport only counts as live while its report is fresh',()=>{
+ const now=Date.now();const at=minutes=>new Date(now-minutes*MIN).toISOString();
+ // A report that is 10 hours old is a claim, not a fact.
+ const stale={agentId:'stale',updatedAt:at(600),transport:{adapter:'x',state:'connected',ts:at(600)}};
+ assert.equal(isLive(stale,{now}),false);
+ assert.equal(isLive(stale,{now,withinMinutes:1000}),false,'the broadcast window does not revive a stale transport');
+ // Either signal is enough: a fresh report or a fresh sighting.
+ assert.equal(isLive({...stale,transport:{...stale.transport,ts:at(1)}},{now}),true);
+ assert.equal(isLive({...stale,updatedAt:at(1)},{now}),true);
+ // The window is five minutes by default and configurable.
+ assert.equal(isLive({...stale,transport:{...stale.transport,ts:at(4)}},{now}),true);
+ assert.equal(isLive({...stale,transport:{...stale.transport,ts:at(6)}},{now}),false);
+ assert.equal(isLive({...stale,transport:{...stale.transport,ts:at(6)}},{now,transportStaleMinutes:10}),true);
+ // A connected transport without any report is stale.
+ assert.equal(isLive({agentId:'no-report',updatedAt:at(600),transport:{adapter:'x',state:'connected'}},{now}),false);
+});
+
+test("broadcast '*' reaches live agents only, drops stale connected agents, reports excluded; '*all' keeps old semantics",async t=>{
  const f=await fixture(t);
  for(const id of ['sender','fresh','old','connected-old','left'])await f.register(id);
  await f.rpc({op:'leave',agentId:'left'});
  await f.restart(age(setAge('old',600),setAge('connected-old',600,{transport:{adapter:'mcp-watch',state:'connected',ts:ago(600)}}),setAge('sender',1),setAge('fresh',2)));
  const live=await f.rpc({op:'send',from:'sender',to:'*',body:'hi',messageId:'b1'});
- assert.deepEqual(live.recipients.sort(),['connected-old','fresh']);
- assert.deepEqual(live.audience,{mode:'live',within:120,excluded:1});
+ assert.deepEqual(live.recipients,['fresh'],'a stale connected transport is not a live recipient');
+ assert.deepEqual(live.audience,{mode:'live',within:120,excluded:2});
  assert.equal((await f.readState()).rooms[0].messages[0].to,'*');
  const wide=await f.rpc({op:'send',from:'sender',to:'*',body:'hi',messageId:'b2',within:1000});
- assert.deepEqual(wide.recipients.sort(),['connected-old','fresh','old']);assert.equal(wide.audience.excluded,0);assert.equal(wide.audience.within,1000);
- const narrow=await f.rpc({op:'send',from:'sender',to:'*',body:'hi',messageId:'b3',within:0});
- assert.deepEqual(narrow.recipients,['connected-old']);assert.equal(narrow.audience.excluded,2);
+ assert.deepEqual(wide.recipients.sort(),['fresh','old']);assert.equal(wide.audience.excluded,1);assert.equal(wide.audience.within,1000);
+ const narrow=await f.request({op:'send',from:'sender',to:'*',body:'hi',messageId:'b3',within:0});
+ assert.equal(narrow.ok,false);assert.equal(narrow.error.code,'NO_RECIPIENTS');assert.equal(narrow.error.excluded,3);
  const all=await f.rpc({op:'send',from:'sender',to:'*all',body:'hi',messageId:'b4'});
  assert.deepEqual(all.recipients.sort(),['connected-old','fresh','old']);
  assert.deepEqual(all.audience,{mode:'all',within:null,excluded:0});
  assert.equal((await f.readState()).rooms[0].messages.at(-1).to,'*all');
  const history=await f.rpc({op:'history',to:'old'});assert.deepEqual(history.messages.map(m=>m.messageId),['b2','b4']);
  // Idempotent retry of a broadcast returns the stored audience.
- const again=await f.rpc({op:'send',from:'sender',to:'*',body:'hi',messageId:'b1'});assert.equal(again.duplicate,true);assert.deepEqual(again.recipients.sort(),['connected-old','fresh']);
+ const again=await f.rpc({op:'send',from:'sender',to:'*',body:'hi',messageId:'b1'});assert.equal(again.duplicate,true);assert.deepEqual(again.recipients,['fresh']);
  assert.equal((await f.request({op:'send',from:'sender',to:'*',body:'hi',messageId:'x',within:-1})).ok,false);
  assert.equal((await f.request({op:'send',from:'sender',to:'*',body:'hi',messageId:'x',within:'soon'})).ok,false);
  // Restarted ledger still validates with '*' and '*all' messages.
@@ -126,7 +143,7 @@ test('reserved broadcast names cannot be registered; ephemeral flag is stored an
  await f.restart();assert.equal(agentRow(await f.readState(),'e').ephemeral,true);
 });
 
-test('prune: dry run by default, apply marks dormant, obligations and connected transports protect',async t=>{
+test('prune: dry run by default, apply marks dormant, obligations and fresh transports protect',async t=>{
  const f=await fixture(t);
  for(const id of ['idle','recent','claimer','machine','handoff-from','handoff-to','proc','tasker','connected','retired','requester'])await f.register(id);
  await f.rpc({op:'claim',agentId:'claimer',resources:['build']});
@@ -142,15 +159,15 @@ test('prune: dry run by default, apply marks dormant, obligations and connected 
  await f.restart(age(...stale.map(id=>setAge(id,2000)),setAge('connected',2000,{transport:{adapter:'mcp-watch',state:'connected',ts:ago(2000)}}),setAge('recent',5)));
  const dry=await f.rpc({op:'prune'});
  assert.equal(dry.dryRun,true);assert.equal(dry.pruned,0);
- assert.deepEqual(dry.candidates.map(c=>c.agentId).sort(),['idle','requester']);
+ assert.deepEqual(dry.candidates.map(c=>c.agentId).sort(),['connected','idle','requester'],'a connected agent unseen for days is prunable');
  assert.deepEqual(Object.keys(dry.candidates[0]).sort(),['agentId','ephemeral','lastSeenAt','runner']);
- assert.deepEqual(dry.kept,{withObligations:6,live:2});assert.equal(dry.total,2);
+ assert.deepEqual(dry.kept,{withObligations:6,live:1});assert.equal(dry.total,3);
  assert.equal(agentRow(await f.readState(),'idle').left,undefined);
  const applied=await f.rpc({op:'prune',dryRun:false});
- assert.equal(applied.dryRun,false);assert.equal(applied.pruned,2);
+ assert.equal(applied.dryRun,false);assert.equal(applied.pruned,3);
  const state=await f.readState();
- for(const id of ['idle','requester']){const a=agentRow(state,id);assert.equal(a.left,true);assert.equal(a.retired,undefined);}
- for(const id of ['claimer','machine','handoff-from','handoff-to','proc','tasker','connected','recent'])assert.equal(agentRow(state,id).left,undefined,id);
+ for(const id of ['idle','requester','connected']){const a=agentRow(state,id);assert.equal(a.left,true,id);assert.equal(a.retired,undefined);}
+ for(const id of ['claimer','machine','handoff-from','handoff-to','proc','tasker','recent'])assert.equal(agentRow(state,id).left,undefined,id);
  assert.equal(agentRow(state,'retired').retired,true);
  // A pruned identity is dormant: it can be written to and reactivates by registering.
  assert.equal((await f.rpc({op:'send',from:'recent',to:'idle',body:'still durable'})).recipientDormant,true);
@@ -215,7 +232,10 @@ test('registry counts and snapshot rows: live flag, counts, single-pass pendingB
  assert.deepEqual({live:view.counts.live,dormant:view.counts.dormant,retired:view.counts.retired,ephemeral:view.counts.ephemeral,prunable:view.counts.prunable,stored:view.counts.stored},
   {live:3,dormant:1,retired:1,ephemeral:1,prunable:1,stored:5});
  const snapshot=await f.rpc({op:'snapshot'});
- assert.deepEqual(snapshot.registry,{stored:5,live:3,dormant:1,retired:1,ephemeral:1,prunable:1});
+ assert.deepEqual(snapshot.registry,{stored:5,live:3,dormant:1,retired:1,ephemeral:1,staleTransports:0,prunable:1});
+  assert.equal(view.counts.staleTransports,0);
+  assert.ok(snapshot.agents.every(row=>row.transportAgeMs===null||row.transportAgeMs>=0));
+  assert.ok(snapshot.agents.every(row=>typeof row.stale==='boolean'&&typeof row.transportStale==='boolean'));
  assert.ok(snapshot.agents.length>0&&snapshot.agents.every(row=>typeof row.live==='boolean'));
  assert.equal(snapshot.agents.find(row=>row.agentId==='a').live,true);
  // Equivalence with the original per-agent scan over every message.

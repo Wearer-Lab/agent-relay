@@ -206,7 +206,7 @@ test('ownership liveness is the registry definition, including the window bounda
  }
  const holder=id=>view.branches.find(branch=>branch.name===`b-${id}`).claim.holder;
  assert.deepEqual(['fresh','edge','old','connected','gone','retired','disconnected'].map(holder),
-  ['active','active','stale','active','left','retired','stale']);
+  ['active','active','stale','stale','left','retired','stale']);
  // The same agents seen through the broader registry window (the default 120 minutes) agree with the same helper.
  const wide=buildOwnership(state,{repo:'/r/.git',rooms:[room],worktrees:[],branches:claims.map(claim=>({name:claim.branch,head:'h',upstream:null,committedAt:at(3)}))},{staleMinutes:120,now});
  assert.equal(wide.branches.find(branch=>branch.name==='b-old').claim.live,true);
