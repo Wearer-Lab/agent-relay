@@ -5,6 +5,8 @@ import {randomUUID} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import spawn from 'cross-spawn';
 import {rpc,wait,ensureBroker,defaultDataDir} from '../lib/client.mjs';
+import {renameWithRetry} from '../lib/runtime.mjs';
+import {sessionIdentity} from '../lib/registration.mjs';
 
 const raw=process.argv.slice(2);
 let command=raw.shift()||'help';
@@ -14,10 +16,10 @@ if(raw.includes('--help')||raw.includes('-h')){command='help';raw.length=0;}
 const opts={},positional=[];let tail=[];
 for(let i=0;i<raw.length;i++){
  if(raw[i]==='--'){tail=raw.slice(i+1);break;}
-  if(raw[i].startsWith('--')){const key=raw[i].slice(2);if(['channel','json','no-open','unread','json-lines','all','force','gate','active','detail','dry-run','accept','decline','arrived','missing','gate-strict','blocked','set','ack','register','remove','check','refresh','offline','allow-incomplete','relinquish','ephemeral','apply','include-test','drop-identities','cascade','pretty','hide-done','if-idle','yes','always-on','url-in-env','revoke-all','revoke','persist','quick','keep'].includes(key))opts[key]=true;else {if(!raw[i+1]||raw[i+1].startsWith('--'))throw new Error(`Missing value for --${key}`);if(key==='attach')(opts.attach??=[]).push(raw[++i]);else opts[key]=raw[++i];}}
+  if(raw[i].startsWith('--')){const key=raw[i].slice(2);if(['channel','json','no-open','unread','json-lines','all','force','gate','active','detail','dry-run','accept','decline','arrived','missing','gate-strict','blocked','set','ack','register','remove','check','refresh','offline','allow-incomplete','relinquish','ephemeral','apply','include-test','drop-identities','cascade','pretty','hide-done','if-idle','yes','always-on','url-in-env','revoke-all','revoke','persist','quick','keep','stale'].includes(key))opts[key]=true;else {if(!raw[i+1]||raw[i+1].startsWith('--'))throw new Error(`Missing value for --${key}`);if(key==='attach')(opts.attach??=[]).push(raw[++i]);else opts[key]=raw[++i];}}
  else positional.push(raw[i]);
 }
-const project=path.resolve(opts.project||process.cwd()),dataDir=opts['data-dir']||defaultDataDir(),options={dataDir};
+const project=path.resolve(opts.project||process.cwd()),dataDir=opts['data-dir']||defaultDataDir(),options={dataDir,project};
 const print=x=>process.stdout.write(JSON.stringify(x,null,2)+'\n');
 const requireAs=()=>{if(!opts.as)throw new Error('Use --as with your registered agent ID');return opts.as;};
 async function checkGate(){
@@ -36,6 +38,61 @@ const question=async prompt=>{
 };
 const flagBool=(name)=>opts[name]===undefined?undefined:opts[name]==='true'?true:opts[name]==='false'?false:(()=>{throw new Error(`Use --${name} true|false`)})();
 const splitList=(value)=>value===undefined?undefined:value.split(',').map(s=>s.trim()).filter(Boolean);
+// A number from a flag or an environment variable. An empty value is no value at all.
+const numOpt=(value)=>{if(value===undefined||value===null)return undefined;const text=String(value).trim();if(!text)return undefined;const number=Number(text);return Number.isFinite(number)?number:undefined;};
+// The scope of a bulk cleanup. The scope fields alone select the bulk form; `--apply` never does.
+const bulkScope=()=>{
+ const scope={};
+ if(opts.stale!==undefined)scope.stale=true;
+ if(opts['idle-hours']!==undefined){const hours=numOpt(opts['idle-hours']);if(hours===undefined||hours<0)throw new Error('--idle-hours must be a nonnegative number of hours');scope.idleHours=hours;}
+ if(opts.prefix!==undefined)scope.prefix=opts.prefix;
+ if(opts.runner!==undefined)scope.runner=opts.runner;
+ return Object.keys(scope).length?scope:null;
+};
+const ageText=(ms)=>{if(!Number.isFinite(ms))return 'unknown';const seconds=Math.round(ms/1000);if(seconds<60)return `${seconds}s`;const minutes=Math.round(seconds/60);if(minutes<60)return `${minutes}m`;const hours=Math.round(minutes/60);if(hours<48)return `${hours}h`;return `${Math.round(hours/24)}d`;};
+// The pending breakdown, read out loud. `--json` prints the broker's own report instead.
+function printPending(result){
+ const counts=result.counts??{};
+ console.log(`Pending deliveries: ${result.total??0}`);
+ console.log(`  awaiting live agents: ${counts.live??0}`);
+ console.log(`  awaiting dormant identities: ${counts.dormant??0}`);
+ console.log(`  awaiting retired identities: ${counts.retired??0}`);
+ console.log(`  expired (waiting for the archive): ${counts.expired??0}`);
+ if(result.groups?.length){
+  console.log(`\nBy ${result.by??'state'}:`);
+  for(const group of result.groups)console.log(`  ${String(group.key).padEnd(24)}${group.count}`);
+ }
+ const rows=result.rows??[];
+ console.log(`\nDeliveries (offset ${result.offset??0}, limit ${result.limit??rows.length}):`);
+ if(!rows.length)console.log('  none');
+ for(const row of rows)console.log(`  ${row.messageId}  ${row.from} -> ${row.to}  ${row.kind}  ${row.state}  ${ageText(row.ageMs)} old`);
+ if((result.total??0)>rows.length)console.log(`  ... ${(result.total??0)-rows.length} more; use --limit and --offset, or --json for the whole report.`);
+}
+// The bulk cleanup report: what would change, what was kept, and why.
+function printBulk(result){
+ const mode=result.mode??'leave';
+ console.log(`Bulk ${mode}${result.dryRun?' (dry run)':''}: ${result.total?.candidates??result.candidates?.length??0} candidate(s), ${result.total?.kept??result.kept?.length??0} kept, ${result.total?.skippedLive??result.skippedLive?.length??0} skipped as live.`);
+ for(const row of result.candidates??[])console.log(`  candidate  ${row.agentId}  (${row.runner??'unknown runner'}, last seen ${ageText(row.lastSeenAgeMs)} ago)`);
+ for(const row of result.kept??[]){
+  const owed=row.obligations??{};
+  const held=[...(owed.claims??[]).map(v=>`claim ${v}`),...(owed.machineClaims??[]).map(v=>`machine claim ${v}`),...(owed.branchClaims??[]).map(v=>`branch claim ${v}`),...(owed.handoffs??[]).map(v=>`handoff ${v}`),...(owed.processes??[]).map(v=>`process ${v}`),...(owed.tasks??[]).map(v=>`task ${v}`)];
+  console.log(`  kept       ${row.agentId}  still holds ${held.length?held.join(', '):'something'}: it stays active.`);
+ }
+ for(const id of result.skippedLive??[])console.log(`  skipped    ${id}  is live: it is never touched.`);
+ console.log(result.dryRun?'Nothing was changed. Re-run with --apply to change it.':`Changed ${result.changed??0} identity(ies).`);
+}
+// The clipboard is a convenience, never a requirement: the text is always printed too.
+function copyToClipboard(text){
+ try{
+  const [command,...args]=process.platform==='darwin'?['pbcopy']:process.platform==='win32'?['clip']:['xclip','-selection','clipboard'];
+  const child=spawn(command,args,{stdio:['pipe','ignore','ignore'],detached:true});
+  child.on('error',()=>{});
+  child.stdin.on('error',()=>{});
+  child.stdin.end(text);
+  child.unref();
+  return true;
+ }catch{return false;}
+}
 const daemonAlive=pid=>{try{process.kill(pid,0);return true;}catch(e){return e.code==='EPERM';}};
 async function readDiscovery(){
  try{
@@ -107,9 +164,11 @@ async function main(){
  case 'daemon':{
   const {createBroker}=await import('../lib/broker.mjs');
   const pruneAfter=opts['prune-after-minutes']??process.env.AGENT_RELAY_PRUNE_AFTER_MINUTES,ephemeralPrune=opts['ephemeral-prune-minutes']??process.env.AGENT_RELAY_EPHEMERAL_PRUNE_MINUTES,compactAfter=opts['compact-after-days']??process.env.AGENT_RELAY_COMPACT_AFTER_DAYS;
-  const broker=await createBroker({dataDir,staleMinutes:opts['stale-minutes']===undefined?Number(process.env.AGENT_RELAY_STALE_MINUTES??30):Number(opts['stale-minutes']),...(pruneAfter===undefined?{}:{pruneAfterMinutes:Number(pruneAfter)}),...(ephemeralPrune===undefined?{}:{ephemeralPruneMinutes:Number(ephemeralPrune)}),...(compactAfter===undefined?{}:{compactAfterDays:Number(compactAfter)})});
+  const broadcastTtl=numOpt(opts['broadcast-ttl-days']??process.env.AGENT_RELAY_BROADCAST_TTL_DAYS),directTtl=numOpt(opts['direct-ttl-days']??process.env.AGENT_RELAY_DIRECT_TTL_DAYS),releaseStale=numOpt(opts['release-stale-claims-hours']??process.env.AGENT_RELAY_RELEASE_STALE_CLAIMS_HOURS);
+  const broker=await createBroker({dataDir,staleMinutes:opts['stale-minutes']===undefined?Number(process.env.AGENT_RELAY_STALE_MINUTES??30):Number(opts['stale-minutes']),...(pruneAfter===undefined?{}:{pruneAfterMinutes:Number(pruneAfter)}),...(ephemeralPrune===undefined?{}:{ephemeralPruneMinutes:Number(ephemeralPrune)}),...(compactAfter===undefined?{}:{compactAfterDays:Number(compactAfter)}),...(broadcastTtl===undefined?{}:{broadcastTtlDays:broadcastTtl}),...(directTtl===undefined?{}:{directTtlDays:directTtl}),...(releaseStale===undefined?{}:{releaseStaleClaimsHours:releaseStale})});
   const discovery=path.join(dataDir,'broker.json'),tmp=discovery+`.${process.pid}.tmp`;
-  await fs.writeFile(tmp,JSON.stringify({pid:process.pid,url:broker.url,token:broker.token,api:'/api/v1/rpc'}),{mode:0o600});await fs.rename(tmp,discovery);
+  // The rename retries the Windows sharing failures, so a dashboard may read the file meanwhile.
+  await fs.writeFile(tmp,JSON.stringify({pid:process.pid,url:broker.url,token:broker.token,api:'/api/v1/rpc'}),{mode:0o600});await renameWithRetry(tmp,discovery);
   if(opts['startup-lock'])await fs.rm(opts['startup-lock'],{recursive:true,force:true});
   const stop=async()=>{await broker.close();try{const current=JSON.parse(await fs.readFile(discovery,'utf8'));if(current.pid===process.pid)await fs.unlink(discovery);}catch{}process.exit(0);};
   process.once('SIGTERM',stop);process.once('SIGINT',stop);break;
@@ -222,7 +281,28 @@ async function main(){
    if(!result.ok){console.error(result.message);process.exitCode=1;break;}
    console.log(result.message);break;
   }
-  console.error(`Unknown remote action: ${action}. Use on, off, status, doctor, approve, deny, revoke, add, test, room or gateway.`);
+  if(action==='host'){
+   // The always-on host: the artifacts and the steps. Nothing is deployed from here.
+   const {planRemoteHost,remoteHostInstructions,writeRemoteHostArtifacts}=await import('../lib/remote-host.mjs');
+   const {originOf,branchOf}=await import('../lib/remote-rooms.mjs');
+   const repo=await originOf(project).catch(()=>null);
+   const rooms=repo?[{name:path.basename(project),repo,branch:await branchOf(project).catch(()=>'main')}]:[];
+   const plan=planRemoteHost({provider:opts.provider,port:opts.port===undefined?undefined:Number(opts.port),hostname:opts.hostname,rooms});
+   if(!plan.ok){console.error(plan.message);process.exitCode=1;break;}
+   console.log(remoteHostInstructions(plan));
+   if(opts.out){
+    const written=await writeRemoteHostArtifacts({dir:opts.out,provider:opts.provider,port:opts.port===undefined?undefined:Number(opts.port),hostname:opts.hostname,rooms});
+    if(!written.ok){console.error(written.message);process.exitCode=1;break;}
+    console.log(`\nThe artifacts are written to ${written.dir}:`);
+    for(const file of written.written)console.log(`  ${file.path}`);
+   }
+   const clipboard=[...plan.steps,'','On this machine:',...plan.local.steps].join('\n');
+   console.log('\nCopy this (the deployment steps and the local wiring):');
+   console.log(clipboard);
+   console.log(copyToClipboard(clipboard)?'(copied to the clipboard)':'(the clipboard was not available; copy the text above)');
+   break;
+  }
+  console.error(`Unknown remote action: ${action}. Use on, off, status, doctor, approve, deny, revoke, add, test, host, room or gateway.`);
   process.exitCode=1;break;
  }
  case 'dashboard':{
@@ -240,7 +320,29 @@ async function main(){
    else print(await setupProject(project,{runners:opts.runners?.split(',')}));await ensureBroker(options);break;
   }
   case 'join': print(await rpc(project,{op:'register',agentId:requireAs(),runner:opts.runner||'generic',sessionId:opts.session,groupId:opts.group,ephemeral:opts.ephemeral||undefined},options));break;
- case 'leave':print(await rpc(project,{op:'leave',agentId:requireAs(),ifIdle:opts['if-idle']||undefined},options));break;
+ case 'leave':case 'retire':{
+  // The scope fields alone select the bulk form: `--apply` never turns one identity into a sweep.
+  const scope=bulkScope();
+  if(scope){
+   const result=await rpc(project,{op:command,...scope,actor:opts.actor,apply:opts.apply===true?true:undefined},options);
+   if(opts.json)print(result);else printBulk(result);
+   break;
+  }
+  if(command==='leave')print(await rpc(project,{op:'leave',agentId:requireAs(),ifIdle:opts['if-idle']||undefined},options));
+  else print(await rpc(project,{op:'retire',agentId:requireAs(),relinquish:opts.relinquish||undefined},options));
+  break;
+ }
+ case 'pending':{
+  const by=opts.by;
+  if(by!==undefined&&!['recipient','state','age','sender','kind'].includes(by))throw new Error('Use --by recipient|state|age|sender|kind.');
+  const limit=opts.limit===undefined?undefined:Number(opts.limit);
+  if(limit!==undefined&&(!Number.isInteger(limit)||limit<1))throw new Error('--limit must be a positive integer.');
+  const offset=opts.offset===undefined?undefined:Number(opts.offset);
+  if(offset!==undefined&&(!Number.isSafeInteger(offset)||offset<0))throw new Error('--offset must be a nonnegative integer.');
+  const result=await rpc(project,{op:'pending',...(by===undefined?{}:{by}),...(limit===undefined?{}:{limit}),...(offset===undefined?{}:{offset})},options);
+  if(opts.json)print(result);else printPending(result);
+  break;
+ }
   case 'agents': print(await rpc(project,{op:'agents',active:opts.active,within:opts.within===undefined?undefined:Number(opts.within),staleMinutes:opts['stale-minutes']===undefined?undefined:Number(opts['stale-minutes']),transport:opts.transport,test:flagBool('test')},options));break;
  case 'send':{
   let body=opts.message;if(body==='-'){body='';for await(const chunk of process.stdin)body+=chunk;}
@@ -342,7 +444,6 @@ async function main(){
    else throw new Error('Use branch claim|release|list|force-release');
    break;
   }
-  case 'retire':print(await rpc(project,{op:'retire',agentId:requireAs(),relinquish:opts.relinquish||undefined},options));break;
   case 'reconcile':{
    if(!opts.id||(!opts.arrived&&!opts.missing))throw new Error('Use --id MESSAGE_ID with --arrived or --missing');
    const {reconcileCodexDelivery}=await import('../lib/codex.mjs');
