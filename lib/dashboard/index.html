@@ -48,7 +48,7 @@
 </section>
 <div class="gauges" id="gauges">
 <button type="button" class="gauge rise" data-go="agents" data-fk="g-live"><span class="g-label">Running</span><strong id="agents-count">—</strong><span class="g-sub" id="agents-sub">live agents</span></button>
-<button type="button" class="gauge rise" data-go="messages" data-fk="g-pending"><span class="g-label">Awaiting ack</span><strong id="pending-count">—</strong><span class="g-sub">pending deliveries</span></button>
+<button type="button" class="gauge rise" data-go="messages" data-fk="g-pending"><span class="g-label" id="pending-label">Awaiting ack</span><strong id="pending-count">—</strong><span class="g-sub" id="pending-sub">pending deliveries</span></button>
 <button type="button" class="gauge rise" data-go="claims" data-fk="g-claims"><span class="g-label">Claims</span><strong id="claims-count">—</strong><span class="g-sub" id="claims-sub">files and resources</span></button>
 <button type="button" class="gauge rise" data-go="branches" data-fk="g-conflicts"><span class="g-label">Branch flags</span><strong id="conflicts-count">—</strong><span class="g-sub" id="conflicts-sub">ownership map</span></button>
 <button type="button" class="gauge rise gauge-ring" data-go="roadmap" data-fk="g-plan"><span class="g-label">Roadmap</span><strong id="plan-count">—</strong><span class="g-sub" id="plan-sub">roadmap progress</span><span class="ring" id="plan-ring" aria-hidden="true"></span></button>
@@ -59,6 +59,7 @@
 <section class="panel rise attention" aria-labelledby="h-attention"><div class="panel-head"><h2 id="h-attention">Needs attention</h2></div><ul id="attention" class="attention-list"></ul></section>
 <section class="panel rise traffic" aria-labelledby="h-traffic"><div class="panel-head"><h2 id="h-traffic">Running now</h2><button type="button" class="link" data-go="agents">All agents</button></div><div id="traffic" class="strips compact"></div></section>
 <section class="panel rise recent" aria-labelledby="h-recent"><div class="panel-head"><h2 id="h-recent">Recent messages</h2><button type="button" class="link" data-go="messages">All messages</button></div><ol id="recent" class="recent"></ol></section>
+<section class="panel rise pairings" id="pairings" aria-labelledby="h-pairings" hidden><div class="panel-head"><h2 id="h-pairings">Pending pairing requests</h2><span class="note">Read-only</span></div><div id="pairing-list" class="pairing-list"></div><p class="note">A cloud agent is waiting for a person at the machine. Approve or deny it there with <code>agent-relay remote approve</code>. This dashboard never approves anything. Requests expire after ten minutes.</p></section>
 </div>
 </section>
 

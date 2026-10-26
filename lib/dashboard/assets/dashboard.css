@@ -289,7 +289,12 @@ button[aria-pressed=true]:hover { background: #fff; }
 .steps li::before { content: counter(step); display: inline-grid; place-items: center; width: 22px; height: 22px; flex: none; border: 1px solid var(--cyan); border-radius: 50%; color: var(--cyan-ink); font: 600 11px var(--font-mono); }
 code { font: 12px/1.5 var(--font-mono); padding: 2px 8px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 7px; overflow-wrap: anywhere; }
 .tower-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 14px; }
-.registry { grid-column: span 7; } .attention { grid-column: span 5; } .traffic { grid-column: span 7; } .recent { grid-column: span 5; }
+.registry { grid-column: span 7; } .attention { grid-column: span 5; } .traffic { grid-column: span 7; } .recent { grid-column: span 5; } .pairings { grid-column: span 12; }
+.pairing-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin-bottom: 12px; }
+.pairing { display: grid; gap: 4px; align-content: start; padding: 12px 14px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; }
+.pairing p { margin: 0; overflow-wrap: anywhere; }
+.pairing-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; }
+.pairing-code { font: 600 15px var(--font-mono); letter-spacing: .14em; color: var(--ink); }
 .registry-head { margin: 0 0 14px; font: 14px var(--font-mono); display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; }
 .registry-head strong { font-size: clamp(28px, 3vw, 38px); font-weight: 600; letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; }
 .registry-head .live-n { color: var(--live-ink); }
@@ -347,6 +352,13 @@ ol.recent { margin: 0; padding: 0; }
 .warn-n { color: var(--amber-ink); }
 .strip-age { display: grid; align-content: center; text-align: right; font: 11px var(--font-mono); color: var(--muted); white-space: nowrap; }
 .strip-age b { font-weight: 600; color: var(--ink); }
+/* Cloud agents: the runner they carry and the fact that they came through the gateway. */
+.strip-marks { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.cloud-badge { display: inline-flex; align-items: center; font: 600 10px/1.6 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; padding: 0 8px; border: 1px solid var(--cyan); border-radius: 999px; color: var(--cyan-ink); background: var(--cyan-bg); }
+.via-gateway { display: inline-flex; align-items: center; font: 500 10px/1.6 var(--font-mono); letter-spacing: .04em; padding: 0 8px; border: 1px dashed var(--cyan); border-radius: 999px; color: var(--cyan-ink); }
+.pending-held { white-space: normal; }
+.strip-nums .pending-held b { font-size: 11px; }
+.message-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
 .compact .strip { grid-template-columns: 52px minmax(120px, 1fr) minmax(0, 2fr) 78px; }
 .compact .strip > div { padding: 10px 13px; }
 .compact .task { -webkit-line-clamp: 1; }
@@ -494,7 +506,7 @@ td:first-child { width: 48%; color: var(--callsign); font-weight: 600; }
 
 /* ---- responsive -------------------------------------------------------------------------- */
 @media (max-width: 1180px) {
-  .registry, .attention, .traffic, .recent { grid-column: 1 / -1; }
+  .registry, .attention, .traffic, .recent, .pairings { grid-column: 1 / -1; }
   .strip { grid-template-columns: 64px minmax(140px, 1fr) minmax(0, 2fr) minmax(120px, .8fr) 84px; }
   .strip-wire { display: none; }
 }
