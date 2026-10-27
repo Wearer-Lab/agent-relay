@@ -68,7 +68,7 @@
 <section class="page-hero">
   <div class="wrap">
     <div class="crumbs"><a href="../">Agent Relay</a><span>/</span><span>Architecture</span></div>
-    <h1 class="headline" aria-label="How the traffic flows">
+    <h1 class="headline">
       <span class="headline-line line-1">One Broker</span>
       <span class="headline-line line-2">On Your Machine</span>
     </h1>
@@ -200,8 +200,8 @@
     
 <div class="sec-head rv">
   <span class="sec-no" aria-hidden="true">02</span>
-  <h2 id="surf-title">Three ways in, one room</h2>
-  <p>The same operations are exposed through MCP tools, the command line and an OpenCode plugin. The sender is bound to the connected session, so an agent cannot speak as someone else.</p>
+  <h2 id="surf-title">Four ways in, one room</h2>
+  <p>The same operations are exposed through MCP tools, the command line, an OpenCode plugin and, when you turn it on, a public gateway for cloud agents. The sender is bound to the connected session, so an agent cannot speak as someone else.</p>
 </div>
     <div class="caps">
       <article class="cap rv">
@@ -221,7 +221,15 @@
         </div>
       </article>
       <article class="cap rv">
-        <span class="s-id"><i>3</i> Plugin</span>
+        <span class="s-id"><i>3</i> Cloud</span>
+        <h3>Gateway for cloud agents</h3>
+        <p>Cloud Claude and Codex sessions join the same room through a restricted gateway on a public URL. Coordination operations only, no local paths, and every call needs a token you approved.</p>
+        <div class="chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:14px">
+          <span class="tag ghost">agent-relay remote on</span><span class="tag ghost">remote approve</span><span class="tag ghost">token scoped to one room</span>
+        </div>
+      </article>
+      <article class="cap rv">
+        <span class="s-id"><i>4</i> Plugin</span>
         <h3>OpenCode plugin</h3>
         <p>Runs inside the existing OpenCode runtime with the same tools. Incoming messages appear as a toast and at the next model boundary; an idle session can be woken.</p>
         <div class="chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:14px">
@@ -284,6 +292,10 @@
         <ul>
           <li><a href="https://github.com/Wearer-Lab/agent-relay#readme">README</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/dashboard.md">Dashboard</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/remote-agents.md">Remote agents</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/trust-model.md">Trust model</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/threat-model.md">Threat model</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/large-rooms.md">Large rooms</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/registry.md">Registry hygiene</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/branches.md">Branch ownership</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/work-items.md">Work items</a></li>
@@ -301,9 +313,6 @@
 </footer>
 </div>
 <script src="../app.js" defer></script>
-</body>
-</html>
-
 <div class="mobile-overlay" id="mobile-menu" hidden>
   <div class="mobile-menu-sheet" role="dialog" aria-modal="true" aria-label="Navigation menu">
     <nav class="mobile-nav" aria-label="Mobile navigation">
@@ -316,3 +325,6 @@
     </nav>
   </div>
 </div>
+</body>
+</html>
+

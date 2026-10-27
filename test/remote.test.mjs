@@ -121,7 +121,7 @@ test('pairing asks for a code, approval hands over a token once, and the request
   assert.equal(approved.status, 200);
   const body = await approved.json();
   assert.equal(body.status, 'approved');
-  assert.equal(body.room, '/work/alpha');
+  assert.equal(body.room, '.', 'the room path never leaves the machine');
   assert.ok(body.token, 'the agent receives a token');
 
   const again = await fetch(`${gateway.url}/pair/${request.requestId}`);
@@ -193,6 +193,83 @@ test('a Cloudflare Access token, when configured, is required', async t => {
   assert.equal(wrong.status, 401);
   const right = await fetch(`${gateway.url}/rpc`, {method: 'POST', headers: {authorization: `Bearer ${token.value}`, 'cf-access-client-id': 'id', 'cf-access-client-secret': 'secret'}, body: JSON.stringify({op: 'agents'})});
   assert.equal(right.status, 200);
+});
+
+test('a token cannot post as somebody else, nor force a release or sweep a room', async t => {
+  const {gateway} = await gatewayWith(t);
+  const token = await issue(gateway, {agentPrefix: 'cloud-'});
+  const headers = {authorization: `Bearer ${token.value}`};
+  const post = body => fetch(`${gateway.url}/rpc`, {method: 'POST', headers, body: JSON.stringify(body)});
+
+  // `from` is the sender a message claims, and `agentId` is the agent it acts
+  // as: a request that carries both must be checked against both.
+  const own = await post({op: 'send', agentId: 'cloud-1', from: 'cloud-1', to: 'cloud-2', body: 'hi'});
+  assert.equal(own.status, 200);
+  const masked = await post({op: 'send', agentId: 'cloud-1', from: 'local-codex-1', to: 'cloud-2', body: 'hi'});
+  assert.equal(masked.status, 403, 'a local sender cannot hide behind an allowed agentId');
+  assert.match((await masked.json()).error, /may only act for agents starting with cloud-/);
+
+  const forced = await post({op: 'release', agentId: 'cloud-1', force: true, resources: ['src/app.js']});
+  assert.equal(forced.status, 403);
+  assert.match((await forced.json()).error, /forced release needs a local human/);
+  const sweep = await post({op: 'leave', agentId: 'cloud-1', stale: true, apply: true});
+  assert.equal(sweep.status, 403);
+  assert.match((await sweep.json()).error, /bulk sweep/);
+});
+
+test('a path inside a nested object is refused too', async t => {
+  const {gateway} = await gatewayWith(t);
+  const token = await issue(gateway);
+  const nested = await fetch(`${gateway.url}/rpc`, {
+    method: 'POST', headers: {authorization: `Bearer ${token.value}`},
+    body: JSON.stringify({op: 'status', agentId: 'cloud-1', task: {file: '/etc/passwd'}}),
+  });
+  assert.equal(nested.status, 400);
+  assert.match((await nested.json()).error, /Local paths cannot cross the gateway/);
+});
+
+test('concurrent pairings do not take the gateway down', async t => {
+  const {gateway} = await gatewayWith(t);
+  const answers = await Promise.all(Array.from({length: 6}, () => fetch(`${gateway.url}/pair`, {
+    method: 'POST', headers: {'content-type': 'application/json'},
+    body: JSON.stringify({repo: 'github.com/org/repo', runner: 'claude'}),
+  })));
+  for (const answer of answers) assert.ok(answer.status === 200 || answer.status === 429, `got ${answer.status}`);
+  const health = await fetch(`${gateway.url}/health`);
+  assert.equal(health.status, 200, 'the gateway is still answering');
+});
+
+test('a revoke is not undone by a write that started before it', async t => {
+  const {gateway, dataDir} = await gatewayWith(t);
+  const token = await issue(gateway);
+  const {TokenStore} = await import('../lib/gateway.mjs');
+  const store = await new TokenStore(dataDir).load();
+  store.revoke(token.id);
+  await store.save();
+  // The gateway still has the token in memory from before the revoke.
+  const response = await fetch(`${gateway.url}/rpc`, {
+    method: 'POST', headers: {authorization: `Bearer ${token.value}`},
+    body: JSON.stringify({op: 'agents'}),
+  });
+  assert.equal(response.status, 401, 'a revoked token stops working even if a request was in flight');
+});
+
+test('a pairing request is bounded and free of control characters', async t => {
+  const {gateway} = await gatewayWith(t);
+  const huge = await fetch(`${gateway.url}/pair`, {
+    method: 'POST', headers: {'content-type': 'application/json'},
+    body: JSON.stringify({repo: 'x'.repeat(400)}),
+  });
+  assert.equal(huge.status, 400);
+  const escape = await fetch(`${gateway.url}/pair`, {
+    method: 'POST', headers: {'content-type': 'application/json'},
+    body: JSON.stringify({repo: '\u001b[31mgithub.com/org/repo\u001b[0m'}),
+  });
+  assert.equal(escape.status, 200);
+  const {TokenStore} = await import('../lib/gateway.mjs');
+  const store = await new TokenStore(gateway.store.file.replace(/remote-tokens\.json$/, '')).load();
+  const pending = store.pendingPairings();
+  assert.ok(pending.every(row => !/[\u0000-\u001f]/u.test(row.repo)), 'no control character is stored');
 });
 
 test('the gateway refuses too many pairing requests at once', async t => {

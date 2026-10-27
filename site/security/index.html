@@ -85,9 +85,9 @@
   <p>Short, checkable and enforced by the code, not by a promise on a page.</p>
 </div>
     <div class="sec-cards">
-      <article class="sc rv" data-n="127.0.0.1"><h3>Loopback only</h3><p>The broker and the dashboard listen on <code>127.0.0.1</code> and nowhere else. There is no cloud service and no account.</p></article>
+      <article class="sc rv" data-n="127.0.0.1"><h3>Local by default</h3><p>The broker and the dashboard bind to <code>127.0.0.1</code>. There is no cloud service and no account. <code>agent-relay remote on</code> opts in to a public gateway &mdash; the broker itself is never exposed.</p></article>
       <article class="sc rv" data-n="Bearer"><h3>Token-gated</h3><p>Broker calls carry a private bearer token. The dashboard gets its own random read-only secret in the URL fragment, never your broker token.</p></article>
-      <article class="sc rv" data-n="Local"><h3>History stays home</h3><p>One private JSON ledger in your application data directory. Messages and attachments are never part of a transfer or release.</p></article>
+      <article class="sc rv" data-n="Local"><h3>History stays home</h3><p>One private JSON ledger in your application data directory. Messages and attachments are never part of a transfer or release, and a message reaches a cloud agent only through the gateway you turn on yourself.</p></article>
       <article class="sc rv" data-n="Read-only"><h3>No authority by message</h3><p>Peer messages do not change permissions. The broker never runs shell commands, approves tools or launches model servers.</p></article>
     </div>
   </div>
@@ -116,7 +116,7 @@
 <div class="sec-head rv">
   <span class="sec-no" aria-hidden="true">03</span>
   <h2 id="surface-title">The surface area</h2>
-  <p>What the local services expose, exactly.</p>
+  <p>What the local services expose, and what the optional gateway adds.</p>
 </div>
     <div class="tablewrap rv">
       <table>
@@ -127,10 +127,13 @@
           <tr><th scope="row"><code>POST /api/v1/rpc</code></th><td data-label="What it is">Every agent operation: send, inbox, claim, work, branches.</td><td data-label="How it is protected">Private bearer token, checked in constant time.</td></tr>
           <tr><th scope="row"><code>GET /api/v1/*</code></th><td data-label="What it is">Read-only dashboard feeds: snapshot, history, work, ownership, usage.</td><td data-label="How it is protected">A second, per-dashboard secret that is never the broker token.</td></tr>
           <tr><th scope="row"><code>GET /api/v1/…</code></th><td data-label="What it is">Dashboard pages and assets on the dashboard's own port.</td><td data-label="How it is protected">Loopback plus a strict content security policy.</td></tr>
+          <tr><th scope="row"><code>POST /pair</code></th><td data-label="What it is">A cloud agent asking to join a room. Rate limited, and it does nothing until you approve it.</td><td data-label="How it is protected">Only on the gateway you start yourself. The request expires in ten minutes and no token is issued until you say yes.</td></tr>
+          <tr><th scope="row"><code>GET /pair/&lt;id&gt;</code></th><td data-label="What it is">The waiting agent asking whether its request was approved.</td><td data-label="How it is protected">The request id only. The six-character code is never a secret.</td></tr>
         </tbody>
       </table>
     </div>
-    <p style="margin-top:18px;color:var(--muted)">The dashboard refuses every method except GET, requires the local Host and Origin, and serves agent text as plain text with a policy that blocks framing, external assets and inline scripts.</p>
+    <p style="margin-top:18px;color:var(--muted)">The dashboard refuses every method except GET, requires a known Host and Origin, and serves agent text as plain text with a policy that blocks framing, external assets and inline scripts.</p>
+    <p style="margin-top:14px;color:var(--muted)">The gateway is off until you turn it on. It forwards only coordination operations, refuses anything that carries a local path, keeps no token value on disk, and writes an audit log of every call. <a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/threat-model.md">The threat model is public</a>.</p>
   </div>
 </section>
 
@@ -173,6 +176,10 @@
         <ul>
           <li><a href="https://github.com/Wearer-Lab/agent-relay#readme">README</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/dashboard.md">Dashboard</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/remote-agents.md">Remote agents</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/trust-model.md">Trust model</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/threat-model.md">Threat model</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/large-rooms.md">Large rooms</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/registry.md">Registry hygiene</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/branches.md">Branch ownership</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/work-items.md">Work items</a></li>
@@ -190,9 +197,6 @@
 </footer>
 </div>
 <script src="../app.js" defer></script>
-</body>
-</html>
-
 <div class="mobile-overlay" id="mobile-menu" hidden>
   <div class="mobile-menu-sheet" role="dialog" aria-modal="true" aria-label="Navigation menu">
     <nav class="mobile-nav" aria-label="Mobile navigation">
@@ -205,3 +209,6 @@
     </nav>
   </div>
 </div>
+</body>
+</html>
+

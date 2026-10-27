@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { ensureBroker, recordOwnerRefusal, resolveNodeRuntime } from '../lib/client.mjs';
-import { probeNode, recordNodeRuntime, renameWithRetry } from '../lib/runtime.mjs';
+import { probeNode, recordNodeRuntime, renameWithRetry, readProjectRuntime } from '../lib/runtime.mjs';
 import { createLogWriter } from '../lib/logwriter.mjs';
 import { createBroker } from '../lib/broker.mjs';
 
@@ -31,22 +31,35 @@ test('the recorded runtime is read back and preferred over the host binary', asy
   await fs.rm(root, { recursive: true, force: true });
 });
 
-test('the runtime the setup step recorded in the project is read back', async () => {
+test('a runtime named by the repository is read, but never executed', async () => {
   const root = await temp('relay-ack-project-');
   const project = path.join(root, 'project');
   await fs.mkdir(project);
+  // A binary that would leave a mark if it were ever run.
+  const marker = path.join(root, 'executed');
+  const impostor = path.join(root, 'evil-node');
+  await fs.writeFile(impostor, `#!/bin/sh\n touch ${JSON.stringify(marker)}\n echo v99.0.0\n`);
+  await fs.chmod(impostor, 0o755);
   await fs.writeFile(path.join(project, '.mcp.json'),
-    JSON.stringify({ mcpServers: { 'agent-relay': { command: process.execPath, args: ['cli'] } } }));
+    JSON.stringify({ mcpServers: { 'agent-relay': { command: impostor, args: ['cli'] } } }));
+
   const fromMcp = await resolveNodeRuntime({ project, execPath: '/opt/homebrew/bin/opencode', versions: { bun: '1.2.0' } });
-  assert.equal(fromMcp.command, process.execPath);
-  assert.equal(fromMcp.source, 'project');
+  assert.notEqual(fromMcp.command, impostor, 'a path named by the repository is never chosen');
+  assert.notEqual(fromMcp.source, 'project');
+  // And it was never run.
+  await assert.rejects(fs.stat(marker), 'the binary from the repository was never executed');
+
+  // It is still reported, so the error can name it.
+  const bound = await readProjectRuntime(project);
+  assert.equal(bound.command, impostor);
+  assert.equal(bound.source, 'project');
+
   await fs.writeFile(path.join(project, '.mcp.json'), '{}');
   await fs.mkdir(path.join(project, '.codex'));
   await fs.writeFile(path.join(project, '.codex', 'config.toml'),
-    `[mcp_servers.agent-relay]\ncommand = ${JSON.stringify(process.execPath)}\nargs = ["cli"]\n`);
+    `[mcp_servers.agent-relay]\ncommand = ${JSON.stringify(impostor)}\nargs = ["cli"]\n`);
   const fromCodex = await resolveNodeRuntime({ project, execPath: '/opt/homebrew/bin/opencode', versions: { bun: '1.2.0' } });
-  assert.equal(fromCodex.command, process.execPath);
-  assert.equal(fromCodex.source, 'project');
+  assert.notEqual(fromCodex.command, impostor, 'the codex binding is not executed either');
   await fs.rm(root, { recursive: true, force: true });
 });
 

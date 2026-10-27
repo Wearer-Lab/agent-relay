@@ -198,7 +198,7 @@ test('tower shows the registry hygiene story, attention items and degraded state
  assert.match(registry,/1,410 identities stored/);assert.match(registry,/25 on the air/);assert.match(registry,/300 stored identities are prunable/);assert.match(registry,/Source: broker registry report/);
  assert.equal(byClass(page.$('registry'),'seg').length,4);
  assert.equal(textOf(page.$('conflicts-count')),'—');assert.equal(textOf(page.$('conflicts-sub')),'not available on this broker');
- assert.equal(textOf(page.$('plan-count')),'—');assert.equal(textOf(page.$('plan-sub')),'not available on this broker');
+ assert.equal(textOf(page.$('roadmap-count')),'—');assert.equal(textOf(page.$('roadmap-sub')),'not available on this broker');
  const attention=findAll(page.$('attention'),el=>el.tag==='button').map(textOf);
  assert.ok(attention.some(t=>/3 deliveries awaiting acknowledgement/.test(t)));assert.ok(attention.some(t=>/300 identities could be pruned/.test(t)));
  assert.equal(page.$('view-overview').hidden,false);assert.equal(page.$('view-roadmap').hidden,true);
@@ -208,7 +208,7 @@ test('tower summarizes the flight plan and branch conflicts when the broker supp
  const page=boot({projects:rooms,snapshot:fleetSnapshot(),work:workPayload(),ownership:ownershipPayload(),usage:{available:true,agents:{stored:33,active:33,left:0},nearLimit:[]}});
  await page.flush();
  assert.equal(textOf(page.$('conflicts-count')),'3','the number counts branches with any flag');assert.equal(textOf(page.$('conflicts-sub')),'1 contested · 1 missing · 1 orphaned · 1 unclaimed');
- assert.equal(textOf(page.$('plan-count')),'40%');assert.equal(textOf(page.$('plan-sub')),'2/5 items done');
+ assert.equal(textOf(page.$('roadmap-count')),'40%');assert.equal(textOf(page.$('roadmap-sub')),'2/5 items done');
  assert.equal(textOf(page.$('count-branches')),'3');assert.equal(textOf(page.$('count-roadmap')),'40%');
  assert.equal(textOf(page.$('registry')).includes('Source: broker storage usage'),true);
  const first=findAll(page.$('attention'),el=>el.tag==='button').map(textOf)[0];assert.match(first,/ALERT1 contested branch/);
@@ -236,12 +236,12 @@ test('flight plan renders the tree with roll-ups, collapses, filters, and switch
  assert.match(textOf(page.$('roadmap-meta')),/5 items · 40% complete/);assert.ok(!/older broker/.test(textOf(page.$('roadmap-meta'))));
  const twist=findAll(page.$('roadmap-tree'),el=>el.tag==='button'&&el.attributes['aria-label']==='Collapse Foundations')[0];assert.equal(twist.attributes['aria-expanded'],'true');
  twist.listeners.click();assert.deepEqual(titles(),['RM','PH1','PH2','T4','T5']);
- page.$('plan-expand').listeners.click();assert.equal(titles().length,11);page.$('plan-collapse').listeners.click();assert.deepEqual(titles(),['RM']);page.$('plan-expand').listeners.click();
+ page.$('roadmap-expand').listeners.click();assert.equal(titles().length,11);page.$('roadmap-collapse').listeners.click();assert.deepEqual(titles(),['RM']);page.$('roadmap-expand').listeners.click();
  page.$('roadmap-owner').value='quill';page.$('roadmap-owner').listeners.change();assert.deepEqual(titles(),['RM','PH2','T4']);
- page.$('plan-reset').listeners.click();assert.equal(titles().length,11);
+ page.$('roadmap-reset').listeners.click();assert.equal(titles().length,11);
  assert.deepEqual(page.$('roadmap-owner').options.map(o=>o.value),['','atlas','quill','vector']);assert.deepEqual(page.$('roadmap-label').options.map(o=>o.value),['','broker','compat','release']);
  page.$('roadmap-q').value='zzz';page.$('roadmap-q').listeners.input();assert.match(textOf(page.$('roadmap-tree')),/No work items match these filters/);
- page.$('plan-reset').listeners.click();page.$('plan-mode-lanes').listeners.click();
+ page.$('roadmap-reset').listeners.click();page.$('roadmap-mode-lanes').listeners.click();
  assert.equal(page.$('roadmap-lanes').hidden,false);assert.equal(page.$('roadmap-tree').hidden,true);
  const lanes=byClass(page.$('roadmap-lanes'),'lane');assert.equal(lanes.length,6);assert.equal(findAll(lanes[2],el=>el.tag==='article').length,1);assert.match(textOf(lanes[2]),/Launch › Foundations › Work tree/);
 });

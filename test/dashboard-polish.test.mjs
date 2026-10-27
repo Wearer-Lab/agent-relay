@@ -135,7 +135,7 @@ test('a project that is not a git repository says so instead of showing an empty
 test('a brand-new room and a broker with no rooms get an orientation, not a wall of zeros', async()=>{
  const fresh=boot({projects:rooms,snapshot:snapshotOf({agents:[]}),work:{available:true,roots:[],counts:{}},ownership:{available:true,git:true,repo:'/w/.git',rooms:['/w'],branches:[],unassigned:{}}});await fresh.flush();
  assert.equal(fresh.$('welcome').hidden,false);assert.match(textOf(fresh.$('h-welcome')),/Quiet frequency/);assert.match(textOf(fresh.$('welcome-lede')),/No agent has checked in from w yet/);
- assert.equal(textOf(fresh.$('agents-count')),'0');assert.equal(textOf(fresh.$('messages-count')),'0');assert.equal(textOf(fresh.$('plan-sub')),'no work items yet');
+ assert.equal(textOf(fresh.$('agents-count')),'0');assert.equal(textOf(fresh.$('messages-count')),'0');assert.equal(textOf(fresh.$('roadmap-sub')),'no work items yet');
  assert.match(textOf(fresh.$('traffic')),/No registered agents in this room/);assert.match(textOf(fresh.$('recent')),/No transmissions yet/);
  const busy=boot({projects:rooms,snapshot:snapshotOf()});await busy.flush();assert.equal(busy.$('welcome').hidden,true,'a room with an agent is not new');
  const none=boot({projects:{rooms:[],preferredProject:'/w'},snapshot:snapshotOf()});await none.flush();

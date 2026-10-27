@@ -26,7 +26,7 @@
 </header>
 <nav class="rail" aria-label="Views">
 <ol class="rail-list">
-<li><a href="/" id="nav-overview" data-view="overview"><span class="n">1</span><span class="lbl">Overview</span><span class="cnt" id="count-overview" hidden></span></a></li>
+<li><a href="/" id="nav-overview" data-view="overview"><span class="n">1</span><span class="lbl">Overview</span></a></li>
 <li><a href="/roadmap/" id="nav-roadmap" data-view="roadmap"><span class="n">2</span><span class="lbl">Roadmap</span><span class="cnt" id="count-roadmap" hidden></span></a></li>
 <li><a href="/branches/" id="nav-branches" data-view="branches"><span class="n">3</span><span class="lbl">Branches</span><span class="cnt" id="count-branches" hidden></span></a></li>
 <li><a href="/agents/" id="nav-agents" data-view="agents"><span class="n">4</span><span class="lbl">Agents</span><span class="cnt" id="count-agents" hidden></span></a></li>
@@ -51,7 +51,7 @@
 <button type="button" class="gauge rise" data-go="messages" data-fk="g-pending"><span class="g-label" id="pending-label">Awaiting ack</span><strong id="pending-count">—</strong><span class="g-sub" id="pending-sub">pending deliveries</span></button>
 <button type="button" class="gauge rise" data-go="claims" data-fk="g-claims"><span class="g-label">Claims</span><strong id="claims-count">—</strong><span class="g-sub" id="claims-sub">files and resources</span></button>
 <button type="button" class="gauge rise" data-go="branches" data-fk="g-conflicts"><span class="g-label">Branch flags</span><strong id="conflicts-count">—</strong><span class="g-sub" id="conflicts-sub">ownership map</span></button>
-<button type="button" class="gauge rise gauge-ring" data-go="roadmap" data-fk="g-plan"><span class="g-label">Roadmap</span><strong id="plan-count">—</strong><span class="g-sub" id="plan-sub">roadmap progress</span><span class="ring" id="plan-ring" aria-hidden="true"></span></button>
+<button type="button" class="gauge rise gauge-ring" data-go="roadmap" data-fk="g-plan"><span class="g-label">Roadmap</span><strong id="roadmap-count">—</strong><span class="g-sub" id="roadmap-sub">roadmap progress</span><span class="ring" id="roadmap-ring" aria-hidden="true"></span></button>
 <button type="button" class="gauge rise" data-go="messages" data-fk="g-messages"><span class="g-label">Messages</span><strong id="messages-count">—</strong><span class="g-sub">retained messages</span></button>
 </div>
 <div class="tower-grid">
@@ -66,17 +66,17 @@
 <section id="view-roadmap" class="view" data-view="roadmap" aria-labelledby="h-roadmap" hidden>
 <header class="view-head rise"><div><p class="kicker">Work</p><h1 id="h-roadmap">Roadmap</h1></div><p id="roadmap-meta" class="project"></p></header>
 <div class="toolbar rise">
-<div class="segmented" role="group" aria-label="Layout"><button type="button" id="plan-mode-tree" aria-pressed="true">Tree</button><button type="button" id="plan-mode-lanes" aria-pressed="false">Lanes</button></div>
+<div class="segmented" role="group" aria-label="Layout"><button type="button" id="roadmap-mode-tree" aria-pressed="true">Tree</button><button type="button" id="roadmap-mode-lanes" aria-pressed="false">Lanes</button></div>
 <label class="field"><span class="sr-only">Search work items</span><input id="roadmap-q" type="search" placeholder="Search work"></label>
 <label class="field"><span class="sr-only">Status</span><select id="roadmap-status"><option value="">Any status</option></select></label>
 <label class="field"><span class="sr-only">Owner</span><select id="roadmap-owner"><option value="">Any owner</option></select></label>
 <label class="field"><span class="sr-only">Branch</span><select id="roadmap-branch"><option value="">Any branch</option></select></label>
 <label class="field"><span class="sr-only">Label</span><select id="roadmap-label"><option value="">Any label</option></select></label>
 <span class="spacer"></span>
-<button type="button" id="plan-expand">Expand all</button><button type="button" id="plan-collapse">Collapse all</button><button type="button" id="plan-reset">Reset filters</button>
+<button type="button" id="roadmap-expand">Expand all</button><button type="button" id="roadmap-collapse">Collapse all</button><button type="button" id="roadmap-reset">Reset filters</button>
 </div>
-<div id="roadmap-summary" class="plan-summary rise"></div>
-<div id="roadmap-tree" class="plan-tree"></div>
+<div id="roadmap-summary" class="roadmap-summary rise"></div>
+<div id="roadmap-tree" class="roadmap-tree"></div>
 <div id="roadmap-lanes" class="lanes" hidden></div>
 </section>
 

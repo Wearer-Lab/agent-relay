@@ -227,7 +227,7 @@ test('the pairing round trip hands a working token to the cloud agent', async t 
   assert.equal(collected.status, 200);
   const handed = await collected.json();
   assert.equal(handed.status, 'approved');
-  assert.equal(handed.room, project);
+  assert.equal(handed.room, '.', 'the room path never leaves the machine');
   assert.ok(handed.token, 'the agent receives a token');
 
   // The token works.

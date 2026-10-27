@@ -30,6 +30,7 @@ const files = [
   'site/variants/a/index.html',
   'site/variants/b/index.html',
   'site/variants/c/index.html',
+  'site/README.md',
 ];
 
 const pkgPath = path.join(root, 'package.json');
@@ -81,4 +82,4 @@ await fs.writeFile(readmePath, readme.split(current).join(origin));
 
 console.log(`${current} -> ${origin}`);
 console.log(`${changed} of ${files.length} site files rewritten, plus package.json and README.md.`);
-console.log('Now point the domain at GitHub Pages and set the custom domain on the repository.');
+console.log('Now point the domain at Cloudflare and set the custom domain in wrangler.jsonc; GitHub Pages keeps serving the same files as a mirror.');

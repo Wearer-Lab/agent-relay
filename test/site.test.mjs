@@ -165,17 +165,47 @@ test('the site tells crawlers where to go, and ships a way home for a bad URL',a
  for(const file of ['assets/favicon-32.png','assets/apple-touch-icon.png','assets/icon-512.png'])assert.ok(await exists(site,file),`missing icon: ${file}`);
 });
 
+// Third parties the site is allowed to point at.
+// `example` is the reserved documentation domain (RFC 2606): the site's own
+// README uses it as the placeholder for a future move.
+const ALLOWED_HOSTS=/(github\.com|npmjs\.com|opensource\.org|onlinewebfonts\.com|json-schema\.org|schema\.org|sitemaps\.org|w3\.org|\.example)$/;
 test('every absolute URL on the site points at the same origin',async()=>{
- const files=['robots.txt','sitemap.xml','404.html','site.webmanifest',...PAGES,...VARIANTS];
+ const files=['robots.txt','sitemap.xml','404.html','site.webmanifest','README.md',...PAGES,...VARIANTS];
  for(const file of files){
   const source=await readFile(path.join(site,file),'utf8');
-  const found=[...source.matchAll(/https:\/\/[a-z0-9.-]+\/agent-relay/g)].map(m=>m[0]);
-  for(const url of found)assert.equal(url,origin,`${file} points at ${url}, not ${origin}`);
+  // Markdown emphasis and punctuation trail a URL in a README, so they are stripped.
+  const found=[...source.matchAll(/https?:\/\/[^\s"'<>)\]]+/g)].map(m=>m[0].replace(/[.,;:!*_]+$/,''));
+  for(const url of found){
+   let host='';
+   try{host=new URL(url).host;}catch{continue;}
+   if(ALLOWED_HOSTS.test(host))continue;
+   // The bare origin is as good as a path on it.
+   assert.ok(url===origin||url.startsWith(`${origin}/`),`${file} points at ${url}, not ${origin}`);
+  }
  }
  const robots=await readFile(path.join(site,'robots.txt'),'utf8');
  assert.ok(robots.includes(`Sitemap: ${origin}/sitemap.xml`),'robots.txt must point at the sitemap on the same origin');
  const sitemap=await readFile(path.join(site,'sitemap.xml'),'utf8');
  assert.ok(sitemap.includes(`<loc>${origin}/</loc>`),'the sitemap must use the same origin');
+});
+
+test('the pages agree with each other about their own address and version',async()=>{
+ const pkg=JSON.parse(await readFile(path.join(root,'package.json'),'utf8'));
+ for(const page of PAGES){
+  const source=await readFile(path.join(site,page),'utf8');
+  const canonical=pick(source,/<link rel="canonical" href="([^"]*)"/i);
+  assert.ok(canonical.startsWith(`${origin}/`),`${page}: canonical is not on the site origin`);
+  for(const [label,re] of [['og:url',/<meta property="og:url" content="([^"]*)"/i],['twitter:image',/<meta name="twitter:image" content="([^"]*)"/i],['og:image',/<meta property="og:image" content="([^"]*)"/i]]){
+   const value=pick(source,re);
+   assert.ok(value&&value.startsWith(`${origin}/`),`${page}: ${label} does not point at the site origin`);
+  }
+  const ld=JSON.parse(source.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1]);
+  const graph=ld['@graph']??[ld];
+  for(const node of graph){
+   if(node['@type']==='SoftwareApplication')assert.equal(node.softwareVersion,pkg.version,`${page}: the structured data states a stale version`);
+   if(node.url)assert.ok(String(node.url).startsWith(`${origin}/`),`${page}: the structured data points at ${node.url}`);
+  }
+ }
 });
 
 test('the origin can be changed with one command',async()=>{

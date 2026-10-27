@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { createBroker, validateStore } from '../lib/broker.mjs';
-import { planMigration, migrateState, isSchema2, hasReadMessage, backupStateFile, writeStateFile } from '../lib/schema2.mjs';
+import { planMigration, migrateState, isSchema2, hasReadMessage, readersOf, backupStateFile, writeStateFile } from '../lib/schema2.mjs';
 
 const DAY = 864e5;
 
@@ -288,6 +288,14 @@ test('the export of a migrated ledger carries schema 2 and restores', async t =>
   const restoredState = await relay.disk();
   assert.doesNotThrow(() => validateStore(restoredState));
   await assert.rejects(() => relay.call({ op: 'restore', state: exported.state, schemaVersion: 3 }), /not supported/);});
+
+test('a cursor does not invent a read for an agent the broadcast was not addressed to',()=>{
+ const room={project:'/w',agents:[{agentId:'x',readThrough:5},{agentId:'y',readThrough:5}],messages:[
+  {messageId:'m3',to:'*',kind:'broadcast',cursor:3,recipients:['y'],ackedBy:['y'],acks:[]}]};
+ assert.equal(hasReadMessage('x',room.messages[0],room.agents[0]),false,'x was never addressed to m3');
+ assert.equal(hasReadMessage('y',room.messages[0],room.agents[1]),true,'y was addressed and read it');
+ assert.deepEqual([...readersOf(room.messages[0],room)],['y'],'only the reader is reported');
+});
 
 test('the backup keeps the old rows recoverable', async t => {
   const { dir } = await root(t);

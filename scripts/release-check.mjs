@@ -18,7 +18,16 @@ try{
  assert.equal(shrinkwrap.version,pkg.version);
  assert.equal(shrinkwrap.packages[''].version,pkg.version,'Lockfile root package version must match package.json');
  assert.equal(pkg.publishConfig?.provenance,true,'publishConfig.provenance must be true');
- assert.equal(pkg.homepage,'https://relay.next-notes.com/');
+ assert.match(pkg.homepage,/^https:\/\//,'the homepage must be an absolute https URL');
+ // The origin lives in one place: package.json's homepage. The site files have to
+ // agree with it, or the published metadata would point somewhere else.
+ const origin=pkg.homepage.replace(/\/+$/,'');
+ const sitemap=await fs.readFile(path.join(root,'site','sitemap.xml'),'utf8');
+ const robots=await fs.readFile(path.join(root,'site','robots.txt'),'utf8');
+ assert.ok(sitemap.includes(`<loc>${origin}/</loc>`),'the sitemap must use the homepage origin');
+ assert.ok(robots.includes(`Sitemap: ${origin}/sitemap.xml`),'robots.txt must use the homepage origin');
+ const home=await fs.readFile(path.join(root,'site','index.html'),'utf8');
+ assert.ok(home.includes(`rel="canonical" href="${origin}/"`),'the home page canonical must use the homepage origin');
  assert.equal(pkg.repository?.url,'git+https://github.com/Wearer-Lab/agent-relay.git');
  const changelog=await fs.readFile(path.join(root,'CHANGELOG.md'),'utf8');
  assert.ok(changelog.split(/\r?\n/).some(l=>l.startsWith(`## [${pkg.version}] - `)),`CHANGELOG.md needs a dated "## [${pkg.version}] - YYYY-MM-DD" section`);

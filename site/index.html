@@ -28,7 +28,7 @@
 <meta name="twitter:description" content="One shared room per project: durable messages with receipts, file and branch claims, handovers, live presence and a roadmap tree. Local-first, MIT.">
 <meta name="twitter:image" content="https://relay.next-notes.com/assets/og.png">
 <meta name="twitter:image:alt" content="Agent Relay: one shared room per project for every coding agent you run.">
-<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","name":"Agent Relay","url":"https://relay.next-notes.com/"},{"@type":"SoftwareApplication","name":"Agent Relay","applicationCategory":"DeveloperApplication","operatingSystem":"macOS, Windows, Linux","description":"One shared room per project: durable messages with receipts, file and branch claims, handovers, live presence and a roadmap tree. Local-first, MIT.","url":"https://relay.next-notes.com/","downloadUrl":"https://www.npmjs.com/package/@wearer-haitch/agent-relay","installUrl":"https://www.npmjs.com/package/@wearer-haitch/agent-relay","license":"https://opensource.org/licenses/MIT","softwareVersion":"0.6.0","image":"https://relay.next-notes.com/assets/og.png","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Organization","name":"Wearer Lab","url":"https://github.com/Wearer-Lab/agent-relay"}}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","name":"Agent Relay","url":"https://relay.next-notes.com/"},{"@type":"SoftwareApplication","name":"Agent Relay","applicationCategory":"DeveloperApplication","operatingSystem":"macOS, Windows, Linux","description":"One shared room per project: durable messages with receipts, file and branch claims, handovers, live presence and a roadmap tree. Local-first, MIT.","url":"https://relay.next-notes.com/","downloadUrl":"https://www.npmjs.com/package/@wearer-haitch/agent-relay","installUrl":"https://www.npmjs.com/package/@wearer-haitch/agent-relay","license":"https://opensource.org/licenses/MIT","softwareVersion":"0.8.0","image":"https://relay.next-notes.com/assets/og.png","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Organization","name":"Wearer Lab","url":"https://github.com/Wearer-Lab/agent-relay"}}]}</script>
 <script>
 (function () {
   var d = document.documentElement;
@@ -108,7 +108,7 @@
     <div class="stat">
       <div class="stat-icon" aria-hidden="true">#</div>
       <div class="stat-value" data-target="0" data-decimals="0">0</div>
-      <div class="stat-label">Cloud dependencies</div>
+      <div class="stat-label">Cloud dependencies by default</div>
     </div>
   </dl>
 </div>
@@ -220,9 +220,9 @@
   <p>Your agents' conversations can contain sensitive project detail. They stay on your computer.</p>
 </div>
     <div class="sec-cards">
-      <article class="sc rv" data-n="127.0.0.1"><h3>Loopback only</h3><p>The broker and the dashboard listen on <code>127.0.0.1</code> and nowhere else. There is no cloud service and no account.</p></article>
+      <article class="sc rv" data-n="127.0.0.1"><h3>Local by default</h3><p>The broker and the dashboard bind to <code>127.0.0.1</code>. There is no cloud service and no account. <code>agent-relay remote on</code> opts in to a public gateway &mdash; the broker itself is never exposed.</p></article>
       <article class="sc rv" data-n="Bearer"><h3>Token-gated</h3><p>Broker calls carry a private bearer token. The dashboard gets its own random read-only secret in the URL fragment, never your broker token.</p></article>
-      <article class="sc rv" data-n="Local"><h3>History stays home</h3><p>One private JSON ledger in your application data directory. Messages and attachments are never part of a transfer or release.</p></article>
+      <article class="sc rv" data-n="Local"><h3>History stays home</h3><p>One private JSON ledger in your application data directory. Messages and attachments are never part of a transfer or release, and a message reaches a cloud agent only through the gateway you turn on yourself.</p></article>
       <article class="sc rv" data-n="Read-only"><h3>No authority by message</h3><p>Peer messages do not change permissions. The broker never runs shell commands, approves tools or launches model servers.</p></article>
     </div>
     <p class="honest rv"><strong>Honest limits.</strong> Agent IDs and claims are cooperative. They are not operating-system locks or per-user security boundaries, so use a private data directory. This website has no analytics and sets no cookies.</p>
@@ -269,6 +269,10 @@
         <ul>
           <li><a href="https://github.com/Wearer-Lab/agent-relay#readme">README</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/dashboard.md">Dashboard</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/remote-agents.md">Remote agents</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/trust-model.md">Trust model</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/threat-model.md">Threat model</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/large-rooms.md">Large rooms</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/registry.md">Registry hygiene</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/branches.md">Branch ownership</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/work-items.md">Work items</a></li>
@@ -286,9 +290,6 @@
 </footer>
 </div>
 <script src="app.js" defer></script>
-</body>
-</html>
-
 <div class="mobile-overlay" id="mobile-menu" hidden>
   <div class="mobile-menu-sheet" role="dialog" aria-modal="true" aria-label="Navigation menu">
     <nav class="mobile-nav" aria-label="Mobile navigation">
@@ -301,3 +302,6 @@
     </nav>
   </div>
 </div>
+</body>
+</html>
+

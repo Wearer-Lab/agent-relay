@@ -179,8 +179,10 @@ async function main(){
    // The gateway runs in the foreground; `remote on` starts it in the background.
    const {startGateway,DEFAULT_GATEWAY_PORT}=await import('../lib/gateway.mjs');
    const {dashboardFor,readState,readAccess}=await import('../lib/remote.mjs');
-   const state=await readState(dataDir);
-   const origin=state.url??`http://127.0.0.1:${opts.port===undefined?DEFAULT_GATEWAY_PORT:Number(opts.port)}`;
+   const local=`http://127.0.0.1:${opts.port===undefined?DEFAULT_GATEWAY_PORT:Number(opts.port)}`;
+   // The public URL is only known once the tunnel is up, so the origin is resolved
+   // per request: the loopback address and, once it exists, the public one.
+   const origin=async()=>{const state=await readState(dataDir);return state.url?[local,state.url]:[local];};
    const dashboard=await dashboardFor({dataDir,project,origin});
    const access=await readAccess(dataDir);
    const gateway=await startGateway({dataDir,port:opts.port===undefined?DEFAULT_GATEWAY_PORT:Number(opts.port),dashboard,access});
@@ -235,7 +237,12 @@ async function main(){
     for(const row of pending){
      const resolved=await remote.resolveRoomFor({dataDir,repo:row.repo,branch:row.branch,rooms});
      console.log(`${row.code}  ${row.runner}  ${row.repo}${row.branch?` (${row.branch})`:''}  →  ${resolved.room??'no matching room'}`);
-     if(opts.yes){const ok=await remote.remoteApprove({dataDir,code:row.code,alwaysOn:Boolean(opts['always-on']),ttlMs:opts['ttl-hours']?Number(opts['ttl-hours'])*3600000:undefined,agentPrefix:opts.prefix??'',project});console.log(ok.message);continue;}
+     if(opts.yes){
+     // `--yes` means "approve the one I named". Without a code it would approve
+     // every waiting request, including one an attacker queued.
+     console.log('Name one code to approve with --yes: agent-relay remote approve <code> --yes');
+     continue;
+    }
      const answer=await question(`Approve ${row.code} for ${row.repo}? [y/N] `);
      if(!/^y(es)?$/i.test(answer)){const denied=await remote.remoteDeny({dataDir,code:row.code});console.log(denied.message);continue;}
      const result=await remote.remoteApprove({dataDir,code:row.code,alwaysOn:Boolean(opts['always-on']),ttlMs:opts['ttl-hours']?Number(opts['ttl-hours'])*3600000:undefined,agentPrefix:opts.prefix??'',project});
@@ -271,7 +278,7 @@ async function main(){
    break;
   }
   if(action==='dashboard'){
-   const result=await remote.remoteDashboard({dataDir,project});
+   const result=await remote.remoteDashboard({dataDir,project,revoke:Boolean(opts.revoke)});
    if(!result.ok){console.error(result.message);process.exitCode=1;break;}
    console.log(`${result.message}\n${result.url}`);
    break;

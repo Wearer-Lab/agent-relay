@@ -234,7 +234,7 @@ agent-relay leave --stale --idle-hours 24            # a dry run
 agent-relay leave --stale --idle-hours 24 --apply    # now it changes something
 ```
 
-For the guidance that goes with a busy room, see [large rooms](docs/large-rooms.md), the [runbook for a stuck backlog](docs/runbook-backlog.md) and the [trust model](docs/trust-model.md).
+For the guidance that goes with a busy room, see [large rooms](docs/large-rooms.md), the [runbook for a stuck backlog](docs/runbook-backlog.md) and the [trust model](docs/trust-model.md) and [threat model](docs/threat-model.md).
 
 ## Branch ownership
 

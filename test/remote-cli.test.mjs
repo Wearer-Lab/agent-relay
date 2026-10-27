@@ -51,12 +51,12 @@ test('a cloud agent pairs, a person approves, and the agent gets a scoped token'
     rooms: [{project: '/work/alpha', origin: 'github.com/org/repo', branch: 'main', main: true}],
   });
   assert.equal(approved.ok, true);
-  assert.equal(approved.room, '/work/alpha');
+  assert.equal(approved.room, '/work/alpha','the approval names the local room');
 
   const polled = await fetch(`${gateway.url}/pair/${request.requestId}`);
   const handed = await polled.json();
   assert.equal(handed.status, 'approved');
-  assert.equal(handed.room, '/work/alpha');
+  assert.equal(handed.room, '.','the room path never leaves the machine');
   assert.ok(handed.token, 'the waiting agent receives a token');
 
   const used = await fetch(`${gateway.url}/rpc`, {
@@ -144,7 +144,7 @@ test('remote add writes the URL into the repository, or keeps it out with --url-
   const keptOut = await remoteAdd({dataDir, project: other, runner: 'claude', urlInEnv: true});
   assert.equal(keptOut.ok, true);
   const kept = JSON.parse(await fs.readFile(path.join(other, '.mcp.json'), 'utf8'));
-  assert.equal(kept.mcpServers['agent-relay'].env, undefined, 'the URL stays out of git');
+  assert.equal(kept.mcpServers['agent-relay'].env.AGENT_RELAY_URL, undefined, 'the URL stays out of git');
   assert.match(keptOut.clipboard, /AGENT_RELAY_URL=https:\/\/relay\.example/);
 });
 

@@ -11,6 +11,7 @@ import {fileURLToPath} from 'node:url';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const pkg = JSON.parse(await fs.readFile(path.join(root, 'package.json'), 'utf8'));
 const origin = (process.env.ORIGIN || process.argv[2] || pkg.homepage || '').replace(/\/+$/, '');
+const REPO = process.env.AGENT_RELAY_REPO || 'Wearer-Lab/agent-relay';
 if (!origin) {
   console.error('No origin to watch: pass one or set a homepage in package.json.');
   process.exit(1);
@@ -47,7 +48,19 @@ for (const page of PAGES) {
   for (const tag of ['og:title', 'og:url', 'og:image', 'twitter:card', 'twitter:image']) {
     check(`${page} has ${tag}`, new RegExp(`<meta (?:property|name)="${tag}"`).test(text));
   }
-  check(`${page} has structured data`, /<script type="application\/ld\+json">/.test(text));
+  const ld = text.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)?.[1] ?? '';
+  check(`${page} has structured data`, ld.length > 0);
+  let parsed = null;
+  try { parsed = JSON.parse(ld); } catch { /* reported below */ }
+  check(`${page} has parseable structured data`, parsed !== null);
+  if (parsed) {
+    const graph = parsed['@graph'] ?? [parsed];
+    for (const node of graph) {
+      if (node['@type'] === 'SoftwareApplication') {
+        check(`${page} states the current version`, node.softwareVersion === pkg.version, `says ${node.softwareVersion}, the repository is ${pkg.version}`);
+      }
+    }
+  }
 }
 
 // The crawler's files.
@@ -58,9 +71,14 @@ check('sitemap.xml answers 200', sitemap.status === 200, `got ${sitemap.status}`
 for (const page of PAGES) {
   check(`the sitemap lists ${page}`, sitemap.text.includes(`<loc>${origin}${page === '/' ? '/' : page}</loc>`));
 }
-for (const icon of ['/favicon.svg', '/assets/favicon-32.png', '/assets/apple-touch-icon.png', '/assets/icon-512.png', '/site.webmanifest']) {
-  const {status} = await get(icon);
-  check(`${icon} answers 200`, status === 200, `got ${status}`);
+// The assets a broken deploy loses: the stylesheet and the script of every page,
+// the social card, the mark and the dashboard screenshots.
+const ASSETS = ['/styles.css', '/app.js', '/favicon.svg', '/assets/favicon-32.png', '/assets/apple-touch-icon.png',
+  '/assets/icon-512.png', '/assets/logo.svg', '/assets/og.png', '/site.webmanifest',
+  ...['overview', 'roadmap', 'branches', 'agents', 'messages', 'claims'].flatMap(view => [`/assets/dash-${view}-dark.webp`, `/assets/dash-${view}-light.webp`])];
+for (const asset of ASSETS) {
+  const {status} = await get(asset);
+  check(`${asset} answers 200`, status === 200, `got ${status}`);
 }
 
 // A missing path is a styled 404, not a server error.
@@ -84,6 +102,17 @@ try {
   }
 } catch (error) {
   notes.push(`skip  npm registry check — ${error.message}`);
+}
+try {
+  const release = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {headers: {accept: 'application/vnd.github+json', 'user-agent': 'agent-relay-surveillance'}});
+  if (release.ok) {
+    const tag = (await release.json()).tag_name?.replace(/^v/u, '') ?? '';
+    check('the GitHub release matches this repository', tag === pkg.version, `the release is ${tag || 'unknown'}`);
+  } else {
+    notes.push(`skip  GitHub release check — ${release.status}`);
+  }
+} catch (error) {
+  notes.push(`skip  GitHub release check — ${error.message}`);
 }
 
 for (const line of notes) console.log(line);
