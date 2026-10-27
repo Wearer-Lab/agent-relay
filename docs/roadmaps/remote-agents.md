@@ -31,7 +31,7 @@ Tunnel choice. Tailscale Funnel is the default: it is free, gives a stable `http
 | Cloudflare named tunnel (`--provider cloudflare --hostname relay.example.com`) | Cloudflare account plus a domain on Cloudflare | Yes | Requires owning a domain on Cloudflare |
 | ngrok (`--provider ngrok`) | ngrok sign-in | Yes (free dev domain) | The free plan allows 20,000 requests a month. One long-polling agent uses about 100,000 a month |
 
-Security model: the public URL is on the internet. Every gateway call needs a token scoped to one room and one agent-ID prefix, except the pairing request. Pairing requests are rate-limited, expire after 10 minutes, and do nothing until approved locally. Tokens are random 256-bit values that are stored only as hashes, can be revoked, and expire (24 hours for paired sessions, configurable for always-on tokens). Peer messages remain coordination input, never authorization.
+Security model: the public URL is on the internet. Every gateway call needs a token, except the pairing request. A token is scoped to one room and to **one agent identity**: the first registration through it binds the token to that agent, and after that it reads only that agent's conversations and writes only as itself. Pairing requests are rate limited by the address the tunnel reports, expire after 10 minutes, and do nothing until approved locally; a request with a foreign `Origin` is refused, and `--yes` approves one named code. Tokens are random 256-bit values that are stored only as hashes, can be revoked, and expire (24 hours for paired sessions, configurable for always-on tokens). Peer messages remain coordination input, never authorization. The reasoning, and what is still open, is in [the threat model](../threat-model.md).
 
 ## Phase 1: Remote gateway
 Labels: gateway
@@ -97,7 +97,7 @@ One provider interface: detect, install hint, sign in, start, stop, status and p
 - [x] Detect `tailscale`. If missing, show the exact install command for the OS (macOS: `brew install tailscale` and start the open-source daemon)
 - [x] If not signed in, run `tailscale up` (opens the browser once), then continue automatically
 - [x] Start `tailscale funnel --bg 47820` and capture the `*.ts.net` URL. The first run triggers Tailscale's one-click "enable Funnel" approval; detect it and wait
-- [x] `remote off` runs `tailscale funnel reset` (or the equivalent) for our port only
+- [x] `remote off` runs `tailscale funnel reset` (or the equivalent). The reset is for the machine, not for one port: Tailscale has no per-port form
 
 ### Cloudflare
 - [x] Quick tunnel: `cloudflared tunnel --url http://127.0.0.1:47820`, parse the trycloudflare URL, and warn that it changes on every start (cloud settings need `*.trycloudflare.com`)
@@ -129,8 +129,8 @@ Labels: dashboard
 People can follow cloud and local agents from any browser. Agents never need the dashboard.
 
 ### Remote read-only dashboard
-- [x] Serve the dashboard through the gateway at `/dashboard`, read-only, behind a one-time link from `agent-relay remote dashboard` (secret in the URL fragment, as locally)
-- [x] Mark cloud agents in Strips and Radio log (runner badge, "via gateway"), and show pending pairing requests read-only in the Tower view
+- [x] Serve the dashboard through the gateway on its own routes (`/`, `/roadmap/`, `/branches/`, `/agents/`, `/messages/`, `/claims/`), read-only, behind a one-time link from `agent-relay remote dashboard` (secret in the URL fragment, as locally)
+- [x] Mark cloud agents with a runner badge (Agents and Messages views), and show pending pairing requests read-only
 - [x] Links expire after 24 hours; `remote dashboard --revoke` invalidates them all
 
 ## Phase 6: Docs, tests and release

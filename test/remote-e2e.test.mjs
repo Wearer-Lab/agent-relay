@@ -124,11 +124,15 @@ const normalize = (value, project) => {
 };
 
 // The operations the roadmap lists, in one run.
-const scenario = async call => {
+//
+// The scenario is what ONE agent does. A gateway token is bound to one
+// identity, so the second agent in the room is set up by the local side, not
+// through the tunnel: the cloud agent can talk to it, but it cannot be it.
+const scenario = async (call, {local} = {}) => {
   const results = {};
   results.register = await call({op: 'register', agentId: 'cloud-1', runner: 'claude'});
-  results.registerLocal = await call({op: 'register', agentId: 'local-1', runner: 'codex'});
-  results.send = await call({op: 'send', from: 'local-1', to: 'cloud-1', body: 'hello from the local agent'});
+  await local({op: 'register', agentId: 'local-1', runner: 'codex'});
+  results.send = await local({op: 'send', from: 'local-1', to: 'cloud-1', body: 'hello from the local agent'});
   results.inbox = await call({op: 'inbox', agentId: 'cloud-1'});
   results.ack = await call({op: 'ack', agentId: 'cloud-1', messageId: results.send.messageId});
   results.wait = await call({op: 'wait', agentId: 'cloud-1', after: 0, timeoutMs: 200});
@@ -297,8 +301,10 @@ test('the tools behave the same through the gateway', async t => {  const dir = 
   await gateway.store.save();
   const remotely = async fields => throughGateway(gateway, token.value, fields);
 
-  const localResults = await scenario(locally);
-  const remoteResults = await scenario(remotely);
+  const localResults = await scenario(locally, {local: locally});
+  // On the remote side the second agent is a local one, so it is set up on the
+  // broker behind the gateway rather than through the tunnel.
+  const remoteResults = await scenario(remotely, {local: fields => brokerCall(remote.broker, project, fields)});
   // The scenario is not empty: it really sent, received, claimed and released.
   assert.deepEqual(localResults.send.recipients, ['cloud-1']);
   assert.equal(localResults.inbox.messages.length, 1);
@@ -528,4 +534,29 @@ test('the hosted relay artifacts say what to run, and nothing is deployed', asyn
   const state = JSON.parse(await fs.readFile(path.join(local, 'remote-state.json'), 'utf8'));
   assert.equal(state.url, 'https://relay.example');
   assert.equal(state.hosted, true);
+});
+
+test('a cloud agent cannot take over a local identity', async t => {
+  const dir = await temp(t);
+  const project = await checkout(dir);
+  const {broker, dataDir} = await brokerFor(t);
+  // A local agent owns this identity.
+  await brokerCall(broker, project, {op: 'register', agentId: 'local-codex-1', runner: 'codex'});
+  const gateway = await startGateway({
+    dataDir, port: 0,
+    call: (room, fields) => brokerCall(broker, room, fields),
+  });
+  t.after(() => gateway.close());
+  const token = gateway.store.issue({room: project, runner: 'claude'});
+  await gateway.store.save();
+  const headers = {authorization: `Bearer ${token.value}`};
+  const post = body => fetch(`${gateway.url}/rpc`, {method: 'POST', headers, body: JSON.stringify(body)});
+
+  const takeover = await post({op: 'register', agentId: 'local-codex-1', runner: 'claude'});
+  assert.equal(takeover.status, 400, 'the takeover is refused');
+  assert.match((await takeover.json()).error, /identity|Identity/);
+
+  // And it cannot post as that local agent either.
+  const asLocal = await post({op: 'send', from: 'local-codex-1', to: 'local-codex-1', body: 'not me'});
+  assert.equal(asLocal.status, 400);
 });

@@ -46,14 +46,25 @@ Pairing requests expire after ten minutes, and at most five may wait at once.
 
 The public URL is on the internet, so the gateway is deliberately narrow.
 
-- A token is scoped to **one room** and, optionally, **one agent-ID prefix**.
-  The room comes from the token, never from the request.
+- A token is scoped to **one room** and to **one agent identity**. The room
+  comes from the token, never from the request. The identity is bound the
+  first time the agent registers through the token: after that, the gateway
+  imposes it, so the token reads only that agent's conversations and writes
+  only as itself. A cloud agent also cannot take over the identity of a local
+  agent.
+- A token may be issued for one **agent-ID prefix** as well, so a token for
+  `cloud-` cannot act as anything else.
 - Tokens are 256-bit random values. Only their SHA-256 hash is written down,
   they are compared in constant time, and they never appear in a log.
 - Tokens expire (24 hours for a paired session, or never with `--always-on`),
   and `remote revoke` invalidates them at once.
 - Every call is rate limited per token and per address, and returns `429` with a
-  `Retry-After` header when it is too fast.
+  `Retry-After` header when it is too fast. The address is the one the tunnel
+  reports (`X-Forwarded-For`), and the limit runs before the token is looked
+  up, so an unauthenticated flood is throttled too.
+- A pairing request with a foreign `Origin` is refused, every field in it is
+  bounded and stripped of control characters, and `--yes` approves **one named
+  code**: without a code it approves nothing.
 - Only coordination operations are allowed: register, agents, send, inbox, ack,
   wait, status, claim, release, tasks, branches, ownership, history, receipt,
   outbox, bulletin, handoffs, blocked and leave. Everything else is refused by
@@ -131,7 +142,9 @@ test token again.
 | What you see | What it means | What to do |
 | --- | --- | --- |
 | `The relay gateway at … is not answering` | The gateway process is gone | `agent-relay remote on` |
+| `The tunnel at … is not answering, but the gateway is up` | The tunnel died, the gateway is fine | `agent-relay remote on` |
 | `The relay gateway at … could not be reached` | The tunnel is down | `agent-relay remote doctor` |
+| `This token is bound to the agent …` | The token registered as one agent and then asked to be another | Use the identity the token was bound to |
 | `This relay token is not valid` | The token expired or was revoked | Approve the agent again |
 | `This token may only act for agents starting with …` | The agent used an id outside its prefix | Use the prefix the token was issued for |
 | `The operation … is not available through the gateway` | The operation is refused by design | Use the local CLI for it |
@@ -170,10 +183,22 @@ The secret sits in the URL fragment, exactly like the local dashboard, and the
 feeds under `/api/v1/` need it. The dashboard never writes: it cannot send a
 message, claim a resource or acknowledge anything.
 
+The link is good for 24 hours. To end it early:
+
+```sh
+agent-relay remote dashboard --revoke   # every link handed out before now stops working
+```
+
+`agent-relay remote off` and `agent-relay remote revoke --all` drop it as
+well, so a closed public URL leaves no live dashboard link behind.
+
 ## What is not here yet
 
 - An always-on host, so cloud agents keep working while this computer sleeps.
-- A threat-model review of the public endpoint.
+- A cap on how many long polls one token may hold open.
+
+The public endpoint has been reviewed: [the threat model](threat-model.md)
+lists what the gateway defends, what it does not, and what is still open.
 
 See [the roadmap](roadmaps/remote-agents.md) for the full plan and what is
 still to do.

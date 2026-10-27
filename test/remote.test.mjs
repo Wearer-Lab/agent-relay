@@ -335,3 +335,35 @@ test('remote mode talks to the gateway and never starts a broker', async t => {
   await assert.rejects(() => remoteRpc('/work/alpha', {op: 'agents'}, {token: 'nope'}), error => error.code === 'TOKEN_REJECTED');
   await assert.rejects(() => remoteRpc('/work/alpha', {op: 'agents'}, {url: 'http://127.0.0.1:45999', token: token.value}), error => error.code === 'GATEWAY_OFF');
 });
+
+test('a token is bound to one identity once the agent has registered', async t => {
+  const {gateway, calls} = await gatewayWith(t);
+  const token = await issue(gateway);
+  const headers = {authorization: `Bearer ${token.value}`};
+  const post = body => fetch(`${gateway.url}/rpc`, {method: 'POST', headers, body: JSON.stringify(body)});
+
+  // Before the agent registers, a read has no identity to read as.
+  const early = await post({op: 'history', agentId: 'cloud-1'});
+  assert.equal(early.status, 403);
+  assert.match((await early.json()).error, /Register first/);
+
+  const registered = await post({op: 'register', agentId: 'cloud-1', runner: 'claude'});
+  assert.equal(registered.status, 200);
+
+  // The token is bound now: a second identity is refused.
+  const other = await post({op: 'register', agentId: 'cloud-2', runner: 'claude'});
+  assert.equal(other.status, 403);
+  assert.match((await other.json()).error, /bound to the agent cloud-1/);
+  const asOther = await post({op: 'inbox', agentId: 'cloud-2'});
+  assert.equal(asOther.status, 403, 'a token cannot read another identity\'s inbox');
+  const asSelf = await post({op: 'inbox', agentId: 'cloud-1'});
+  assert.equal(asSelf.status, 200, 'the bound identity still works');
+
+  // A request that names no agent at all is read as the bound one, never as
+  // the whole room.
+  const anonymous = await post({op: 'history'});
+  assert.equal(anonymous.status, 200);
+  const history = await anonymous.json();
+  assert.ok(history.ok, 'the request went through');
+});
+

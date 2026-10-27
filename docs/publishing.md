@@ -23,10 +23,15 @@ The repository owner configures these once; nothing in the repository can do it.
 2. **GitHub environment.** In the repository, Settings > Environments > New
    environment named `npm`. Optionally require a reviewer to approve every
    release, and restrict deployment to tags matching `v*`.
-3. **Pages.** Settings > Pages > Build and deployment > Source: **GitHub
-   Actions**. The site is then served from https://wearer-lab.github.io/agent-relay/
-   after the Pages workflow runs on `main` (it publishes `site/` when that
-   directory changes, or run it by hand from the Actions tab).
+3. **The site.** The canonical site is **https://relay.next-notes.com**, served
+   by Cloudflare Workers static assets (`wrangler.jsonc` holds the custom
+   domain route). The **Cloudflare** workflow deploys it on `main` and then
+   checks that the domain answers. The **Pages** workflow publishes the same
+   `site/` directory to GitHub Pages as a mirror
+   (https://wearer-lab.github.io/agent-relay/), so the site is still reachable
+   if Cloudflare is down. To move the site to another domain, run
+   `node scripts/set-site-origin.mjs <origin>` and update the route in
+   `wrangler.jsonc`.
 4. **Optional fallback token.** If trusted publishing is not configured, add a
    repository (or `npm` environment) secret named `NPM_TOKEN` holding an npm
    automation token with publish permission on the package. The release workflow
