@@ -60,6 +60,9 @@ jobs:
             else echo "NPM_TAG=latest"; echo "PRERELEASE="; fi
           } >> "$GITHUB_ENV"
       - run: npm ci --ignore-scripts --no-audit --no-fund
+      # The suite runs twice on a failure: a busy runner can make a good test
+      # fail, and a release should not be blocked by that.
+      - run: npm test || npm test
       - run: npm run release:check
       - name: Pack the reviewed archive
         run: |

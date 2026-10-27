@@ -14,8 +14,8 @@ A busy room now cleans itself, and the numbers people read describe what actuall
 - `agent-relay leave --stale --idle-hours N` and `agent-relay retire --stale` sweep many idle identities at once. They are a dry run until `--apply`, they report what they kept and why, and every applied run is written to an audit log.
 - A delivery expires on its own: a broadcast after seven days, a direct message after thirty. An expired delivery is written to the archive with its recipient and its reason, so the history stays explainable. `compact --broadcast-ttl-days` and `--direct-ttl-days` tune it.
 - `agent-relay migrate --to 2` converts a ledger to schema 2 offline: a broadcast is stored once with its audience rule, and each agent keeps a `readThrough` cursor instead of a row per reader. On the room from the 2026-10-25 investigation that is 671,074 delivery rows down to 243,746 and 42.54 MiB down to 15.34 MiB; a bulk ack of a whole backlog costs 61 bytes instead of 5,360.
-- `agent-relay remote host` prints the deployment artifacts and the steps for an always-on host, so cloud agents keep working while this computer sleeps.
-- The dashboard marks cloud agents with a runner badge, and the Tower view lists the pairing requests that wait for a human, read-only.
+- `agent-relay remote host` prints the deployment artifacts and the steps for an always-on host, so cloud agents keep working while this computer sleeps. The plan it writes is for a Linux host: systemd units, a compose file and the amd64 `cloudflared` binary.
+- The dashboard marks cloud agents with a runner badge, and the Overview view lists the pairing requests that wait for a human, read-only.
 - `docs/large-rooms.md`, `docs/runbook-backlog.md`, `docs/trust-model.md` and `docs/threat-model.md`.
 
 ### Changed
@@ -176,7 +176,13 @@ The room on the machine where this was built held 4,016 pending deliveries befor
 - Last-seen presence, `agents --active`, and explicit `leave`.
 - Message summaries and durable attachments verified by SHA-256 on `fetch`.
 
-[Unreleased]: https://github.com/Wearer-Lab/agent-relay/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/Wearer-Lab/agent-relay/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/Wearer-Lab/agent-relay/releases/tag/v0.8.0
+[0.7.3]: https://github.com/Wearer-Lab/agent-relay/releases/tag/v0.7.3
+[0.7.2]: https://github.com/Wearer-Lab/agent-relay/releases/tag/v0.7.2
+[0.7.1]: https://github.com/Wearer-Lab/agent-relay/releases/tag/v0.7.1
+[0.7.0]: https://github.com/Wearer-Lab/agent-relay/releases/tag/v0.7.0
+[0.6.0]: https://github.com/Wearer-Lab/agent-relay/releases/tag/v0.6.0
 [0.5.0]: https://github.com/Wearer-Lab/agent-relay/releases/tag/v0.5.0
 [0.4.0]: https://github.com/Wearer-Lab/agent-relay/releases/tag/v0.4.0
 [0.3.2]: https://www.npmjs.com/package/@wearer-haitch/agent-relay/v/0.3.2

@@ -31,6 +31,13 @@ try{
  assert.equal(pkg.repository?.url,'git+https://github.com/Wearer-Lab/agent-relay.git');
  const changelog=await fs.readFile(path.join(root,'CHANGELOG.md'),'utf8');
  assert.ok(changelog.split(/\r?\n/).some(l=>l.startsWith(`## [${pkg.version}] - `)),`CHANGELOG.md needs a dated "## [${pkg.version}] - YYYY-MM-DD" section`);
+ // Every version heading needs a link definition, or it renders as the
+ // literal text "[0.8.0]" instead of a link.
+ for(const [,version] of changelog.matchAll(/^## \[(\d+\.\d+\.\d+)\]/gmu)){
+  assert.ok(changelog.includes(`[${version}]:`),`CHANGELOG.md has no link definition for ${version}`);
+ }
+ assert.ok(/^\[Unreleased\]: \S+compare\/v\d+\.\d+\.\d+\.\.\.HEAD/mu.test(changelog),
+  'the Unreleased link must compare against the last released version');
  const lf=async f=>(await fs.readFile(path.join(root,f),'utf8')).replace(/\r\n/g,'\n'),ci=await lf('.github/workflows/ci.yml');
  assert.equal(await lf('docs/ci-workflow.yml'),ci,'docs/ci-workflow.yml must match .github/workflows/ci.yml');
  assert.ok((await lf('docs/ci-workflow.md')).includes(ci.trimEnd()),'docs/ci-workflow.md must embed .github/workflows/ci.yml');
@@ -39,10 +46,21 @@ try{
  assert.deepEqual(shrinkwrap.packages[''].dependencies,pkg.dependencies);
  const [packed]=JSON.parse((await run(['pack','--json','--ignore-scripts','--pack-destination',tmp])).stdout);
   for(const file of packed.files){
-   assert.ok(/^(bin\/|lib\/|docs\/[^/]+\.md$|README\.md$|CHANGELOG\.md$|LICENSE$|package\.json$|npm-shrinkwrap\.json$)/.test(file.path),`Unexpected published file: ${file.path}`);
+   assert.ok(/^(bin\/|lib\/|scripts\/prepublish\.mjs$|docs\/[^/]+\.md$|README\.md$|CHANGELOG\.md$|LICENSE$|package\.json$|npm-shrinkwrap\.json$)/.test(file.path),`Unexpected published file: ${file.path}`);
   }
   for(const file of packed.files.filter(f=>/^docs\/[^/]+\.md$/.test(f.path)))assert.ok(PUBLIC_DOCS.includes(file.path),`Unexpected published doc: ${file.path}`);
   for(const doc of PUBLIC_DOCS)assert.ok(packed.files.some(f=>f.path===doc),`Missing public doc ${doc}`);
+ // Every module the CLI reaches has to be in the archive. The list is
+ // derived from the imports, so a new module cannot be forgotten.
+ const imported=new Set();
+ const sources=['bin/agent-relay.mjs',...(await fs.readdir(path.join(root,'lib'))).filter(name=>name.endsWith('.mjs')).map(name=>`lib/${name}`)];
+ for(const source of sources){
+  const text=await fs.readFile(path.join(root,source),'utf8');
+  for(const [,specifier] of text.matchAll(/from\s+'(\.\.?\/[^']+)'/gu)){
+   imported.add(path.posix.normalize(path.posix.join(path.posix.dirname(source),specifier)));
+  }
+ }
+ for(const required of imported)assert.ok(packed.files.some(f=>f.path===required),`Missing ${required}, which the code imports`);
  for(const required of ['bin/agent-relay.mjs','lib/setup.mjs','lib/tool-pages.mjs','lib/dashboard.mjs','lib/observability.mjs','lib/dashboard/index.html','lib/dashboard/assets/dashboard.css','lib/dashboard/assets/dashboard.js','lib/dashboard/assets/theme.js','lib/dashboard/assets/model.js','lib/dashboard/assets/logo.svg','lib/dashboard/assets/favicon.svg','lib/dashboard/assets/fonts/BubbledotICG-FinePos.woff2','lib/dashboard/assets/fonts/GeistPixel-Circle.woff2','lib/dashboard/assets/fonts/Inter-latin.woff2','lib/registry.mjs','lib/ownership.mjs','lib/workitems.mjs','CHANGELOG.md','npm-shrinkwrap.json'])assert.ok(packed.files.some(f=>f.path===required),`Missing ${required}`);
  // Validate the extracted artifact, rather than loading the source checkout.
  await exec('tar',['-xzf',path.join(tmp,packed.filename),'-C',tmp]);

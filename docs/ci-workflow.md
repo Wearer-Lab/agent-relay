@@ -41,6 +41,7 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm test
       - run: npm run release:check
       - run: npm publish --dry-run --ignore-scripts --provenance=false
   package:
@@ -89,7 +90,11 @@ Jobs:
   and checks `agent-relay --version` and `--help`.
 
 Publishing is a separate workflow (`.github/workflows/release.yml`, triggered by a
-`vX.Y.Z` tag) and the landing page has its own (`.github/workflows/pages.yml`);
+`vX.Y.Z` tag). The landing page has two: `.github/workflows/cloudflare.yml`
+publishes it to Cloudflare Workers, which is the canonical copy, and
+`.github/workflows/pages.yml` publishes the same directory to GitHub Pages as a
+mirror. `.github/workflows/surveillance.yml` watches the live surfaces every six
+hours and after every Cloudflare deploy.
 see [publishing](./publishing.md). Dependabot proposes weekly npm and GitHub
 Actions updates (`.github/dependabot.yml`); a dependency bump that changes only
 one of `package-lock.json` and `npm-shrinkwrap.json` fails `release:check`.

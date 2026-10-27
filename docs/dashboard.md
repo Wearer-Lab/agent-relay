@@ -210,6 +210,7 @@ broker supports them) work items, then serves the dashboard and prints its link:
 
 ```sh
 node scripts/dashboard-fixture.mjs [--mock | --no-git | --empty] [--port N] [--open] [--keep]
+# from a source checkout: the package ships the dashboard, not the fixture
 ```
 
 Without flags it creates real git worktrees, branch claims and an imported

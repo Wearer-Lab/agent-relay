@@ -12,8 +12,9 @@
   "scripts": {
     "test": "node --test --test-timeout=300000",
     "start": "node bin/agent-relay.mjs start",
-    "release:check": "npm test && node scripts/release-check.mjs",
-    "prepublishOnly": "npm run release:check"
+    "release:check": "node scripts/release-check.mjs",
+    "release:verify": "npm test && npm run release:check",
+    "prepublishOnly": "node scripts/prepublish.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",
@@ -26,6 +27,7 @@
   },
   "files": [
     "bin",
+    "scripts/prepublish.mjs",
     "lib",
     "docs/*.md",
     "README.md",

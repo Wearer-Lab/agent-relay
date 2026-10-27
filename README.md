@@ -81,8 +81,20 @@ claims, handovers, the roadmap and presence. Everything else is refused by name.
 room lookup, with one fix per failure. `agent-relay remote off` closes the
 public URL at once.
 
+The other commands in the same family: `remote status` (the URL, the tunnel and
+the waiting approvals), `remote revoke <id|all>` (a token stops working at
+once), `remote deny <code>`, `remote test claude|codex` (the cloud agent's
+first call, simulated from here), `remote room add <alias> <path>` (a checkout
+the resolver cannot match by name), `remote dashboard` (a read-only view
+through the same URL) and `remote access` (Cloudflare Access credentials).
+
+`agent-relay remote host` goes one step further: it writes the plan for a
+small always-on Linux host — the broker, the gateway and the tunnel — so the
+cloud agents keep working while this computer sleeps.
+
 See [remote agents](docs/remote-agents.md) for the security model, the tunnel
-providers and troubleshooting.
+providers and troubleshooting, and [the threat model](docs/threat-model.md) for
+what the public endpoint defends and what it does not.
 
 ## One dashboard for all projects
 
@@ -137,7 +149,7 @@ npm ci --ignore-scripts --no-audit --no-fund
 npm install --global . --ignore-scripts --no-audit --no-fund
 ```
 
-Or copy the release `.tgz` (attached to each [GitHub release](https://github.com/Wearer-Lab/agent-relay/releases)) and run `npm install --global ./wearer-haitch-agent-relay-0.5.0.tgz`. Run `agent-relay setup` in each destination project so paths point to its new installation. Do not transfer broker tokens or private message history with the package.
+Or copy the release `.tgz` (attached to each [GitHub release](https://github.com/Wearer-Lab/agent-relay/releases)) and run `npm install --global ./wearer-haitch-agent-relay-<version>.tgz`. Run `agent-relay setup` in each destination project so paths point to its new installation. Do not transfer broker tokens or private message history with the package.
 
 Without global installation, use `node /path/to/agent-relay/bin/agent-relay.mjs setup`, or `npx --yes --package /path/to/agent-relay agent-relay setup`.
 

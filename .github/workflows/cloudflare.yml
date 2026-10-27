@@ -29,7 +29,7 @@ jobs:
       - name: Deploy the site
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
-            echo "::notice::No Cloudflare credentials in this repository, so nothing was deployed."
+            echo "::warning::No Cloudflare credentials in this repository, so nothing was deployed. The site at https://relay.next-notes.com still serves the last manual publish."
             echo "Add them as repository secrets to publish on every push:"
             echo "  CLOUDFLARE_API_TOKEN  an API token with Workers Scripts:Edit, Workers Routes:Edit and DNS:Edit for next-notes.com"
             echo "  CLOUDFLARE_ACCOUNT_ID  d534728dd8656056d2feef1bf282724d"

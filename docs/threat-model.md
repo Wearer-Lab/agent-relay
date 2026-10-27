@@ -366,10 +366,11 @@ node --input-type=module -e "
 "
 ```
 
-The same file, `test/remote-e2e.test.mjs`, holds the end-to-end checks: the
-pairing round trip, the allowlist, the path refusal, the rate limit, the
+In a source checkout, `test/remote-e2e.test.mjs` holds the end-to-end checks:
+the pairing round trip, the allowlist, the path refusal, the rate limit, the
 one-identity rule and the takeover refusal. `test/remote.test.mjs` holds the
 gateway's own: the scope checks, the shape checks, the merge and the lock.
+The published package ships neither the tests nor the fixtures.
 
 ## What this review does not cover
 

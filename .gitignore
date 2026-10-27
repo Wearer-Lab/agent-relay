@@ -26,3 +26,7 @@ AGENTS.md
 CLAUDE.md
 .aws/
 .ssh/
+
+# The parallel workflow runner leaves its worktrees and its report behind.
+.worktrees/
+docs/roadmaps/reports/

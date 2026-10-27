@@ -7,8 +7,9 @@ npm ci --ignore-scripts --no-audit --no-fund
 npm run release:check
 ```
 
-The current automated suite has **369 passing tests for 0.5.0** on macOS, Linux and Windows. The
-CI (`.github/workflows/ci.yml`, see [CI workflow](./ci-workflow.md)) runs the release checks on macOS,
+The current automated suite has **510 passing tests for 0.8.0** on macOS, Linux and Windows. The
+CI (`.github/workflows/ci.yml`, see [CI workflow](./ci-workflow.md)) runs the suite and the release
+checks on macOS,
 Linux, and Windows with Node.js 20 and 22 for every pull request and push to `main`.
 Every job, including the Windows test suite and the packed Windows installation, is
 required to pass. POSIX file-mode assertions are skipped on Windows, which has no
@@ -39,7 +40,7 @@ of this public repository.
 
 ## Validation matrix
 
-This matrix describes the baseline evidence behind the support claims for version 0.3.0
+This matrix describes the baseline evidence behind the support claims for version 0.8.0
 of the npm package. It is versioned: every release that claims platform or
 runner support must update it to match its own evidence. "Automated" means the
 repeatable test suite or release checker; "live-verified" means observed in a
@@ -115,7 +116,7 @@ as part of validation, not an optional extra.
 
 ## 0.3.1 review regression checks
 
-The full release suite passes 237 tests on macOS with Node.js 26.5.0. It includes
+The full release suite passes 510 tests on macOS with Node.js 26.5.0. It includes
 the eight latest review reproductions: real offline CLI dry-run/schema/new-directory
 workflows, complete collection and marker retrieval, MCP initialization/closure,
 valid TOML bindings, and unchanged authenticated HTTP snapshot caching.
@@ -128,7 +129,7 @@ mutation after capture. These checks do not wake a vendor model.
 For a separate fresh dependency installation of the packed artifact, run:
 
 ```sh
-node docs/reviews/2026-10-12-packed-smoke.mjs
+node docs/reviews/2026-10-12-packed-smoke.mjs   # from a source checkout
 ```
 
 That smoke checks all runner bindings, CLI message/claim workflows, the installed

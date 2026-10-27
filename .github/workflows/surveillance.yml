@@ -1,7 +1,7 @@
 name: Surveillance
 # Watches the deployed surfaces. It runs on a schedule, on demand, and after every
-# Cloudflare deploy, and it runs in parallel with the deploy workflow rather than
-# after it: a broken page is reported even if the deploy itself hangs.
+# Cloudflare deploy. After a deploy it waits for the deploy to finish: a run that
+# starts at the same moment as the deploy would only see the old site.
 #
 # What it checks:
 #   - every public page answers 200 and carries its SEO metadata
@@ -17,9 +17,12 @@ on:
         description: 'Site origin to watch (defaults to the package homepage)'
         required: false
         default: ''
+  workflow_run:
+    workflows: ['Cloudflare']
+    types: [completed]
   push:
     branches: [main]
-    paths: ['site/**', 'package.json', 'scripts/surveillance.mjs']
+    paths: ['scripts/surveillance.mjs']
 concurrency:
   group: surveillance
   cancel-in-progress: true

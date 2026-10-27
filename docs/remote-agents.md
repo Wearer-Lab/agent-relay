@@ -192,6 +192,30 @@ agent-relay remote dashboard --revoke   # every link handed out before now stops
 `agent-relay remote off` and `agent-relay remote revoke --all` drop it as
 well, so a closed public URL leaves no live dashboard link behind.
 
+## A relay that does not sleep
+
+The cloud agent talks to whatever URL you give it. Nothing says that URL has to
+be a tunnel on your own machine.
+
+```sh
+agent-relay remote host --out ./host     # writes the plan for a small always-on host
+```
+
+`remote host` writes the artifacts a hosted relay needs — a systemd unit for
+the broker and the gateway, a compose file, and the Cloudflare steps that put
+the URL in front of it — and prints what to run. It is a **Linux** plan: the
+units are systemd, the compose file is Docker, and the `cloudflared` binary it
+downloads is the amd64 one.
+
+Afterwards, the local agents talk to the host instead of to this machine:
+
+```sh
+agent-relay remote access --access-client-id ID --access-client-secret SECRET
+```
+
+That is the same pair of credentials Cloudflare Access wants, and the local
+relay points itself at the hosted URL.
+
 ## What is not here yet
 
 - An always-on host, so cloud agents keep working while this computer sleeps.
@@ -200,5 +224,5 @@ well, so a closed public URL leaves no live dashboard link behind.
 The public endpoint has been reviewed: [the threat model](threat-model.md)
 lists what the gateway defends, what it does not, and what is still open.
 
-See [the roadmap](roadmaps/remote-agents.md) for the full plan and what is
-still to do.
+See [the roadmap](https://github.com/Wearer-Lab/agent-relay/blob/main/docs/roadmaps/remote-agents.md)
+for the full plan and what is still to do.
