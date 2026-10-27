@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createBroker, validateStore } from '../lib/broker.mjs';
 import { planMigration, migrateState, isSchema2, hasReadMessage, readersOf, backupStateFile, writeStateFile } from '../lib/schema2.mjs';
+import { backlogState } from '../scripts/bench-schema2.mjs';
 
 const DAY = 864e5;
 
@@ -105,9 +106,12 @@ test('migrateState keeps every message and is idempotent', () => {
     if (message.kind === 'broadcast') assert.equal(message.audience.mode, 'live');
   }
   validateStore(migrated);
-  // Migrating again changes nothing.
+  // Migrating again changes nothing. The comparison is between two distinct
+  // objects: comparing a value with itself cannot fail.
+  const snapshot = structuredClone(migrated);
   const again = migrateState(migrated);
-  assert.deepEqual(again.state, migrated, 'the migration is idempotent');
+  assert.deepEqual(again.state, snapshot, 'the migration is idempotent');
+  assert.deepEqual(migrated, snapshot, 'the migration did not touch the ledger');
   assert.equal(again.report.from, 2);
   assert.ok(again.report.warnings.some(warning => /already at schema 2/.test(warning)));
   assert.equal(again.report.changes.messages, 0);
@@ -313,4 +317,66 @@ test('the backup keeps the old rows recoverable', async t => {
   assert.equal(written.bytes, Buffer.byteLength(JSON.stringify(migrated)));
   assert.deepEqual(JSON.parse(await fs.readFile(file, 'utf8')), migrated);
   assert.equal((await fs.readdir(dir)).filter(name => name.endsWith('.tmp')).length, 0);
+});
+
+test('the schema 2 win is real at the size the redesign was built for', () => {
+  // The whole point of the redesign: a broadcast is stored once, and the read
+  // state is one cursor per agent instead of one row per reader.
+  const state = backlogState('/work/p', {agents: 300, live: 300, messages: 1, broadcasts: 1, acked: 1});
+  const before = JSON.stringify(state).length;
+  const {state: migrated} = migrateState(state);
+  const broadcast = migrated.rooms[0].messages[0];
+  assert.deepEqual(broadcast.ackedBy, [], 'no per-reader rows survive');
+  assert.equal(broadcast.acks, undefined);
+  assert.ok(migrated.rooms[0].agents.some(agent => agent.readThrough === 1), 'the reader has a cursor');
+  assert.ok(migrated.rooms[0].agents.every(agent => agent.ackedBy === undefined), 'no per-agent read rows survive');
+  assert.ok(JSON.stringify(migrated).length < before, 'the ledger shrank');
+  validateStore(migrated);
+});
+
+test('a migration of a ledger the broker itself wrote keeps the truth', async () => {
+  // The hand-written fixtures are shaped to satisfy the validator. This runs
+  // the broker, takes the ledger it wrote, and migrates that.
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'relay-ack-real-'));
+  const project = path.join(root, 'project');
+  await fs.mkdir(project);
+  const dataDir = path.join(root, 'data');
+  await fs.mkdir(dataDir);
+  const broker = await createBroker({dataDir, pruneAfterMinutes: 0, compactAfterDays: 0});
+  const call = async fields => {
+    const response = await fetch(`${broker.url}/rpc`, {method: 'POST',
+      headers: {authorization: `Bearer ${broker.token}`, 'content-type': 'application/json'},
+      body: JSON.stringify({project, ...fields})});
+    const result = await response.json();
+    if (!result.ok) throw Object.assign(new Error(result.error.message), {code: result.error.code});
+    return result;
+  };
+  try {
+    await call({op: 'register', agentId: 'a', runner: 'codex'});
+    await call({op: 'register', agentId: 'b', runner: 'claude'});
+    await call({op: 'register', agentId: 'c', runner: 'codex'});
+    const broadcast = await call({op: 'send', from: 'a', to: '*', body: 'to everybody'});
+    const direct = await call({op: 'send', from: 'a', to: 'b', body: 'just for you'});
+    const reply = await call({op: 'send', from: 'b', to: 'a', body: 'and back', replyTo: direct.messageId, summary: 'a summary'});
+    await call({op: 'ack', agentId: 'b', messageId: broadcast.messageId});
+    await call({op: 'notified', agentId: 'b', messageId: direct.messageId, adapter: 'codex'});
+    const raw = JSON.parse(await fs.readFile(path.join(dataDir, 'state.json'), 'utf8'));
+    assert.equal(raw.version, 1, 'the broker writes schema 1');
+    const {state: migrated} = migrateState(raw);
+    const messages = migrated.rooms[0].messages;
+    const all = messages.find(m => m.messageId === broadcast.messageId);
+    const d = messages.find(m => m.messageId === direct.messageId);
+    const r = messages.find(m => m.messageId === reply.messageId);
+    assert.ok(all && d && r, 'every message survived');
+    assert.equal(all.kind, 'broadcast');
+    assert.equal(r.replyTo, direct.messageId, 'the reply target survives');
+    assert.equal(r.summary, 'a summary', 'the summary survives');
+    assert.ok((d.notified ?? []).length >= 1, 'the transport marker survives');
+    assert.ok(migrated.rooms[0].agents.some(a => a.agentId === 'b' && a.readThrough > 0),
+      'the reader has a cursor');
+    validateStore(migrated);
+  } finally {
+    await broker.close();
+    await fs.rm(root, {recursive: true, force: true});
+  }
 });

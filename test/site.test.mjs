@@ -215,6 +215,46 @@ test('the origin can be changed with one command',async()=>{
  assert.match(script,/package\.json/);
 });
 
+// The command really moves the site: a copy of the tree is moved to another
+// origin and every file has to follow. The list of files is checked against
+// the pages that exist, so a new page cannot be forgotten.
+test('moving the origin moves every file, and no page is left behind',async()=>{
+ const {mkdtemp,cp,mkdir,readdir}=await import('node:fs/promises');
+ const {tmpdir}=await import('node:os');
+ const {execFile}=await import('node:child_process');
+ const {promisify}=await import('node:util');
+ const execFileAsync=promisify(execFile);
+ const copy=await mkdtemp(path.join(tmpdir(),'relay-site-'));
+ await cp(site,path.join(copy,'site'),{recursive:true});
+ await cp(path.join(root,'package.json'),path.join(copy,'package.json'));
+ await cp(path.join(root,'README.md'),path.join(copy,'README.md'));
+ await cp(path.join(root,'scripts'),path.join(copy,'scripts'),{recursive:true});
+ const target='https://relay.example';
+ await execFileAsync(process.execPath,[path.join(copy,'scripts','set-site-origin.mjs'),target],{cwd:copy});
+
+ const moved=await readFile(path.join(copy,'site','index.html'),'utf8');
+ assert.ok(moved.includes(`${target}/`),'the canonical moved');
+ assert.ok(!moved.includes('relay.next-notes.com'),'nothing points at the old origin');
+ const pkg=JSON.parse(await readFile(path.join(copy,'package.json'),'utf8'));
+ assert.equal(pkg.homepage,`${target}/`,'the homepage moved');
+ const robots=await readFile(path.join(copy,'site','robots.txt'),'utf8');
+ assert.ok(robots.includes(`Sitemap: ${target}/sitemap.xml`),'the sitemap line moved');
+
+ // Every page in the site has to be in the script's list.
+ const script=await readFile(path.join(copy,'scripts','set-site-origin.mjs'),'utf8');
+ const listed=new Set([...script.matchAll(/'(site\/[^']+)'/g)].map(match=>match[1]));
+ const walk=async dir=>{
+  const out=[];
+  for(const entry of await readdir(dir,{withFileTypes:true})){
+   const full=path.join(dir,entry.name);
+   if(entry.isDirectory())out.push(...await walk(full));
+   else if(entry.name.endsWith('.html'))out.push(path.relative(copy,full).split(path.sep).join('/'));
+  }
+  return out;
+ };
+ for(const page of await walk(path.join(copy,'site')))assert.ok(listed.has(page),`${page} is not in the move list`);
+});
+
 test('site assets stay small (under 3 MB) and screenshots exist for both themes',async()=>{
  const dir=path.join(site,'assets');let total=0;
  for(const name of await readdir(dir)){const info=await stat(path.join(dir,name));if(info.isFile())total+=info.size;}

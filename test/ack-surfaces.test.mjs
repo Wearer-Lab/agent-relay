@@ -6,7 +6,7 @@ import path from 'node:path';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {fileURLToPath} from 'node:url';
-import {createBroker} from '../lib/broker.mjs';
+import {createBroker, validateStore} from '../lib/broker.mjs';
 import {createMcpAdapter} from '../lib/mcp.mjs';
 import {AgentRelayPlugin} from '../lib/opencode-plugin.mjs';
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
@@ -123,6 +123,29 @@ test('the migration refuses to run while a broker owns the data directory', asyn
   const plan = await f.run('migrate', '--to', '2', '--dry-run');
   assert.equal(plan.dryRun, true);
   assert.equal(plan.to, 2);
+});
+
+test('the migration command really migrates, and says so the second time', async t => {
+  const f = await fixture(t);
+  await f.run('join', '--as', 'a', '--runner', 'codex');
+  await f.run('join', '--as', 'b', '--runner', 'codex');
+  await f.run('send', '--as', 'a', '--to', '*', '--message', 'hello everybody');
+  // The migration needs the broker to be stopped.
+  await f.broker.close();
+
+  const result = await f.run('migrate', '--to', '2');
+  assert.equal(result.ok, true, 'the migration ran');
+  assert.ok(result.backup && String(result.backup).endsWith('.json'), 'it wrote a backup');
+  const backup = JSON.parse(await fs.readFile(result.backup, 'utf8'));
+  assert.equal(backup.version, 1, 'the backup is the old ledger');
+  const onDisk = JSON.parse(await fs.readFile(path.join(f.dataDir, 'state.json'), 'utf8'));
+  assert.equal(onDisk.version, 2, 'the ledger is on schema 2');
+  validateStore(onDisk);
+
+  const before = await fs.readFile(path.join(f.dataDir, 'state.json'));
+  const again = await f.run('migrate', '--to', '2');
+  assert.equal(again.already, true, 'the second run says it is already there');
+  assert.deepEqual(await fs.readFile(path.join(f.dataDir, 'state.json')), before, 'the second run changes nothing');
 });
 
 test('the MCP tools forward the new operations exactly', async t => {

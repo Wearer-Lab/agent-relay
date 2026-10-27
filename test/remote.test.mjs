@@ -367,3 +367,69 @@ test('a token is bound to one identity once the agent has registered', async t =
   assert.ok(history.ok, 'the request went through');
 });
 
+test('the rate limiter has an address bucket of its own, and the window resets', () => {
+  let clock = 1_000_000;
+  const limiter = new RateLimiter({perToken: 10, perIp: 2, windowMs: 1000, now: () => clock});
+  assert.equal(limiter.check('t1', '1.1.1.1').allowed, true);
+  assert.equal(limiter.check('t2', '1.1.1.1').allowed, true);
+  const blocked = limiter.check('t3', '1.1.1.1');
+  assert.equal(blocked.allowed, false, 'the address bucket is separate from the token bucket');
+  assert.ok(blocked.retryAfter >= 1);
+  assert.equal(limiter.check('t4', '2.2.2.2').allowed, true, 'another address has its own bucket');
+  clock += 1001;
+  assert.equal(limiter.check('t5', '1.1.1.1').allowed, true, 'the window resets');
+});
+
+test('a paired token is kept for one gateway and one repository only', async t => {
+  const http = await import('node:http');
+  const {execFile} = await import('node:child_process');
+  const {promisify} = await import('node:util');
+  const execFileAsync = promisify(execFile);
+
+  // A checkout with an origin, so the client knows what to pair with.
+  const dir = await temp(t);
+  const project = path.join(dir, 'project');
+  await fs.mkdir(project);
+  await execFileAsync('git', ['init', '-q', project]);
+  await execFileAsync('git', ['-C', project, 'remote', 'add', 'origin', 'https://github.com/org/repo.git']);
+
+  // A fake gateway that pairs on request and says what it was given.
+  const fake = async (label) => {
+    const state = {pairs: 0, tokens: []};
+    const server = http.createServer((req, res) => {
+      const answer = (code, body) => { res.writeHead(code, {'content-type': 'application/json'}); res.end(JSON.stringify(body)); };
+      if (req.method === 'POST' && req.url === '/pair') {
+        state.pairs++;
+        return answer(200, {requestId: `req-${state.pairs}`, code: 'ABC123'});
+      }
+      if (req.method === 'GET' && req.url.startsWith('/pair/')) {
+        return answer(200, {status: 'approved', room: '.', token: `token-${label}`});
+      }
+      state.tokens.push(req.headers.authorization ?? '');
+      return answer(200, {ok: true, label});
+    });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    t.after(() => server.close());
+    return {url: `http://127.0.0.1:${server.address().port}`, state};
+  };
+
+  const first = await fake('first');
+  const second = await fake('second');
+
+  // The client polls for the approval; a short interval keeps the test quick.
+  const one = await remoteRpc(project, {op: 'agents'}, {url: first.url, pollMs: 20});
+  assert.equal(one.label, 'first');
+  assert.equal(first.state.pairs, 1, 'the client paired once');
+  const two = await remoteRpc(project, {op: 'agents'}, {url: first.url, pollMs: 20});
+  assert.equal(two.label, 'first');
+  assert.equal(first.state.pairs, 1, 'the token is reused for the same gateway');
+
+  // Another gateway must not get the first token.
+  const three = await remoteRpc(project, {op: 'agents'}, {url: second.url, pollMs: 20});
+  assert.equal(three.label, 'second');
+  assert.equal(second.state.pairs, 1, 'the second gateway had to pair on its own');
+  assert.ok(second.state.tokens.every(value => value === 'Bearer token-second'),
+    'no token from another gateway is sent');
+  assert.ok(first.state.tokens.every(value => value === 'Bearer token-first'),
+    'the first gateway only ever saw its own token');
+});
