@@ -6,6 +6,8 @@ CONTEXT: A "remote gateway" lets cloud agents join relay rooms through a public 
   test/remote.test.mjs, test/remote-cli.test.mjs
 It listens on 127.0.0.1:47820 and forwards to the local broker through `lib/client.mjs` rpc().
 
+A later wave hardened the endpoint (a cloud marker on agents, read-only pending pairings, three holes closed from a threat model). Check that the hardening is actually complete.
+
 YOUR LANE: `lib/gateway.mjs` and `lib/remote-rooms.mjs` only. Assume the endpoint is on the internet and the attacker can send arbitrary HTTP and read every response.
 
 HUNT FOR (be specific, cite file:line):
@@ -16,5 +18,6 @@ HUNT FOR (be specific, cite file:line):
 5. Token storage and leakage: any token value written to disk, logged or echoed. Is the pairing handoff single-use in every path? Is the store written atomically with safe permissions?
 6. The audit log: can it be used to inject content? Is it bounded?
 7. Any way to make the gateway act on a room other than the token's room.
+8. The wave's hardening: the cloud marker on agents, the pending-pairing display, and the three holes `docs/threat-model.md` says were closed. Is each one closed in the code, and did closing it open another?
 
 DO NOT MODIFY ANY FILE. Report findings only, ordered by severity, each with file:line, the concrete attack, and an exact fix. Distinguish real exploits from theoretical noise.

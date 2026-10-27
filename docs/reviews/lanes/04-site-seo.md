@@ -7,7 +7,9 @@ CONTEXT: The marketing site lives in site/ and is served by GitHub Pages (mirror
 There is no build step: the committed HTML is the source of truth.
 scripts/set-site-origin.mjs rewrites every absolute URL to move the site to another domain. test/site.test.mjs enforces the metadata contract.
 
-YOUR LANE: site/ only, plus scripts/set-site-origin.mjs, scripts/surveillance.mjs and test/site.test.mjs. Do not review lib/.
+A later wave added public documents: docs/large-rooms.md, docs/runbook-backlog.md, docs/trust-model.md, docs/threat-model.md, docs/roadmaps/**.
+
+YOUR LANE: site/ only, plus scripts/set-site-origin.mjs, scripts/surveillance.mjs, test/site.test.mjs, and the new public docs (do they claim anything untrue, and are they linked from anywhere reachable?). Do not review lib/.
 
 HUNT FOR (be specific, cite file:line):
 1. SEO defects: a missing or duplicated tag, a title or description over the limit, a canonical that disagrees with the real URL, an og:url or og:image on the wrong origin, invalid JSON-LD or structured data that claims something false, a missing twitter tag, a missing lang or viewport, a broken heading order, more than one h1, a link with no accessible name.

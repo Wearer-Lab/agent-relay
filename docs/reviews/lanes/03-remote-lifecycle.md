@@ -6,6 +6,8 @@ CONTEXT: A "remote agents" feature lets cloud Claude/Codex sessions join local r
   lib/tunnels/{base,index,tailscale,cloudflare,ngrok}.mjs
   bin/agent-relay.mjs — the `remote` command family
   lib/remote-rooms.mjs — git origin normalisation and room resolution
+  lib/runtime.mjs — how the broker daemon runtime (Node vs another host) is resolved and recorded
+  scripts/parallel-work.mjs — the multi-lane workflow runner
 
 YOUR LANE: those files only. Another reviewer owns lib/gateway.mjs; do not duplicate it.
 
@@ -18,5 +20,7 @@ HUNT FOR (be specific, cite file:line):
 6. Tunnel providers: are spawned processes reaped, are URLs parsed correctly, does the Tailscale provider detect the "enable Funnel" approval, does spawnBackground leak descriptors?
 7. `remotePersist`: are the launchd plist, the systemd unit and the Task Scheduler entry correct (paths, quoting, arguments)? Is the plist valid XML? Would a wrong path break the boot job?
 8. Races between the gateway process (which writes the token store) and the CLI (which approves and revokes).
+9. `lib/runtime.mjs`: can the recorded runtime be stale, tampered with, or point at a binary that no longer exists, and what happens then?
+10. `scripts/parallel-work.mjs`: can a lane clobber another's file, lose a finding, or leave a half-merged tree?
 
 DO NOT MODIFY ANY FILE. Report findings only, ordered by severity, each with file:line, what breaks and under what conditions, and a concrete fix. Prefer a few real defects over a long list of style opinions.

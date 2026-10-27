@@ -8,9 +8,13 @@ Assets moved to `/assets/*`, read-only feeds to `/api/v1/*`.
 Files moved: `lib/dashboard/{dashboard.css,dashboard.js,model.js,theme.js}` → `lib/dashboard/assets/*`.
 Element ids were renamed to match (view-overview, nav-roadmap, count-agents, roadmap-tree, branch-chips, agent-q, ...).
 
-YOUR LANE: the dashboard rewrite and the rename.
+A later wave added a dashboard served THROUGH the gateway (a read-only tower on the public URL, with cloud badges and pending pairings shown).
+
+YOUR LANE: the dashboard rewrite and the rename, plus the dashboard over the gateway.
   lib/dashboard.mjs, lib/dashboard/index.html, lib/dashboard/assets/{dashboard.js,model.js,dashboard.css,theme.js}
+  lib/gateway.mjs (only the dashboard mounting part), lib/remote.mjs (only dashboardFor/remoteDashboard)
   test/dashboard.test.mjs, test/dashboard-views.test.mjs, test/dashboard-polish.test.mjs, test/dashboard-dom.mjs, test/theme.test.mjs
+  test/remote-dashboard.test.mjs, test/remote-e2e.test.mjs
 
 HUNT FOR (be specific, cite file:line):
 1. Renaming mistakes: a leftover old id, name or path in JS, HTML, CSS or tests that no longer matches. A view key in `model.js` attentionItems that does not match the `VIEWS` array in `dashboard.js`. Behaviour that silently broke because an id changed.
