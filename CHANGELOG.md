@@ -4,6 +4,10 @@ All notable changes to `@wearer-haitch/agent-relay` are recorded here. The forma
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-28
+
+A receipt now says whether a message was delivered or handled, and a stale claim names the state of its owner.
+
 ### Added
 
 - A receipt now separates **delivered** (an adapter or poll fetched the body) from **handled** (the agent acked). An optional session nonce, presented by the session that fetched the body, records which session read it. An ack without that nonce still counts as handled, and the receipt says the session is unbound.
@@ -186,7 +190,8 @@ The room on the machine where this was built held 4,016 pending deliveries befor
 - Last-seen presence, `agents --active`, and explicit `leave`.
 - Message summaries and durable attachments verified by SHA-256 on `fetch`.
 
-[Unreleased]: https://github.com/Wearer-Lab/agent-relay/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/Wearer-Lab/agent-relay/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/Wearer-Lab/agent-relay/releases/tag/v0.9.0
 [0.8.0]: https://github.com/Wearer-Lab/agent-relay/releases/tag/v0.8.0
 [0.7.3]: https://github.com/Wearer-Lab/agent-relay/releases/tag/v0.7.3
 [0.7.2]: https://github.com/Wearer-Lab/agent-relay/releases/tag/v0.7.2

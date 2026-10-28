@@ -1,5 +1,5 @@
 # Delivery backlog: liveness, expiry and fan-out
-Status: the 0.8.0 phases are shipped. Stale-claim owner state is on `agents`, `blocked` and the dashboard, in the tree and unreleased. Delivered versus handled receipts, and the optional session nonce, are in the tree and unreleased. Phase 0's owner ack stays open.
+Status: the 0.8.0 phases are shipped. Stale-claim owner state is on `agents`, `blocked` and the dashboard, shipped in 0.9.0. Delivered versus handled receipts, and the optional session nonce, shipped in 0.9.0. Phase 0's owner ack stays open.
 Labels: reliability, registry, roadmap
 
 Goal: a busy room never accumulates deliveries nobody can read. Dead identities stop counting as live, unread rows expire on their own, broadcasts stop multiplying rows, and the numbers people see describe what actually needs attention.
@@ -193,7 +193,7 @@ Labels: docs
 Priority: p3
 Labels: future
 
-In the tree and unreleased. Not part of 0.8.0.
+Shipped in 0.9.0.
 
 ### Delivered versus handled
 - [x] Separate "delivered" (an adapter or poll fetched the body) from "handled" (the agent acked after acting), and show both in `receipt`

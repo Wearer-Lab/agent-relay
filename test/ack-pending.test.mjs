@@ -136,9 +136,11 @@ test('the pending breakdown matches a hand-computed table', async t => {
 
 test('the pending operation is read-only: no agent, no ledger change, the same numbers twice', async t => {
   const f = await fixture(t, { seed: seeded });
-  const before = await f.readBytes();
   const agentsBefore = await f.rpc({ op: 'agents' });
+  // Fetching the inbox records delivery. That write belongs to inbox, so the
+  // snapshot is taken after it: pending itself must leave the ledger alone.
   const inboxBefore = await f.rpc({ op: 'inbox', agentId: 'bob' });
+  const before = await f.readBytes();
   const first = await f.rpc({ op: 'pending' });
   const second = await f.rpc({ op: 'pending' });
   assert.equal(await f.readBytes(), before, 'the ledger file is untouched');

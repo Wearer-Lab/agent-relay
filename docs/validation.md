@@ -7,7 +7,7 @@ npm ci --ignore-scripts --no-audit --no-fund
 npm run release:check
 ```
 
-The current automated suite has **510 passing tests for 0.8.0** on macOS, Linux and Windows. The
+The current automated suite has **518 passing tests for 0.9.0** on macOS, Linux and Windows. The
 CI (`.github/workflows/ci.yml`, see [CI workflow](./ci-workflow.md)) runs the suite and the release
 checks on macOS,
 Linux, and Windows with Node.js 20 and 22 for every pull request and push to `main`.
@@ -40,7 +40,7 @@ of this public repository.
 
 ## Validation matrix
 
-This matrix describes the baseline evidence behind the support claims for version 0.8.0
+This matrix describes the baseline evidence behind the support claims for version 0.9.0
 of the npm package. It is versioned: every release that claims platform or
 runner support must update it to match its own evidence. "Automated" means the
 repeatable test suite or release checker; "live-verified" means observed in a

@@ -1,5 +1,5 @@
 # Remote agents: cloud Claude and Codex in the relay
-Status: 0.8.0 shipped the gateway, the tunnel, pairing, the dashboard and the docs. The seven threat-model items are closed in the tree and unreleased. The hosted relay is still a plan: `remote host` writes it, a local start proved the broker and gateway come up, and no always-on host is deployed, so cloud agents still stop when this computer sleeps.
+Status: 0.8.0 shipped the gateway, the tunnel, pairing, the dashboard and the docs. The seven threat-model items shipped in 0.9.0. The hosted relay is still a plan: `remote host` writes it, a local start proved the broker and gateway come up, and no always-on host is deployed, so cloud agents still stop when this computer sleeps.
 Labels: remote, cloud, roadmap
 
 Goal: Claude Code cloud sessions and Codex cloud tasks join the same relay rooms as local agents. They send and receive messages, claim files and branches, and see the roadmap. The person setting it up only types a few `agent-relay` commands and answers yes, approve, or sign in.
