@@ -1,5 +1,5 @@
 # Remote agents: cloud Claude and Codex in the relay
-Status: shipped in 0.8.0 (the hosted relay is still a plan, not a deployment)
+Status: 0.8.0 shipped the gateway, the tunnel, pairing, the dashboard and the docs. The seven threat-model items are closed in the tree and unreleased. The hosted relay is still a plan: `remote host` writes it, a local start proved the broker and gateway come up, and no always-on host is deployed, so cloud agents still stop when this computer sleeps.
 Labels: remote, cloud, roadmap
 
 Goal: Claude Code cloud sessions and Codex cloud tasks join the same relay rooms as local agents. They send and receive messages, claim files and branches, and see the roadmap. The person setting it up only types a few `agent-relay` commands and answers yes, approve, or sign in.
@@ -17,7 +17,7 @@ agent-relay remote on              # checks/installs the tunnel tool, one browse
 agent-relay remote add claude      # wires this repo for Claude cloud sessions (prints the one cloud setting)
 agent-relay remote add codex       # same for Codex cloud tasks
 # a cloud agent starts and asks to join (it shows a 6-character code)
-agent-relay remote approve         # "Approve cloud-claude (code K7Q-2PX) for room speechify? [y/N]" -> y
+agent-relay remote approve         # "Approve K7Q-2PX for /path/to/speechify? [y/N]" -> y
 agent-relay remote status          # URL, tunnel health, connected cloud agents, pending requests
 agent-relay remote off             # closes the public URL immediately
 ```
@@ -31,7 +31,7 @@ Tunnel choice. Tailscale Funnel is the default: it is free, gives a stable `http
 | Cloudflare named tunnel (`--provider cloudflare --hostname relay.example.com`) | Cloudflare account plus a domain on Cloudflare | Yes | Requires owning a domain on Cloudflare |
 | ngrok (`--provider ngrok`) | ngrok sign-in | Yes (free dev domain) | The free plan allows 20,000 requests a month. One long-polling agent uses about 100,000 a month |
 
-Security model: the public URL is on the internet. Every gateway call needs a token, except the pairing request. A token is scoped to one room and to **one agent identity**: the first registration through it binds the token to that agent, and after that it reads only that agent's conversations and writes only as itself. Pairing requests are rate limited by the address the tunnel reports, expire after 10 minutes, and do nothing until approved locally; a request with a foreign `Origin` is refused, and `--yes` approves one named code. Tokens are random 256-bit values that are stored only as hashes, can be revoked, and expire (24 hours for paired sessions, configurable for always-on tokens). Peer messages remain coordination input, never authorization. The reasoning, and what is still open, is in [the threat model](../threat-model.md).
+Security model: the public URL is on the internet. Every gateway call needs a token, except the pairing request. A token is scoped to one room and to **one agent identity**: the first registration through it binds the token to that agent, and after that it reads only that agent's conversations and writes only as itself. Pairing requests are rate limited by the address the tunnel reports, expire after 10 minutes, and do nothing until approved locally; a request with a foreign `Origin` is refused, and `--yes` approves one named code. Tokens are random 256-bit values that are stored only as hashes, can be revoked, and expire (24 hours for paired sessions; an always-on token uses that window and renews it on use, and `--ttl-hours` sets the window). A call that names another room or another agent is refused. A token may hold four long polls. Peer messages remain coordination input, never authorization. The reasoning is in [the threat model](../threat-model.md). Its open list is empty.
 
 ## Phase 1: Remote gateway
 Labels: gateway
@@ -149,7 +149,7 @@ Labels: docs, release
 
 
 - [x] The dashboard over the same public URL (Phase 5).
-- [x] An always-on host, so cloud agents keep working while this computer sleeps.
+- [ ] An always-on host that stays up while this computer sleeps. `remote host` writes the plan. A local start proved the broker and gateway come up, then they were stopped. Nothing is deployed.
 - [x] A threat-model review of the public endpoint.
 - [x] A release with the changelog entry and the README section.
 
@@ -157,5 +157,5 @@ Labels: docs, release
 Labels: future
 
 ### Hosted relay option
-- [ ] Run the broker plus gateway on a small always-on host (a VM or a container platform), so cloud agents keep working while this computer sleeps
-- [x] `agent-relay remote host` to deploy it and point local agents at it, using the same tokens and rooms
+- [ ] Run the broker plus gateway on a small always-on host (a VM or a container platform), so cloud agents keep working while this computer sleeps. The plan's broker and gateway were started locally from the unit commands and came up, then were stopped. That is not a host that stays up.
+- [x] `agent-relay remote host` writes the host plan and the steps that point local agents at it, using the same tokens and rooms

@@ -284,8 +284,11 @@ test('strips group agents by liveness, cap the dormant pile, and filter to live 
  page.$('agent-q').value='ghost';page.$('agent-q').listeners.input();assert.equal(findAll(page.$('agents'),el=>el.tag==='article').length,1);
 });
 test('claims render stale state and an empty note',async()=>{
- const page=boot({projects:rooms,snapshot:fleetSnapshot({claims:[{resource:'/w/a.mjs',agentId:'atlas',claimedAt:ago(10),scope:'project',stale:true},{resource:'native',agentId:'vector',project:'/w',claimedAt:ago(3),scope:'machine',stale:false}]}),path:'/claims/'});await page.flush();
- const rows=findAll(page.$('claims'),el=>el.tag==='tr');assert.equal(rows.length,2);assert.match(textOf(rows[0]),/a\.mjs/);assert.match(textOf(rows[0]),/stale/);assert.match(textOf(rows[1]),/Machine · native/);assert.equal(page.$('no-claims').hidden,true);assert.match(textOf(page.$('claims-meta')),/2 held · 1 stale/);
+ const page=boot({projects:rooms,snapshot:fleetSnapshot({claims:[{resource:'/w/a.mjs',agentId:'atlas',claimedAt:ago(10),scope:'project',stale:true,holder:'left'},{resource:'native',agentId:'vector',project:'/w',claimedAt:ago(3),scope:'machine',stale:false,holder:'active'}]}),path:'/claims/'});await page.flush();
+ const rows=findAll(page.$('claims'),el=>el.tag==='tr');assert.equal(rows.length,2);assert.match(textOf(rows[0]),/a\.mjs/);assert.match(textOf(rows[0]),/stale · left/);assert.match(textOf(rows[0]),/10m ago/);assert.match(textOf(rows[1]),/Machine · native/);assert.match(textOf(rows[1]),/held/);assert.equal(page.$('no-claims').hidden,true);assert.match(textOf(page.$('claims-meta')),/2 held · 1 stale/);
+ const idle=boot({projects:rooms,snapshot:fleetSnapshot({claims:[{resource:'/w/b.mjs',agentId:'vector',claimedAt:ago(90),scope:'project',stale:true,holder:'stale'},{resource:'/w/c.mjs',agentId:'gone',claimedAt:ago(5),scope:'project',stale:true,holder:'retired'},{resource:'/w/d.mjs',agentId:'none',claimedAt:ago(5),scope:'project',stale:true,holder:'missing'}]}),path:'/claims/'});await idle.flush();
+ const idleRows=findAll(idle.$('claims'),el=>el.tag==='tr').map(textOf);
+ assert.match(idleRows[0],/stale · idle/);assert.match(idleRows[1],/stale · retired/);assert.match(idleRows[2],/stale · missing/);
  const none=boot({projects:rooms,snapshot:fleetSnapshot({claims:[]}),path:'/claims/'});await none.flush();assert.equal(none.$('no-claims').hidden,false);
 });
 test('dashboard script only reads: no writes, inline handlers or hash routing',async()=>{

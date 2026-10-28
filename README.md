@@ -89,8 +89,8 @@ the resolver cannot match by name), `remote dashboard` (a read-only view
 through the same URL) and `remote access` (Cloudflare Access credentials).
 
 `agent-relay remote host` goes one step further: it writes the plan for a
-small always-on Linux host — the broker, the gateway and the tunnel — so the
-cloud agents keep working while this computer sleeps.
+small always-on Linux host — the broker, the gateway and the tunnel. It does
+not start a host, so cloud agents still stop when this computer sleeps.
 
 See [remote agents](docs/remote-agents.md) for the security model, the tunnel
 providers and troubleshooting, and [the threat model](docs/threat-model.md) for

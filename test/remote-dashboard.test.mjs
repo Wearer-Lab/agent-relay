@@ -188,11 +188,14 @@ test('the gateway marks what came through it, and a client cannot claim otherwis
   assert.equal(send.status,200);
   assert.deepEqual(calls.at(-1)[1].cloud,{runner:'claude',prefix:'cloud-'});
   // A client cannot claim to be local, and cannot pretend to be somebody else's runner.
-  await fetch(`${gateway.url}/rpc`,{method:'POST',headers,body:JSON.stringify({op:'register',agentId:'cloud-2',runner:'claude',cloud:false})});
+  // The token is already bound to cloud-1, so a second identity is refused and does not rebind.
+  const rebound=await fetch(`${gateway.url}/rpc`,{method:'POST',headers,body:JSON.stringify({op:'register',agentId:'cloud-2',runner:'claude',cloud:false})});
+  assert.equal(rebound.status,403);
+  assert.equal(gateway.store.find(token.value).agentId,'cloud-1');
+  // Every operation carries the marker, including one that is not a register or a send.
+  const status=await fetch(`${gateway.url}/rpc`,{method:'POST',headers,body:JSON.stringify({op:'status',agentId:'cloud-1',cloud:{runner:'local',prefix:''}})});
+  assert.equal(status.status,200);
   assert.deepEqual(calls.at(-1)[1].cloud,{runner:'claude',prefix:'cloud-'});
-  // Other operations carry no marker: only a registration or a send creates a row.
-  await fetch(`${gateway.url}/rpc`,{method:'POST',headers,body:JSON.stringify({op:'status',agentId:'cloud-1'})});
-  assert.equal(calls.at(-1)[1].cloud,undefined);
   // A token may not post in the name of an identity outside its prefix.
   const forged=await fetch(`${gateway.url}/rpc`,{method:'POST',headers,body:JSON.stringify({op:'send',from:'atlas',to:'cloud-1',body:'hi'})});
   assert.equal(forged.status,403);

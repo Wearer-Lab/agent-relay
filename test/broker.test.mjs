@@ -563,8 +563,8 @@ test('outbox and receipt derive per-recipient delivery ladder states from transp
   assert.deepEqual(Object.keys(outbox.messages[0]).sort(), ['body', 'counts', 'cursor', 'followups', 'from', 'id', 'pending', 'pendingTotal', 'recipients', 'recipientsTotal', 'summary', 'to', 'ts']);
   assert.equal(outbox.messages[0].summary, 'ladder');
   assert.equal(outbox.messages[0].cursor, sent.cursor);
-  assert.deepEqual(outbox.messages[0].recipients, [{ agentId: 'b', stored: true, notified: [], accepted: [], missing: [], acked: false, state: 'stored', cursor: sent.cursor }]);
-  assert.deepEqual(outbox.messages[0].counts, { recipients: 1, acked: 0, accepted: 0, notified: 0, pending: 1, missing: 0 });
+  assert.deepEqual(outbox.messages[0].recipients, [{ agentId: 'b', stored: true, notified: [], accepted: [], missing: [], acked: false, delivered: false, handled: false, session: 'unbound', state: 'stored', cursor: sent.cursor }]);
+  assert.deepEqual(outbox.messages[0].counts, { recipients: 1, acked: 0, accepted: 0, notified: 0, pending: 1, missing: 0, delivered: 0, handled: 0 });
   const receipt = await f.rpc({ op: 'receipt', messageId: 'ladder' });
   assert.deepEqual(receipt.pending, [{ agentId: 'b', reason: 'no-transport-markers', ts: outbox.messages[0].ts }]);
   assert.equal(await fs.readFile(path.join(f.dataDir, 'state.json'), 'utf8'), before);
@@ -574,7 +574,7 @@ test('outbox and receipt derive per-recipient delivery ladder states from transp
   assert.deepEqual(current.recipients[0].notified.map(n => n.adapter), ['codex-attempted']);
   assert.deepEqual(current.recipients[0].accepted, []);
   assert.deepEqual(current.recipients[0].missing, []);
-  assert.deepEqual(current.counts, { recipients: 1, acked: 0, accepted: 0, notified: 1, pending: 0, missing: 0 });
+  assert.deepEqual(current.counts, { recipients: 1, acked: 0, accepted: 0, notified: 1, pending: 0, missing: 0, delivered: 0, handled: 0 });
   await f.rpc({ op: 'notified', agentId: 'b', messageId: 'ladder', adapter: 'opencode-toast' });
   assert.equal((await f.rpc({ op: 'receipt', messageId: 'ladder' })).recipients[0].state, 'notified');
   await f.rpc({ op: 'notified', agentId: 'b', messageId: 'ladder', adapter: 'codex-accepted' });
@@ -582,14 +582,17 @@ test('outbox and receipt derive per-recipient delivery ladder states from transp
   assert.equal(current.recipients[0].state, 'accepted');
   assert.deepEqual(current.recipients[0].accepted.map(n => n.adapter), ['codex-accepted']);
   assert.deepEqual(current.recipients[0].notified.map(n => n.adapter), ['codex-attempted', 'opencode-toast']);
-  assert.deepEqual(current.counts, { recipients: 1, acked: 0, accepted: 1, notified: 0, pending: 0, missing: 0 });
+  assert.deepEqual(current.counts, { recipients: 1, acked: 0, accepted: 1, notified: 0, pending: 0, missing: 0, delivered: 0, handled: 0 });
   await f.rpc({ op: 'ack', agentId: 'b', messageId: 'ladder' });
   current = await f.rpc({ op: 'receipt', messageId: 'ladder' });
-  assert.deepEqual(Object.keys(current.recipients[0]).sort(), ['accepted', 'ackTs', 'acked', 'agentId', 'cursor', 'missing', 'notified', 'state', 'stored']);
+  assert.deepEqual(Object.keys(current.recipients[0]).sort(), ['accepted', 'ackTs', 'acked', 'agentId', 'cursor', 'delivered', 'handled', 'missing', 'notified', 'session', 'state', 'stored']);
   assert.equal(current.recipients[0].state, 'acked');
   assert.equal(current.recipients[0].acked, true);
+  assert.equal(current.recipients[0].handled, true);
+  assert.equal(current.recipients[0].delivered, false);
+  assert.equal(current.recipients[0].session, 'unbound');
   assert.equal(typeof current.recipients[0].ackTs, 'string');
-  assert.deepEqual(current.counts, { recipients: 1, acked: 1, accepted: 0, notified: 0, pending: 0, missing: 0 });
+  assert.deepEqual(current.counts, { recipients: 1, acked: 1, accepted: 0, notified: 0, pending: 0, missing: 0, delivered: 0, handled: 1 });
   assert.deepEqual(current.pending, []);
 });
 
@@ -613,7 +616,7 @@ test('outbox filters by message ID and cursor window while receipts explain pend
   await f.rpc({ op: 'notified', agentId: 'c', messageId: 'fan', adapter: 'opencode-wake-attempted' });
   const fan = await f.rpc({ op: 'receipt', messageId: 'fan' });
   assert.deepEqual(fan.recipients.map(row => [row.agentId, row.state]), [['b', 'accepted'], ['c', 'attempted']]);
-  assert.deepEqual(fan.counts, { recipients: 2, acked: 0, accepted: 1, notified: 1, pending: 0, missing: 0 });
+  assert.deepEqual(fan.counts, { recipients: 2, acked: 0, accepted: 1, notified: 1, pending: 0, missing: 0, delivered: 0, handled: 0 });
   assert.deepEqual(fan.pending, []);
   await f.rpc({ op: 'leave', agentId: 'b' });
   const pending = await f.rpc({ op: 'receipt', messageId: 'one' });
@@ -674,7 +677,7 @@ test('restart preserves delivery ladder markers, acknowledgement times and follo
   assert.deepEqual(receiptBefore.followups.map(row => row.note), ['escalate']);
   const fan = await f.rpc({ op: 'receipt', messageId: 'fan' });
   assert.deepEqual(fan.recipients.map(row => [row.agentId, row.state]), [['b', 'stored'], ['c', 'attempted']]);
-  assert.deepEqual(fan.counts, { recipients: 2, acked: 0, accepted: 0, notified: 1, pending: 1, missing: 0 });
+  assert.deepEqual(fan.counts, { recipients: 2, acked: 0, accepted: 0, notified: 1, pending: 1, missing: 0, delivered: 0, handled: 0 });
   assert.deepEqual(fan.pending.map(row => row.agentId), ['b']);
 });
 
@@ -1365,7 +1368,7 @@ test('receipt pages recipients while keeping full delivery counts', async t => {
   assert.equal(full.recipientsTotal, 3);
   assert.equal(full.recipientsLimit, 3);
   assert.equal(full.recipientsOffset, 0);
-  assert.deepEqual(full.counts, { recipients: 3, acked: 0, accepted: 1, notified: 1, pending: 1, missing: 0 });
+  assert.deepEqual(full.counts, { recipients: 3, acked: 0, accepted: 1, notified: 1, pending: 1, missing: 0, delivered: 0, handled: 0 });
   const first = await f.rpc({ op: 'receipt', messageId: 'fan', recipientsLimit: 1, recipientsOffset: 0 });
   assert.equal(first.recipients.length, 1);
   assert.equal(first.recipients[0].agentId, full.recipients[0].agentId);
@@ -1393,7 +1396,7 @@ test('reconciled-missing advances a negative receipt ladder without certifying d
   await f.rpc({ op: 'send', from: 'a', to: 'b', body: 'fragile', messageId: 'fragile' });
   let receipt = await f.rpc({ op: 'receipt', messageId: 'fragile' });
   assert.equal(receipt.recipients[0].state, 'stored');
-  assert.deepEqual(receipt.counts, { recipients: 1, acked: 0, accepted: 0, notified: 0, pending: 1, missing: 0 });
+  assert.deepEqual(receipt.counts, { recipients: 1, acked: 0, accepted: 0, notified: 0, pending: 1, missing: 0, delivered: 0, handled: 0 });
   await f.rpc({ op: 'notified', agentId: 'b', messageId: 'fragile', adapter: 'codex-attempted' });
   receipt = await f.rpc({ op: 'receipt', messageId: 'fragile' });
   assert.equal(receipt.recipients[0].state, 'attempted');
@@ -1401,7 +1404,7 @@ test('reconciled-missing advances a negative receipt ladder without certifying d
   receipt = await f.rpc({ op: 'receipt', messageId: 'fragile' });
   assert.equal(receipt.recipients[0].state, 'missing');
   assert.deepEqual(receipt.recipients[0].missing.map(n => n.adapter), ['codex-reconciled-missing']);
-  assert.deepEqual(receipt.counts, { recipients: 1, acked: 0, accepted: 0, notified: 0, pending: 0, missing: 1 });
+  assert.deepEqual(receipt.counts, { recipients: 1, acked: 0, accepted: 0, notified: 0, pending: 0, missing: 1, delivered: 0, handled: 0 });
   assert.equal(receipt.pending.length, 1);
   assert.equal(receipt.pending[0].agentId, 'b');
   assert.equal(receipt.pending[0].reason, 'operator-confirmed-missing');
@@ -1412,7 +1415,7 @@ test('reconciled-missing advances a negative receipt ladder without certifying d
   assert.equal(negative.recipients[0].state, 'missing');
   assert.equal(negative.pending[0].reason, 'negative-reconciliation');
   assert.equal(negative.pending[0].ts, negative.recipients[0].missing[0].ts);
-  assert.deepEqual(negative.counts, { recipients: 1, acked: 0, accepted: 0, notified: 0, pending: 0, missing: 1 });
+  assert.deepEqual(negative.counts, { recipients: 1, acked: 0, accepted: 0, notified: 0, pending: 0, missing: 1, delivered: 0, handled: 0 });
   await f.rpc({ op: 'notified', agentId: 'b', messageId: 'fragile', adapter: 'codex-accepted' });
   receipt = await f.rpc({ op: 'receipt', messageId: 'fragile' });
   assert.equal(receipt.recipients[0].state, 'accepted');
@@ -2112,7 +2115,7 @@ test('receipt pages pending with limit and offset while keeping full counts', as
   assert.equal(full.pendingLimit, 25);
   assert.equal(full.pendingOffset, 0);
   assert.equal(full.pending.length, 25);
-  assert.deepEqual(full.counts, { recipients: 30, acked: 0, accepted: 0, notified: 0, pending: 30, missing: 0 });
+  assert.deepEqual(full.counts, { recipients: 30, acked: 0, accepted: 0, notified: 0, pending: 30, missing: 0, delivered: 0, handled: 0 });
   const second = await f.rpc({ op: 'receipt', messageId: 'fan', pendingLimit: 10, pendingOffset: 25 });
   assert.equal(second.pending.length, 5);
   assert.equal(second.pendingTotal, 30);
@@ -2142,13 +2145,13 @@ test('outbox caps recipients and pending with totals while keeping full counts',
   assert.equal(fan.recipientsTotal, 30);
   assert.equal(fan.pending.length, 25);
   assert.equal(fan.pendingTotal, 30);
-  assert.deepEqual(fan.counts, { recipients: 30, acked: 0, accepted: 0, notified: 0, pending: 30, missing: 0 });
+  assert.deepEqual(fan.counts, { recipients: 30, acked: 0, accepted: 0, notified: 0, pending: 30, missing: 0, delivered: 0, handled: 0 });
   const direct = outbox.messages.find(m => m.id === 'direct');
   assert.equal(direct.recipients.length, 1);
   assert.equal(direct.recipientsTotal, 1);
   assert.equal(direct.pending.length, 1);
   assert.equal(direct.pendingTotal, 1);
-  assert.deepEqual(direct.counts, { recipients: 1, acked: 0, accepted: 0, notified: 0, pending: 1, missing: 0 });
+  assert.deepEqual(direct.counts, { recipients: 1, acked: 0, accepted: 0, notified: 0, pending: 1, missing: 0, delivered: 0, handled: 0 });
   const capped = await f.rpc({ op: 'outbox', from: 'a', recipientsLimit: 10, pendingLimit: 5 });
   const cappedFan = capped.messages.find(m => m.id === 'fan');
   assert.equal(cappedFan.recipients.length, 10);

@@ -235,6 +235,23 @@ test('stale claims are surfaced with age and owner state, and appear in the bloc
   const blocked = await f.rpc({ op: 'blocked' });
   const shape = rows => rows.map(row => ({ resource: row.resource, agentId: row.agentId, scope: row.scope, holder: row.holder }));
   assert.deepEqual(shape(blocked.staleClaims), shape(listed.claims), 'the blocked view shows the same list');
+
+  // agents and the dashboard snapshot use the same liveness classification, so a stale
+  // claim there carries its age and the owner's state, not only a boolean.
+  const agents = await f.rpc({ op: 'agents' });
+  const dormant = agents.claims.find(claim => claim.resource === 'install');
+  const live = agents.claims.find(claim => claim.resource === 'build');
+  assert.equal(dormant.stale, true);
+  assert.equal(dormant.holder, 'left');
+  assert.ok(dormant.ageMs >= 0);
+  assert.ok(dormant.lastSeenAgeMs >= 0);
+  assert.equal(live.stale, false);
+  assert.equal(live.holder, 'active');
+  const snapshot = await f.rpc({ op: 'snapshot' });
+  const surfaced = snapshot.claims.find(claim => claim.resource === 'install');
+  assert.equal(surfaced.holder, 'left');
+  assert.equal(surfaced.stale, true);
+  assert.equal(typeof surfaced.claimedAt, 'string', 'the dashboard ages the claim from its timestamp');
 });
 
 test('a claim held by a live owner is never released; a dormant owner is released only with the opt-in', async t => {

@@ -4,6 +4,16 @@ All notable changes to `@wearer-haitch/agent-relay` are recorded here. The forma
 
 ## [Unreleased]
 
+### Added
+
+- A receipt now separates **delivered** (an adapter or poll fetched the body) from **handled** (the agent acked). An optional session nonce, presented by the session that fetched the body, records which session read it. An ack without that nonce still counts as handled, and the receipt says the session is unbound.
+
+### Changed
+
+- Stale claims listed by `agents`, `blocked` and the dashboard include the claim's age and the owner's state (left, retired, idle, or missing), using the same liveness classification as the stale-claim list.
+- A gateway token may hold four long polls; another is `429` with `Retry-After`. Always-on tokens expire, and each use renews the window (24 hours, or `--ttl-hours`); a paired session keeps a fixed 24 hour expiry. An uncollected token is handed to the gateway in memory and is not written to disk. Approval names the checkout, and a named branch with no checkout is not approved into main. A token that names another room or another agent is refused. Ledger writes from the gateway carry the cloud marker.
+- The host plan runs the gateway in the broker's network namespace, so a container reaches the broker on `127.0.0.1`, and the tunnel command is separate arguments.
+
 ## [0.8.0] - 2026-10-26
 
 A busy room now cleans itself, and the numbers people read describe what actually needs attention.

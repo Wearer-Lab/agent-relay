@@ -1,5 +1,5 @@
 # Delivery backlog: liveness, expiry and fan-out
-Status: shipped in 0.8.0. Two boxes are still open, and the "Later" phase is not part of it.
+Status: the 0.8.0 phases are shipped. Stale-claim owner state is on `agents`, `blocked` and the dashboard, in the tree and unreleased. Delivered versus handled receipts, and the optional session nonce, are in the tree and unreleased. Phase 0's owner ack stays open.
 Labels: reliability, registry, roadmap
 
 Goal: a busy room never accumulates deliveries nobody can read. Dead identities stop counting as live, unread rows expire on their own, broadcasts stop multiplying rows, and the numbers people see describe what actually needs attention.
@@ -21,7 +21,7 @@ Success measures:
 - A burst of short-lived processes adds no permanent identities.
 
 Decisions:
-- **Acks and `leave` stay cooperative.** Agent IDs are not authentication; the broker token is the trust boundary on a single-user machine. So `leave --as` and `ack --as` for any known id are kept, and documented as such (Phase 7). Binding receipts to sessions is the optional "Later" phase, not a fix.
+- **Acks and `leave` stay cooperative.** Agent IDs are not authentication; the broker token is the trust boundary on a single-user machine. So `leave --as` and `ack --as` for any known id are kept, and documented as such (Phase 7). Binding a receipt to the session that fetched the body is optional, not an authentication check: an ack without the nonce still counts.
 - **Stale claims are never released silently by default.** Auto-release can let two agents edit the same files, so it is opt-in (Phase 3), limited to dormant or retired owners, and always audited. By default stale claims are surfaced prominently instead.
 
 Release plan:
@@ -44,7 +44,7 @@ At the peak send rate the room has about two days of runway before the 10,000-me
 - [x] `leave --as <id> --if-idle` for each identity confirmed gone; decide the six with obligations (resolve or hand off their claim, task or branch claim first)
 - [x] `compact --older-than-days 3` dry run, review the counts, then `--apply`; record the before/after pending figure (expected 166,526 to about 7,400)
 - [x] Optional: `compact --drop-identities --apply` to remove about 100 unreferenced dormant identities
-- [ ] Ask each live role to `ack --all` its own backlog after reading it, never on another identity's behalf
+- [ ] Ask each live role to `ack --all` its own backlog after reading it, never on another identity's behalf. This stays an owner step for whenever those roles are live (the 2026-10-26 cleanup found none live on this machine, and acking for them would be a false receipt).
 
 ## Phase 1: Unstick the backlog (0.7.4)
 Priority: p0
@@ -121,7 +121,7 @@ Safe, bulk, dry-run-first commands, so an owner never has to script against the 
 - [x] State plainly that acking for an identity you do not run creates a false receipt
 
 ### Stale claims, surfaced and optionally released
-- [ ] List stale claims (owner left, retired, or idle past a window) in `agents`, `blocked` and the dashboard, with age and owner state
+- [x] List stale claims (owner left, retired, or idle past a window) in `agents`, `blocked` and the dashboard, with age and owner state
 - [x] Opt-in auto-release: `--release-stale-claims-hours N` on the daemon (off by default), only for owners that are dormant or retired, with a release-log entry and a notice to the room
 - [x] Tests: claims held by live owners are never released; released claims are recorded in the audit log
 
@@ -193,6 +193,8 @@ Labels: docs
 Priority: p3
 Labels: future
 
+In the tree and unreleased. Not part of 0.8.0.
+
 ### Delivered versus handled
-- [ ] Separate "delivered" (an adapter or poll fetched the body) from "handled" (the agent acked after acting), and show both in `receipt`
-- [ ] Optionally bind an ack to the session that fetched the body (a per-session nonce), so a receipt proves which session read it
+- [x] Separate "delivered" (an adapter or poll fetched the body) from "handled" (the agent acked after acting), and show both in `receipt`
+- [x] Optionally bind an ack to the session that fetched the body (a per-session nonce), so a receipt proves which session read it

@@ -49,6 +49,13 @@ So:
 
 The relay cannot enforce this. It can only tell the truth about what it was told.
 
+A receipt says two different things, and they are not the same:
+
+- **Delivered** means an adapter or a poll fetched the body (`inbox` or `wait`). A toast or a transport notice is not a delivery.
+- **Handled** means the agent acked after acting. An ack still means "this agent says it handled the message", not "this agent agreed".
+
+An optional session nonce can bind those two. The session that fetched the body may present the same nonce on ack, and the receipt then names that session. An ack without a nonce still counts as handled, and the receipt says the session is unbound. A nonce that does not match the fetch is unbound too: the ack is accepted either way. The nonce is not a credential, and agent ids are still not accounts. Old inbox and ack calls keep working; clients that want the binding send `session` and feature-detect `delivery-receipts`.
+
 ## Leaving is cooperative too
 
 `leave` marks an identity dormant. It keeps the identity resolvable for history and it

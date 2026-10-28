@@ -66,30 +66,25 @@ gateway busy with long polls.
   stripped of control characters ([`validatePairing`]): a 200 KB "repository"
   carrying ANSI escapes cannot rewrite the operator's prompt.
 - `remote approve --yes` approves **one named code**. Without a code it says
-  so and approves nothing (`bin/agent-relay.mjs`).
+  so and approves nothing (`bin/agent-relay.mjs`). The approval question and
+  the approval message name the checkout the room resolves to
+  (`approvalQuestion`, `remoteApprove`), not only the repository.
+- A token may hold four long polls (`MAX_CONCURRENT_WAITS`). A fifth is
+  refused with `429` and `Retry-After` before the broker is called.
 
 **What the limits do not stop.**
 
 - The per-address bucket is per address, not per person: an attacker with many
   addresses can still make many requests, and the five waiting slots are per
   gateway.
-- The operator still approves on trust. The request names a repository, a
-  branch and a runner, and the operator's `y` is the entire authentication of
-  the cloud agent. The gateway cannot tell a fork from its upstream.
-- A token holder can open many long polls. `wait` is allowed and each call
-  holds a socket for up to the gateway's 30 second request timeout. There is
-  still no cap on concurrent waits per token.
+- The operator still approves on trust. The question names the checkout the
+  room resolves to, and the operator's `y` is still the entire authentication
+  of the cloud agent. The gateway cannot tell a fork from its upstream.
 
 **Residual risk.** An unauthenticated caller can deny the pairing service to
 the real agent for up to ten minutes at a time, and can make the approval list
 look busier than it is. An operator who approves a request they did not verify
 hands over one room.
-
-**The one-line fix, if it ever bites.**
-
-- Cap concurrent waits per token (`lib/gateway.mjs` [`ALLOWED_OPS`]).
-- Show the operator the checkout the room resolves to, not only the
-  repository name, so a fork is visible at approval time.
 
 ## Threat 2: token leakage
 
@@ -102,13 +97,17 @@ the room as the cloud agent until it is revoked or expires.
 - A token is 32 random bytes ([`randomToken`]), stored as a SHA-256 hash
   ([`sha256`]) and compared in constant time ([`timingSafeEqual`]). The value
   is never in the token file's `tokens` list, and never in the audit log.
-- The value of an approved-but-uncollected token waits in its own short-lived
-  file (`remote-pending-tokens.json`), never in the token store, and it is
-  deleted when the agent collects it **and** when the pairing expires
-  (`expirePairings` deletes the pending value with the pairing). A token that
-  nobody collects does not sit on the disk for the life of the installation.
-- A paired session token expires after 24 hours ([`issue`], default
-  `ttlMs`), and an always-on token has no expiry. `remote revoke` and
+- The value of an approved-but-uncollected token is handed to the running
+  gateway over a local socket (`listenForHandover`, `TokenStore.handOver`) and
+  lives only in that process's memory until the agent collects it or the
+  pairing expires. It is not written to `remote-pending-tokens.json`. A file
+  left by an older relay is deleted on load and is not read back. The value
+  is not written to the audit log.
+- A paired session token expires after 24 hours and that clock does not move
+  when the token is used ([`issue`], `sliding` false). An always-on token uses
+  the same window, renewed on each successful call (`touch` when `sliding` is
+  set). `--ttl-hours` sets the window. A row written before this change with
+  `expiresAt` null is left without an expiry. `remote revoke` and
   `remote revoke --all` invalidate at once ([`TokenStore.revoke`]).
 - The client keeps the token in memory for the session only
   (`lib/client.mjs` [`sessionToken`]), keyed by the gateway **and** the
@@ -130,23 +129,12 @@ the room as the cloud agent until it is revoked or expires.
   TLS, but it lands in whatever the cloud agent does with it: an environment
   variable (`AGENT_RELAY_TOKEN`), a CI log that echoes the environment, a
   shell history when the token is passed on the command line, or a crash dump.
-- An always-on token never expires on its own, so a leak is a permanent leak
-  until someone runs `remote revoke`.
-- The value of an uncollected token is on disk in the clear for the length of
-  the pairing's ten-minute life. The file is `0600`, but the claim "only a
-  hash is ever stored" is true for the token store and false for the handover
-  file.
 - `TokenStore.find` returns at the first match, so the time it takes to find
   a token depends on where the token sits in the list. Low value to an
   attacker, but it is not constant time end to end.
 
 **Residual risk.** A leaked always-on token is a room-wide read and write
-grant until it is revoked.
-
-**The one-line fix, if it ever bites.**
-
-- Hand the value over out of band, so it is never on disk at all.
-- Give always-on tokens an expiry too, and renew them on use.
+grant until it goes unused for its window, or until it is revoked.
 
 ## Threat 3: prompt-injected agents
 
@@ -157,9 +145,10 @@ that says no, and that a message can never widen what a token may do.
 
 **What the code does today.**
 
-- The room comes from the token, never from the request. The request's own
-  `project` field is deleted, and the room is taken from `token.room`. A
-  message cannot move a token to another room.
+- The room comes from the token, never from the request. A request that names
+  a different `project` is refused (`403`, "bound to one room"). Omitting the
+  project, or naming the token's own room, uses `token.room`. A message cannot
+  move a token to another room.
 - The operation allowlist is decided before anything is forwarded
   ([`ALLOWED_OPS`]), and the operations that touch the machine are refused by
   name with a reason ([`DENIED_OPS`]).
@@ -175,8 +164,11 @@ that says no, and that a message can never widen what a token may do.
   so `/work/application/x` is not mistaken for a file inside `/work/app`.
 - **A token is bound to one identity.** The first registration through a token
   binds it to that agent id, and after that every request that names an agent
-  must name that one; the gateway imposes the identity rather than trusting
-  the request. A token reads its own conversations and writes as itself.
+  must name that one, including a later register. The gateway imposes the
+  identity rather than trusting the request, and it does not rebind. A token
+  reads its own conversations and writes as itself. Room-wide reads that do
+  not name another actor (the task list, the branches, the ownership view)
+  stay available.
 - A cloud agent may not take over a local identity: the broker refuses a
   registration whose agent id belongs to an agent that is not cloud-marked
   (`IDENTITY_TAKEOVER`), and a send whose sender is not cloud-marked is
@@ -194,18 +186,12 @@ that says no, and that a message can never widen what a token may do.
   it, and it can read the work items, the branches and the ownership view.
   The gateway limits the *shape* of what it may do, not the *reach* of what
   it may say.
-- The cloud marker is written on register and send. Other ledger writes a
-  cloud agent makes (claims, task edits, handovers) leave no marker of their
-  own, so the dashboard shows the agent as cloud but not the edit as cloud.
 
 **Residual risk.** A cloud agent inside the room can write into it, and can
-say anything to everyone in it.
-
-**The one-line fix, if it ever bites.**
-
-- Stamp the cloud marker on every operation that writes to the ledger
-  (`lib/broker.mjs`).
-- Give the token a per-room audience as well as an identity.
+say anything to everyone in it. Those writes carry the cloud marker: the
+gateway sets it on every operation, and the broker records it on the claim,
+task, handoff, ack and the other rows that operation writes (`stampCloud` in
+`lib/broker.mjs`).
 
 ## Threat 4: room confusion across forks
 
@@ -225,9 +211,10 @@ in.
   directory and the origin from the common one ([`branchOf`], [`originOf`]),
   so a worktree is not invisible.
 - The rules are in order: an alias the person set wins; then a checkout of the
-  same repository on the requested branch; then the main checkout; then any
-  checkout of it. An alias is looked up by its normalised name only, so the
-  caller's raw string cannot select a room.
+  same repository on the requested branch. A named branch that no checkout is
+  on does not fall through to main (`branch-unmatched`). With no branch named,
+  the main checkout wins, then any checkout. An alias is looked up by its
+  normalised name only, so the caller's raw string cannot select a room.
 - The token is then bound to that one room, and the gateway takes the room
   from the token. One token, one room.
 - A fork has a different origin, so it matches nothing. The person has to
@@ -242,24 +229,16 @@ in.
   a fork agent only joins a room when an alias says so, and the alias is
   global for the data directory. One alias, one room: two forks of the same
   repository need two aliases, and the alias wins over the branch rule.
-- When several worktrees share an origin and none is on the branch the cloud
-  agent reports, the main checkout wins. The cloud agent is then in a
-  different checkout than its own, and its claims are relative to a tree it
-  cannot see. Claims travel as repo-relative paths, so both sides agree on
-  the *name* and not on the *file*.
 - The repository in the pairing request is chosen by the caller, so an
   attacker can ask to be placed in the room of a repository they do not have.
   Only the operator's approval stops it.
 
-**Residual risk.** A cloud agent can end up in a room that is not the checkout
-it is working in, and its claims then name files that do not exist for the
-other agents.
+**Residual risk.** A fork still cannot be told apart from its upstream by name,
+and an alias is global for the data directory. A named branch that is not
+checked out is refused rather than sent to main.
 
 **The one-line fix, if it ever bites.**
 
-- Require a branch that matches a checkout, and refuse to fall back to the
-  main checkout when the caller named a branch (`lib/remote-rooms.mjs`
-  [`resolveRoom`]).
 - Make the alias per branch, or make the alias a fallback rather than a
   first choice.
 
@@ -305,17 +284,7 @@ one room, with a 24-hour life.
 
 ## The open items, in one list
 
-These are the ones the code does not answer today.
-
-| # | Threat | Fix, in one line |
-| --- | --- | --- |
-| 1 | A token holder can open unbounded long polls | Cap concurrent waits per token (`lib/gateway.mjs` [`ALLOWED_OPS`]) |
-| 2 | The operator approves on trust: the request names a repository it cannot verify | Show the checkout the room resolves to at approval time (`lib/remote.mjs` [`remoteApprove`]) |
-| 3 | A cloud agent can land in the wrong worktree when no checkout is on the branch it named | Refuse the main-checkout fallback when a branch was named (`lib/remote-rooms.mjs` [`resolveRoom`]) |
-| 4 | An always-on token never expires | Give always-on tokens an expiry, renewed on use (`lib/gateway.mjs` [`issue`]) |
-| 5 | The uncollected token value is on disk in the clear for ten minutes | Hand the value over out of band (`lib/gateway.mjs` [`TokenStore.approve`]) |
-| 6 | Only register and send carry the cloud marker | Stamp the marker on every operation that writes to the ledger (`lib/broker.mjs`) |
-| 7 | A token is a grant over one room, not over one conversation | Give the token a per-room audience as well as an identity |
+Nothing in this list is still open. The seven items that were here are in the closed table.
 
 ## Closed since the first draft of this review
 
@@ -328,7 +297,14 @@ is in the code, and a test names it.
 | A web page could fill the approval list | A pairing request with a foreign `Origin` is refused | `lib/gateway.mjs` [`createGatewayHandler`] |
 | `remote approve --yes` approved an attacker's request too | `--yes` approves one named code, and nothing without one | `bin/agent-relay.mjs` |
 | The pairing code was also a bearer secret for the token | The public route looks a request up by its id only | `lib/gateway.mjs` [`findPairingById`] |
-| The token value sat in the token file in plaintext until it was collected | The value waits in a separate handover file and is deleted with the pairing | `lib/gateway.mjs` [`TokenStore.approve`], [`expirePairings`] |
+| The token value sat in the token file in plaintext until it was collected | The value is handed to the gateway over a local socket and is not written down | `lib/gateway.mjs` [`TokenStore.handOver`] |
+| A token holder could open unbounded long polls | A token may hold four waits; a fifth is `429` with `Retry-After` | `test/remote.test.mjs` ("a token may hold a few waits, and one more is refused with Retry-After") |
+| Approval named the repository and not the checkout | The question and the approval message name the checkout path | `test/remote.test.mjs` ("the approval question names the checkout before the operator says yes"); `test/remote-e2e.test.mjs` ("the pairing round trip hands a working token to the cloud agent") |
+| A named branch fell through to the main checkout | A named branch with no checkout on it is refused (`branch-unmatched`) | `test/remote.test.mjs` ("a repository is recognised in every spelling, and rooms resolve to the right checkout") |
+| An always-on token never expired | An always-on token expires, and use renews the window; a paired session keeps the expiry it was issued with | `test/remote.test.mjs` ("an always-on token expires, and use renews it; a paired token does not slide") |
+| The uncollected token value sat on disk in the clear for ten minutes | The value is handed over a local socket and no file in the data directory contains it | `test/remote-e2e.test.mjs` ("the pairing code is not a bearer secret, and the token store holds no token value") |
+| Only register and send carried the cloud marker | A claim, a task, a handoff and an ack written with a cloud marker keep it; a local write does not | `test/cloud-marker.test.mjs` ("a cloud claim, task, handoff and ack carry the marker, and a local write does not") |
+| A token could name another room or another agent | Naming another room, or another agent after the token is bound, is refused | `test/remote.test.mjs` ("a token is a grant over one room and one identity") |
 | `send` could name any sender, even with a prefix-scoped token | Every field that names an agent is checked, and the token is bound to one identity | `lib/gateway.mjs` [`createGatewayHandler`] |
 | Free text that looked like a path was refused, and free text that *was* a path was not | The filter looks at path fields and inside nested objects, and every absolute path is scrubbed from a response | `lib/gateway.mjs` [`containsLocalPath`], [`scrubPaths`] |
 | A token read the whole room, not just its own inbox | A token is bound to one identity, and the gateway imposes it | `lib/gateway.mjs` [`createGatewayHandler`] |
@@ -357,11 +333,14 @@ node --input-type=module -e "
   const store = await new TokenStore(dir).load();
   const token = store.issue({room: '/work/alpha'});
   store.approve(store.findPairing(request.code), token, token.value);
+  await store.handOver();
   await store.save();
   const tokens = await fs.readFile(path.join(dir, 'remote-tokens.json'), 'utf8');
   console.log('value in the token store:', tokens.includes(token.value));
-  const pending = await fs.readFile(path.join(dir, 'remote-pending-tokens.json'), 'utf8');
-  console.log('value in the handover file:', pending.includes(token.value));
+  let handoverFile = false;
+  try { handoverFile = (await fs.readFile(path.join(dir, 'remote-pending-tokens.json'), 'utf8')).includes(token.value); }
+  catch (error) { if (error.code !== 'ENOENT') throw error; }
+  console.log('value in the handover file:', handoverFile);
   await gateway.close();
 "
 ```

@@ -252,12 +252,23 @@ async function main(){
      console.log('Name one code to approve with --yes: agent-relay remote approve <code> --yes');
      continue;
     }
-     const answer=await question(`Approve ${row.code} for ${row.repo}? [y/N] `);
+     const answer=await question(remote.approvalQuestion(row.code, resolved.room ?? 'no matching room'));
      if(!/^y(es)?$/i.test(answer)){const denied=await remote.remoteDeny({dataDir,code:row.code});console.log(denied.message);continue;}
      const result=await remote.remoteApprove({dataDir,code:row.code,alwaysOn:Boolean(opts['always-on']),ttlMs:opts['ttl-hours']?Number(opts['ttl-hours'])*3600000:undefined,agentPrefix:opts.prefix??'',project});
      console.log(result.ok?result.message:result.message);
     }
     break;
+   }
+   {
+    const {TokenStore}=await import('../lib/gateway.mjs');
+    const waiting=await new TokenStore(dataDir).load();
+    const row=waiting.findPairing(code);
+    if(row){
+     let rooms=[];
+     try{rooms=(await (await import('../lib/client.mjs')).rpc(project,{op:'rooms'})).rooms??[];}catch{}
+     const resolved=await remote.resolveRoomFor({dataDir,repo:row.repo,branch:row.branch,rooms});
+     console.log(`Checkout: ${resolved.room??'no matching room'}`);
+    }
    }
    const result=await remote.remoteApprove({dataDir,code,alwaysOn:Boolean(opts['always-on']),ttlMs:opts['ttl-hours']?Number(opts['ttl-hours'])*3600000:undefined,agentPrefix:opts.prefix??'',project});
    if(!result.ok){console.error(result.message);process.exitCode=1;break;}

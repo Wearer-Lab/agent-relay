@@ -225,6 +225,7 @@ test('the pairing round trip hands a working token to the cloud agent', async t 
   const approved = await remoteApprove({dataDir, code: request.code, rooms: known});
   assert.equal(approved.ok, true);
   assert.equal(approved.room, project, 'the token is scoped to the room that matches the repository');
+  assert.ok(approved.message.includes(project), 'approval names the checkout');
 
   // The agent collects its token.
   const collected = await fetch(`${gateway.url}/pair/${request.requestId}`);
@@ -238,9 +239,15 @@ test('the pairing round trip hands a working token to the cloud agent', async t 
   const used = await throughGateway(gateway, handed.token, {op: 'agents'});
   assert.ok(used.agents.some(agent => agent.agentId === 'local-1'));
 
-  // The room comes from the token: the request cannot choose another one.
-  await throughGateway(gateway, handed.token, {op: 'status', project: path.join(dir, 'elsewhere'), agentId: 'local-1'});
-  assert.equal(rooms.at(-1), project, 'the token decides the room');
+  // The room comes from the token: naming another one is refused.
+  const refused = await fetch(`${gateway.url}/rpc`, {
+    method: 'POST',
+    headers: {authorization: `Bearer ${handed.token}`, 'content-type': 'application/json'},
+    body: JSON.stringify({op: 'status', project: path.join(dir, 'elsewhere'), agentId: 'local-1'}),
+  });
+  assert.equal(refused.status, 403);
+  assert.match((await refused.json()).error, /bound to one room/);
+  assert.equal(rooms.at(-1), project, 'a call for another room never reaches the broker');
   assert.equal(gateway.store.find(handed.token).room, project, 'the token is scoped to one room');
 
   // The token value is handed over once.
@@ -268,19 +275,28 @@ test('the pairing code is not a bearer secret, and the token store holds no toke
   const row = store.findPairing(request.code);
   const token = store.issue({room: '/work/alpha', runner: 'claude'});
   store.approve(row, token, token.value);
+  await store.handOver();
   await store.save();
   const raw = await fs.readFile(path.join(dataDir, 'remote-tokens.json'), 'utf8');
   assert.ok(!raw.includes(token.value), 'the token value is never written to the token store');
   assert.ok(raw.includes(token.row.hash), 'the store keeps the hash');
-  const pending = await fs.readFile(path.join(dataDir, 'remote-pending-tokens.json'), 'utf8');
-  assert.ok(pending.includes(token.value), 'the value waits in the short-lived handover file');
+  for (const name of await fs.readdir(dataDir)) {
+    const full = path.join(dataDir, name);
+    if (!(await fs.lstat(full)).isFile()) continue;
+    const text = await fs.readFile(full, 'utf8');
+    assert.ok(!text.includes(token.value), `${name} must not hold the token value in the clear`);
+  }
 
   // The waiting agent collects it once, by request id.
   const approved = await fetch(`${gateway.url}/pair/${request.requestId}`);
   assert.equal(approved.status, 200);
   assert.equal((await approved.json()).token, token.value);
-  const after = await fs.readFile(path.join(dataDir, 'remote-pending-tokens.json'), 'utf8');
-  assert.ok(!after.includes(token.value), 'the value is gone once it has been handed over');
+  for (const name of await fs.readdir(dataDir)) {
+    const full = path.join(dataDir, name);
+    if (!(await fs.lstat(full)).isFile()) continue;
+    const text = await fs.readFile(full, 'utf8');
+    assert.ok(!text.includes(token.value), `${name} must not hold the token value after handover`);
+  }
 });
 
 test('the tools behave the same through the gateway', async t => {  const dir = await temp(t);
@@ -502,6 +518,7 @@ test('the hosted relay artifacts say what to run, and nothing is deployed', asyn
   assert.match(compose, /agent-relay", "daemon"/, 'the broker runs as a service');
   assert.match(compose, /agent-relay", "remote", "gateway"/, 'the gateway runs as a service');
   assert.match(compose, /127\.0\.0\.1:47820:47820/, 'the gateway is only reachable on loopback');
+  assert.match(compose, /network_mode: "service:broker"/, 'the gateway shares the broker loopback');
 
   const brokerUnit = plan.files.find(file => file.name === 'agent-relay-broker.service').contents;
   assert.match(brokerUnit, /agent-relay daemon --data-dir \/opt\/agent-relay\/data/);
@@ -559,4 +576,53 @@ test('a cloud agent cannot take over a local identity', async t => {
   // And it cannot post as that local agent either.
   const asLocal = await post({op: 'send', from: 'local-codex-1', to: 'local-codex-1', body: 'not me'});
   assert.equal(asLocal.status, 400);
+});
+
+test('the host plan starts the broker and the gateway, and local wiring points at that gateway', async t => {
+  const dir = await temp(t);
+  const dataDir = path.join(dir, 'data');
+  await fs.mkdir(dataDir, {recursive: true});
+  const plan = planRemoteHost({rooms: [], url: 'http://127.0.0.1:9'});
+  const brokerUnit = plan.files.find(file => file.name === 'agent-relay-broker.service').contents;
+  const gatewayUnit = plan.files.find(file => file.name === 'agent-relay-gateway.service').contents;
+  assert.match(brokerUnit, /agent-relay daemon --data-dir/);
+  assert.match(gatewayUnit, /agent-relay remote gateway --data-dir .+ --port /);
+  const cli = path.join(repoRoot, 'bin', 'agent-relay.mjs');
+  const broker = spawn(process.execPath, [cli, 'daemon', '--data-dir', dataDir], {stdio: 'ignore'});
+  const gateway = spawn(process.execPath, [cli, 'remote', 'gateway', '--data-dir', dataDir, '--port', '0'], {stdio: ['ignore', 'pipe', 'pipe']});
+  const stop = child => { if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM'); };
+  t.after(() => { stop(broker); stop(gateway); });
+  const output = [];
+  gateway.stdout.on('data', chunk => output.push(chunk.toString()));
+  gateway.stderr.on('data', chunk => output.push(chunk.toString()));
+  const waitFor = async (read, ms) => {
+    const deadline = Date.now() + ms;
+    while (Date.now() < deadline) {
+      const value = await read();
+      if (value) return value;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    return null;
+  };
+  const discovery = await waitFor(async () => {
+    try { return JSON.parse(await fs.readFile(path.join(dataDir, 'broker.json'), 'utf8')); }
+    catch { return null; }
+  }, 8000);
+  assert.ok(discovery?.url, 'the broker from the host plan came up');
+  const gatewayUrl = await waitFor(async () => {
+    const match = output.join('').match(/Agent Relay gateway: (http:\/\/127\.0\.0\.1:\d+)/);
+    return match ? match[1] : null;
+  }, 8000);
+  assert.ok(gatewayUrl, `the gateway from the host plan came up (${output.join(' ').slice(0, 400)})`);
+  assert.equal((await fetch(`${gatewayUrl}/health`)).status, 200);
+  assert.equal((await fetch(`${discovery.url}/health`)).status, 200);
+  const local = path.join(dir, 'local');
+  await fs.mkdir(local);
+  const pointed = await pointLocalAtHost({dataDir: local, url: gatewayUrl});
+  assert.equal(pointed.ok, true);
+  assert.equal(pointed.url, gatewayUrl, 'local wiring points at the gateway that came up');
+  const wiring = JSON.parse(await fs.readFile(path.join(local, 'remote-state.json'), 'utf8'));
+  assert.equal(wiring.url, gatewayUrl);
+  stop(broker);
+  stop(gateway);
 });

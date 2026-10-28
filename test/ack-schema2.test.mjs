@@ -59,7 +59,7 @@ async function broker(t, dataDir, project, seed) {
 // The read-through cursor has no per-message stamp, so a cursor read reports the moment the
 // cursor was set. Everything else must answer the same before and after the migration.
 const withoutAckTimes = value => JSON.parse(JSON.stringify(value, (key, value) =>
-  key === 'ackTs' || key === 'at' ? undefined : value));
+  key === 'ackTs' || key === 'at' || key === 'deliveredAt' ? undefined : value));
 
 test('planMigration reports the counts and changes nothing', () => {
   const state = ledger('/work/p');

@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import {promises as fs} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {startGateway, TokenStore, RateLimiter, containsLocalPath, repoRelative, sha256, ALLOWED_OPS, DENIED_OPS} from '../lib/gateway.mjs';
+import {startGateway, TokenStore, RateLimiter, containsLocalPath, repoRelative, sha256, ALLOWED_OPS, DENIED_OPS, MAX_CONCURRENT_WAITS} from '../lib/gateway.mjs';
 import {normalizeRepo, resolveRoom, branchOf, originOf} from '../lib/remote-rooms.mjs';
+import {approvalQuestion} from '../lib/remote.mjs';
 import {remoteRpc} from '../lib/client.mjs';
 
 const temp = async t => {
@@ -65,12 +66,20 @@ test('the gateway needs a token, and an unknown token is refused', async t => {
 test('the room comes from the token, never from the request', async t => {
   const {gateway, calls} = await gatewayWith(t);
   const token = await issue(gateway, {room: '/work/alpha'});
+  const headers = {authorization: `Bearer ${token.value}`};
   const response = await fetch(`${gateway.url}/rpc`, {
-    method: 'POST', headers: {authorization: `Bearer ${token.value}`},
+    method: 'POST', headers,
     body: JSON.stringify({op: 'status', project: '/work/somewhere-else'}),
   });
-  assert.equal(response.status, 200);
-  assert.equal(calls.at(-1)[0], '/work/alpha', 'the token decides the room');
+  assert.equal(response.status, 403);
+  assert.match((await response.json()).error, /bound to one room/);
+  assert.equal(calls.length, 0, 'a call for another room never reaches the broker');
+  const same = await fetch(`${gateway.url}/rpc`, {
+    method: 'POST', headers,
+    body: JSON.stringify({op: 'status', project: '/work/alpha'}),
+  });
+  assert.equal(same.status, 200);
+  assert.equal(calls.at(-1)[0], '/work/alpha', 'the token room is the room');
   assert.equal(calls.at(-1)[1].project, undefined, 'the request cannot choose a room');
 });
 
@@ -115,7 +124,15 @@ test('pairing asks for a code, approval hands over a token once, and the request
   const row = store.findPairing(request.code);
   const token = store.issue({room: '/work/alpha', runner: 'claude'});
   store.approve(row, token, token.value);
+  await store.handOver();
   await store.save();
+  const names = await fs.readdir(dataDir);
+  for (const name of names) {
+    const full = path.join(dataDir, name);
+    if (!(await fs.lstat(full)).isFile()) continue;
+    const text = await fs.readFile(full, 'utf8');
+    assert.ok(!text.includes(token.value), `${name} must not hold the token value`);
+  }
 
   const approved = await fetch(`${gateway.url}/pair/${request.requestId}`);
   assert.equal(approved.status, 200);
@@ -295,6 +312,10 @@ test('the gateway writes an audit trail without token values', async t => {
   assert.ok(!log.includes(token.value), 'no token value reaches the log');
 });
 
+test('the approval question names the checkout before the operator says yes', () => {
+  assert.equal(approvalQuestion('K7Q2PX', '/work/alpha'), 'Approve K7Q2PX for /work/alpha? [y/N] ');
+});
+
 test('a repository is recognised in every spelling, and rooms resolve to the right checkout', async t => {
   assert.equal(normalizeRepo('https://github.com/org/repo.git'), 'github.com/org/repo');
   assert.equal(normalizeRepo('git@github.com:org/repo.git'), 'github.com/org/repo');
@@ -311,7 +332,13 @@ test('a repository is recognised in every spelling, and rooms resolve to the rig
   assert.equal((await resolveRoom({repo: 'github.com/org/repo', rooms})).room, project);
   assert.equal((await resolveRoom({repo: 'git@github.com:org/repo.git', rooms})).room, project);
   assert.equal((await resolveRoom({repo: 'github.com/other/repo', rooms})).room, null);
-  assert.equal((await resolveRoom({repo: 'github.com/org/repo', branch: 'feature', rooms})).room, project, 'the branch does not change the room here');
+  const unmatched = await resolveRoom({repo: 'github.com/org/repo', branch: 'feature', rooms});
+  assert.equal(unmatched.room, null, 'a named branch with no checkout on it is not the main checkout');
+  assert.equal(unmatched.reason, 'branch-unmatched');
+  const feature = path.join(dir, 'feature');
+  const withFeature = [...rooms, {project: feature, branch: 'feature', origin: 'github.com/org/repo', main: false}];
+  assert.equal((await resolveRoom({repo: 'github.com/org/repo', branch: 'feature', rooms: withFeature})).room, feature, 'a checkout on the named branch wins');
+  assert.equal((await resolveRoom({repo: 'github.com/org/repo', rooms: withFeature})).reason, 'main-checkout', 'no named branch still falls back to main');
   const aliased = await resolveRoom({repo: 'github.com/fork/repo', rooms, aliases: {'github.com/fork/repo': project}});
   assert.equal(aliased.reason, 'alias');
   assert.equal(aliased.room, project, 'an alias wins over the repository match');
@@ -432,4 +459,89 @@ test('a paired token is kept for one gateway and one repository only', async t =
     'no token from another gateway is sent');
   assert.ok(first.state.tokens.every(value => value === 'Bearer token-first'),
     'the first gateway only ever saw its own token');
+});
+
+test('a token may hold a few waits, and one more is refused with Retry-After', async t => {
+  let started = 0;
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const {gateway} = await gatewayWith(t, {call: async (_room, fields) => {
+    if (fields.op === 'wait') { started += 1; await gate; }
+    return {ok: true};
+  }});
+  const token = await issue(gateway);
+  const headers = {authorization: `Bearer ${token.value}`, 'content-type': 'application/json'};
+  const open = [];
+  for (let i = 0; i < MAX_CONCURRENT_WAITS; i++) {
+    open.push(fetch(`${gateway.url}/rpc`, {method: 'POST', headers, body: JSON.stringify({op: 'wait', agentId: 'a'})}));
+  }
+  const deadline = Date.now() + 2000;
+  while (started < MAX_CONCURRENT_WAITS && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 10));
+  assert.equal(started, MAX_CONCURRENT_WAITS);
+  try {
+    const extra = await fetch(`${gateway.url}/rpc`, {method: 'POST', headers, body: JSON.stringify({op: 'wait', agentId: 'a'})});
+    assert.equal(extra.status, 429);
+    assert.equal(extra.headers.get('retry-after'), '1');
+    assert.match((await extra.json()).error, /Too many open waits for this token/);
+  } finally {
+    release();
+  }
+  const finished = await Promise.all(open);
+  assert.ok(finished.every(response => response.status === 200));
+});
+
+test('a token is a grant over one room and one identity', async t => {
+  const {gateway, calls} = await gatewayWith(t);
+  const token = await issue(gateway, {room: '/work/alpha', agentPrefix: 'cloud-'});
+  const headers = {authorization: `Bearer ${token.value}`, 'content-type': 'application/json'};
+  const post = fields => fetch(`${gateway.url}/rpc`, {method: 'POST', headers, body: JSON.stringify(fields)});
+
+  const otherRoom = await post({op: 'agents', project: '/work/elsewhere'});
+  assert.equal(otherRoom.status, 403);
+  assert.match((await otherRoom.json()).error, /bound to one room/);
+  assert.equal(calls.length, 0, 'a call for another room never reaches the broker');
+
+  const sameRoom = await post({op: 'agents', project: '/work/alpha'});
+  assert.equal(sameRoom.status, 200);
+  assert.equal(calls.at(-1)[0], '/work/alpha');
+  const omitted = await post({op: 'register', agentId: 'cloud-1', runner: 'claude'});
+  assert.equal(omitted.status, 200);
+  assert.equal(gateway.store.find(token.value).agentId, 'cloud-1');
+
+  const otherAgent = await post({op: 'status', agentId: 'cloud-2'});
+  assert.equal(otherAgent.status, 403);
+  assert.match((await otherAgent.json()).error, /bound to the agent cloud-1/);
+  const rebound = await post({op: 'register', agentId: 'cloud-2', runner: 'claude'});
+  assert.equal(rebound.status, 403);
+  assert.equal(gateway.store.find(token.value).agentId, 'cloud-1', 'a bound token does not take a second identity');
+
+  const own = await post({op: 'claim', resources: ['src/app.js']});
+  assert.equal(own.status, 200);
+  assert.equal(calls.at(-1)[1].agentId, 'cloud-1', 'the bound identity is imposed when the call omits it');
+  assert.equal(calls.at(-1)[0], '/work/alpha');
+});
+
+test('an always-on token expires, and use renews it; a paired token does not slide', async t => {
+  const dataDir = await temp(t);
+  let now = 1_700_000_000_000;
+  const store = await new TokenStore(dataDir, {now: () => now}).load();
+  const paired = store.issue({room: '/work/alpha', ttlMs: 1000});
+  const always = store.issue({room: '/work/alpha', ttlMs: 1000, alwaysOn: true});
+  assert.equal(paired.row.sliding, false);
+  assert.equal(always.row.sliding, true);
+  assert.ok(always.row.expiresAt, 'an always-on token has an expiry');
+  const pairedExpiry = paired.row.expiresAt;
+  const alwaysExpiry = always.row.expiresAt;
+  now += 400;
+  store.touch(paired.row);
+  store.touch(always.row);
+  assert.equal(paired.row.expiresAt, pairedExpiry, 'a paired session keeps the expiry it was issued with');
+  assert.notEqual(always.row.expiresAt, alwaysExpiry, 'use renews an always-on token');
+  now = Date.parse(always.row.expiresAt) + 1;
+  assert.equal(store.find(always.value), null, 'an always-on token dies when it is left unused');
+  now = Date.parse(pairedExpiry) - 1;
+  assert.ok(store.find(paired.value), 'the paired token is still inside its original window');
+  // A row from before this change has no expiry and no sliding flag. It is left alone.
+  store.tokens.set('old', {id: 'old', hash: sha256('legacy-always-on-token-value'), room: '/work/alpha', agentPrefix: '', runner: 'claude', agentId: null, expiresAt: null, revokedAt: null});
+  assert.ok(store.find('legacy-always-on-token-value'), 'an already-issued always-on token with no expiry stays valid');
 });

@@ -38,7 +38,9 @@ agent-relay remote off             # close the public URL immediately
    the waiting agent, once.
 4. The agent keeps that token for the session. An always-on token
    (`remote approve <code> --always-on`) is for a cloud environment that stores a
-   secret, and it does not expire on its own.
+   secret. It expires after 24 hours of not being used, and each successful call
+   renews that window. `--ttl-hours` sets the window. A paired session still
+   expires on a fixed 24 hour clock.
 
 Pairing requests expire after ten minutes, and at most five may wait at once.
 
@@ -47,21 +49,24 @@ Pairing requests expire after ten minutes, and at most five may wait at once.
 The public URL is on the internet, so the gateway is deliberately narrow.
 
 - A token is scoped to **one room** and to **one agent identity**. The room
-  comes from the token, never from the request. The identity is bound the
-  first time the agent registers through the token: after that, the gateway
-  imposes it, so the token reads only that agent's conversations and writes
-  only as itself. A cloud agent also cannot take over the identity of a local
-  agent.
+  comes from the token. A call that names a different room is refused. The
+  identity is bound the first time the agent registers through the token:
+  after that, the gateway imposes it, including on a later register, so the
+  token reads only that agent's conversations and writes only as itself. A
+  cloud agent also cannot take over the identity of a local agent.
 - A token may be issued for one **agent-ID prefix** as well, so a token for
   `cloud-` cannot act as anything else.
 - Tokens are 256-bit random values. Only their SHA-256 hash is written down,
   they are compared in constant time, and they never appear in a log.
-- Tokens expire (24 hours for a paired session, or never with `--always-on`),
-  and `remote revoke` invalidates them at once.
+- Tokens expire (24 hours for a paired session; an always-on token uses the
+  same window and renews it on each use, and `--ttl-hours` sets that window),
+  and `remote revoke` invalidates them at once. An always-on token issued
+  before this change, with no expiry stored, is left as it is.
 - Every call is rate limited per token and per address, and returns `429` with a
   `Retry-After` header when it is too fast. The address is the one the tunnel
   reports (`X-Forwarded-For`), and the limit runs before the token is looked
-  up, so an unauthenticated flood is throttled too.
+  up, so an unauthenticated flood is throttled too. A token may hold four long
+  polls at once; a fifth is the same `429`.
 - A pairing request with a foreign `Origin` is refused, every field in it is
   bounded and stripped of control characters, and `--yes` approves **one named
   code**: without a code it approves nothing.
@@ -145,6 +150,8 @@ test token again.
 | `The tunnel at … is not answering, but the gateway is up` | The tunnel died, the gateway is fine | `agent-relay remote on` |
 | `The relay gateway at … could not be reached` | The tunnel is down | `agent-relay remote doctor` |
 | `This token is bound to the agent …` | The token registered as one agent and then asked to be another | Use the identity the token was bound to |
+| `This token is bound to one room.` | The call named a room the token was not issued for | Omit the room, or use the room the token was approved for |
+| `Too many open waits for this token.` | Four long polls are already open | Close one, or wait for `Retry-After` |
 | `This relay token is not valid` | The token expired or was revoked | Approve the agent again |
 | `This token may only act for agents starting with …` | The agent used an id outside its prefix | Use the prefix the token was issued for |
 | `The operation … is not available through the gateway` | The operation is refused by design | Use the local CLI for it |
@@ -203,9 +210,13 @@ agent-relay remote host --out ./host     # writes the plan for a small always-on
 
 `remote host` writes the artifacts a hosted relay needs — a systemd unit for
 the broker and the gateway, a compose file, and the Cloudflare steps that put
-the URL in front of it — and prints what to run. It is a **Linux** plan: the
-units are systemd, the compose file is Docker, and the `cloudflared` binary it
-downloads is the amd64 one.
+the URL in front of it — and prints what to run. It does not start a host. It
+is a **Linux** plan: the units are systemd, the compose file is Docker, and
+the `cloudflared` binary it downloads is the amd64 one. The compose file runs
+the gateway in the broker's network namespace, so the gateway reaches the
+broker on `127.0.0.1` the same way the systemd units do on one machine. The
+plan's broker and gateway were started locally from those commands and came
+up; they were then stopped. Nothing is left running.
 
 Afterwards, the local agents talk to the host instead of to this machine:
 
@@ -218,11 +229,13 @@ relay points itself at the hosted URL.
 
 ## What is not here yet
 
-- An always-on host, so cloud agents keep working while this computer sleeps.
-- A cap on how many long polls one token may hold open.
+- A deployed always-on host. `agent-relay remote host` writes the plan, and
+  that plan's broker and gateway can be started, but nothing stays up while
+  this computer sleeps.
 
 The public endpoint has been reviewed: [the threat model](threat-model.md)
-lists what the gateway defends, what it does not, and what is still open.
+lists what the gateway defends and what it does not. Nothing in its open list
+is still open.
 
 See [the roadmap](https://github.com/Wearer-Lab/agent-relay/blob/main/docs/roadmaps/remote-agents.md)
 for the full plan and what is still to do.
