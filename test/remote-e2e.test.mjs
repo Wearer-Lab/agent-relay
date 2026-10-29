@@ -108,9 +108,13 @@ const VOLATILE = new Set([
   'cloud',
 ]);
 
-// The same normalisation the gateway applies: the room path becomes a dot.
+// The same normalisation the gateway applies: the room path becomes a dot, and a
+// path inside it is repo-relative with forward slashes on every platform.
 const normalize = (value, project) => {
-  if (typeof value === 'string') return value.split(project).join('.');
+  if (typeof value === 'string') {
+    const text = value.split(project).join('.');
+    return text === value ? text : text.replace(/\.\\[^\s'"),;]*/gu, inside => inside.replace(/\\/g, '/'));
+  }
   if (Array.isArray(value)) return value.map(item => normalize(item, project));
   if (value && typeof value === 'object') {
     const out = {};
