@@ -110,6 +110,8 @@
     function setFinal() { values.forEach(function (el) { el.textContent = format(el, Number(el.dataset.target || 0)); }); }
     if (calm) { setFinal(); }
     else {
+      // The markup carries the final values so the band reads right without JavaScript.
+      values.forEach(function (el) { el.textContent = format(el, 0); });
       var counted = false;
       function run() {
         if (counted) return;
@@ -136,5 +138,20 @@
         if (band) so.observe(band);
       } else run();
     }
+  }
+})();
+
+// The hero film never plays for visitors who ask for less motion, and pauses off screen.
+(() => {
+  const video = document.querySelector('.hero-video');
+  if (!video) return;
+  const still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
+  const stop = () => { video.pause(); video.removeAttribute('autoplay'); };
+  if (still && still.matches) { stop(); return; }
+  if (still && still.addEventListener) still.addEventListener('change', event => { if (event.matches) stop(); });
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver(entries => {
+      for (const entry of entries) entry.isIntersecting ? video.play().catch(() => {}) : video.pause();
+    }).observe(video);
   }
 })();

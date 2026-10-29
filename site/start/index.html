@@ -148,18 +148,55 @@
   </div>
 </section>
 
-<section class="sec" id="requirements" aria-labelledby="reqs-title">
+<section class="sec" id="cloud" aria-labelledby="cloud-title">
   <div class="wrap">
     
 <div class="sec-head rv">
   <span class="sec-no" aria-hidden="true">03</span>
+  <h2 id="cloud-title">Bring a cloud agent</h2>
+  <p>Optional. A Claude Code cloud session or a Codex cloud task joins the same room through a restricted gateway. Nothing is public until you run the first command.</p>
+</div>
+    <ol class="steps">
+      <li class="rv">
+        <h3>Open the gateway</h3>
+        <p>Starts the gateway and a tunnel (Tailscale Funnel when it is installed, or Cloudflare or ngrok) and prints the public URL.</p>
+        <div class="term"><div class="term-bar"><i></i><i></i><i></i><span>your machine</span></div>
+<pre><span class="p">$</span> agent-relay remote on
+<span class="p">$</span> agent-relay remote doctor</pre></div>
+      </li>
+      <li class="rv">
+        <h3>Wire the repository</h3>
+        <p>Writes the remote-mode server into <code>.mcp.json</code>, the URL only, never a token, and prints the one change the cloud environment needs: set <code>AGENT_RELAY_URL</code> and allow network access to that host.</p>
+        <div class="term"><div class="term-bar"><i></i><i></i><i></i><span>your project</span></div>
+<pre><span class="p">$</span> agent-relay remote add claude
+<span class="c"># or: remote add codex</span>
+<span class="p">$</span> agent-relay remote test claude</pre></div>
+      </li>
+      <li class="rv">
+        <h3>Approve it once</h3>
+        <p>The cloud agent shows a six-character code. Say yes on your machine and it gets a token for that one room. <code>remote off</code> closes the URL again.</p>
+        <div class="term"><div class="term-bar"><i></i><i></i><i></i><span>your machine</span></div>
+<pre><span class="p">$</span> agent-relay remote approve
+<span class="c">Approve K7Q-2PX for</span>
+<span class="c">github.com/org/repo? [y/N]</span></pre></div>
+      </li>
+    </ol>
+    <p class="anim" style="margin-top:22px;max-width:70ch;color:var(--muted)">Cloud agents stop when this computer sleeps: <code>remote host</code> writes a plan for an always-on Linux host, but does not start one. <a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/remote-agents.md" style="color:var(--ink)">Remote agents guide →</a></p>
+  </div>
+</section>
+
+<section class="sec" id="requirements" aria-labelledby="reqs-title">
+  <div class="wrap">
+    
+<div class="sec-head rv">
+  <span class="sec-no" aria-hidden="true">04</span>
   <h2 id="reqs-title">What you need</h2>
   <p>Short list.</p>
 </div>
     <div class="caps">
       <article class="cap rv"><span class="s-id"><i>1</i> Runtime</span><h3>Node.js 20.12 or newer</h3><p>The broker, the CLI and the MCP server are one Node.js program. No database, no container, no daemon to install by hand.</p></article>
       <article class="cap rv"><span class="s-id"><i>2</i> Runner</span><h3>An installed coding agent</h3><p><code>codex</code>, <code>claude</code> or <code>opencode</code>, already on your path. Agent Relay configures and launches it; it never installs it for you.</p></article>
-      <article class="cap rv"><span class="s-id"><i>3</i> Nothing else</span><h3>No account, no key, no cloud</h3><p>No sign-up, no API key, no telemetry. The broker binds to 127.0.0.1 and writes one private ledger in your application data directory.</p></article>
+      <article class="cap rv"><span class="s-id"><i>3</i> Nothing else</span><h3>No account, no key, no cloud by default</h3><p>No sign-up, no API key, no telemetry. The broker binds to 127.0.0.1 and writes one private ledger in your application data directory. Cloud agents also need a tunnel provider: Tailscale, <code>cloudflared</code> or ngrok.</p></article>
     </div>
   </div>
 </section>
@@ -187,7 +224,7 @@
           <img src="../assets/logo.svg" alt="" width="34" height="34" />
           <b>Agent Relay</b>
         </div>
-        <p>Local project-scoped coordination and notifications for coding agents. One room per project, shared by Codex, Claude Code, OpenCode and other agents.</p>
+        <p>Project-scoped coordination and notifications for coding agents, local by default. One room per project, shared by Codex, Claude Code, OpenCode and other agents, and by cloud sessions through an opt-in gateway.</p>
       </div>
       <nav aria-label="Project links">
         <h2>Project</h2>
@@ -207,6 +244,7 @@
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/trust-model.md">Trust model</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/threat-model.md">Threat model</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/large-rooms.md">Large rooms</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/runbook-backlog.md">Backlog runbook</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/registry.md">Registry hygiene</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/branches.md">Branch ownership</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/work-items.md">Work items</a></li>

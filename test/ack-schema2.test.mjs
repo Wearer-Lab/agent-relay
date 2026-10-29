@@ -309,7 +309,7 @@ test('the backup keeps the old rows recoverable', async t => {
   const backup = await backupStateFile(file, { now: new Date(Date.parse('2026-10-26T09:00:00.000Z')) });
   assert.equal(backup.bytes, (await fs.stat(file)).size);
   assert.equal(path.dirname(backup.path), dir, 'the backup sits next to the ledger');
-  assert.equal((await fs.stat(backup.path)).mode & 0o777, 0o600, 'the backup is private');
+  if (process.platform !== 'win32') assert.equal((await fs.stat(backup.path)).mode & 0o777, 0o600, 'the backup is private');
   assert.deepEqual(JSON.parse(await fs.readFile(backup.path, 'utf8')), state);
   // The write-back is atomic and leaves no temp file behind.
   const { state: migrated } = migrateState(state);

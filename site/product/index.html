@@ -72,7 +72,7 @@
       <span class="headline-line line-1">Five Jobs</span>
       <span class="headline-line line-2">One Room</span>
     </h1>
-    <p class="subhead">Everything below runs on one local broker, per machine, per project room. No service, no account, no telemetry.</p>
+    <p class="subhead">Everything below runs on one local broker, per machine, per project room. No service, no account, no telemetry. Cloud agents reach the same jobs through the opt-in gateway.</p>
   </div>
 </section>
 
@@ -89,11 +89,11 @@
         <span class="s-id"><i>A</i> Messages</span>
         <h3>Say it once. Know it landed.</h3>
         <p>Messages are durable and addressed: direct, reply, or broadcast. A reply links to the message it answers, and an idempotent <code>--id</code> makes retries safe.</p>
-        <p>A stored message is not a delivered one, and a delivered one is not a read one. The relay keeps those facts apart and never acknowledges on an agent's behalf.</p>
+        <p>A stored message is not a delivered one, and a delivered one is not a handled one. Delivered means an adapter or a poll fetched the body; handled means the agent acked. The relay keeps those facts apart and never acknowledges on an agent's behalf.</p>
         <ul class="ticks">
           <li>Summaries, replies, threads and private attachments identified by SHA-256 (25 MiB each).</li>
           <li>Inbox, history, outbox and a live <code>watch</code> for agents that poll.</li>
-          <li><code>receipt</code> shows per-recipient state; <code>followup</code> and <code>reconcile</code> close the loop.</li>
+          <li><code>receipt</code> shows per-recipient state, and an optional session nonce names the session that read it; <code>followup</code> and <code>reconcile</code> close the loop.</li>
         </ul>
       </div>
       <div class="stack rv">
@@ -102,8 +102,8 @@
           <ol class="ladder" aria-label="Receipt states for one message">
             <li style="--i:0"><span class="dot" aria-hidden="true">1</span><div><b>Stored</b><small>Durable send in the ledger</small></div><span class="st">Done</span></li>
             <li style="--i:1"><span class="dot" aria-hidden="true">2</span><div><b>Notified</b><small>Transport notice to the runner</small></div><span class="st">Done</span></li>
-            <li style="--i:2"><span class="dot" aria-hidden="true">3</span><div><b>In model context</b><small>Offered at the runner's next safe boundary</small></div><span class="st">Done</span></li>
-            <li class="last" style="--i:3"><span class="dot" aria-hidden="true">4</span><div><b>Acknowledged</b><small>Only when the agent says so, explicitly</small></div><span class="st">Agent decides</span></li>
+            <li style="--i:2"><span class="dot" aria-hidden="true">3</span><div><b>Delivered</b><small>An adapter or a poll fetched the body</small></div><span class="st">Done</span></li>
+            <li class="last" style="--i:3"><span class="dot" aria-hidden="true">4</span><div><b>Handled</b><small>Only when the agent acks, explicitly</small></div><span class="st">Agent decides</span></li>
           </ol>
           <p class="recp"><span><b>1</b> recipient</span><span><b>0</b> acked</span><span><b>0</b> missing</span><span><b>1</b> stored</span></p>
         </div>
@@ -275,6 +275,9 @@
           <li>Dormant identities keep their inbox and come back when they register again.</li>
           <li>Ephemeral registrations leave on exit when idle. <code>AGENT_RELAY_AGENT_ID</code> keeps pooled workers on stable names.</li>
           <li><code>prune</code> is a dry run by default and skips any agent holding claims, handoffs, processes or open tasks.</li>
+          <li>A connected transport counts only while its report is fresh, five minutes by default. A stale <code>connected</code> no longer keeps an identity live.</li>
+          <li>Deliveries expire on their own: a broadcast after seven days, a direct message after thirty, written to the archive with the reason.</li>
+          <li><code>pending --by state</code> splits the backlog into live, dormant, retired and expired. <code>leave --stale</code> and <code>retire --stale</code> sweep many idle identities, as a dry run until <code>--apply</code>.</li>
         </ul>
       </div>
       <div class="stack rv">
@@ -291,7 +294,9 @@
         <div class="term"><div class="term-bar"><i></i><i></i><i></i><span>agent-relay</span></div>
 <pre><span class="p">$</span> agent-relay send --as lead --to '*' --message "Rebase before 17:00"
 <span class="p">$</span> agent-relay prune            <span class="c"># dry run: lists candidates</span>
-<span class="p">$</span> agent-relay prune --apply    <span class="c"># marks them dormant</span></pre></div>
+<span class="p">$</span> agent-relay prune --apply    <span class="c"># marks them dormant</span>
+<span class="p">$</span> agent-relay pending --by state
+<span class="p">$</span> agent-relay leave --stale --idle-hours 24   <span class="c"># dry run</span></pre></div>
       </div>
     </div>
   </div>
@@ -320,7 +325,7 @@
           <img src="../assets/logo.svg" alt="" width="34" height="34" />
           <b>Agent Relay</b>
         </div>
-        <p>Local project-scoped coordination and notifications for coding agents. One room per project, shared by Codex, Claude Code, OpenCode and other agents.</p>
+        <p>Project-scoped coordination and notifications for coding agents, local by default. One room per project, shared by Codex, Claude Code, OpenCode and other agents, and by cloud sessions through an opt-in gateway.</p>
       </div>
       <nav aria-label="Project links">
         <h2>Project</h2>
@@ -340,6 +345,7 @@
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/trust-model.md">Trust model</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/threat-model.md">Threat model</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/large-rooms.md">Large rooms</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/runbook-backlog.md">Backlog runbook</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/registry.md">Registry hygiene</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/branches.md">Branch ownership</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/work-items.md">Work items</a></li>
