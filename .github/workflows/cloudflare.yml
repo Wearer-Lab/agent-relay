@@ -5,7 +5,7 @@ name: Cloudflare
 on:
   push:
     branches: [main]
-    paths: ['site/**', 'wrangler.jsonc', '.github/workflows/cloudflare.yml']
+    paths: ['site/**', 'worker/**', 'wrangler.jsonc', '.github/workflows/cloudflare.yml']
   workflow_dispatch:
 concurrency:
   group: cloudflare-deploy
@@ -33,10 +33,10 @@ jobs:
             echo "Add them as repository secrets to publish on every push:"
             echo "  CLOUDFLARE_API_TOKEN  an API token with Workers Scripts:Edit, Workers Routes:Edit and DNS:Edit for next-notes.com"
             echo "  CLOUDFLARE_ACCOUNT_ID  d534728dd8656056d2feef1bf282724d"
-            echo "Until then, publish with: npx wrangler@3 deploy"
+            echo "Until then, publish with: npx wrangler@4 deploy"
             exit 0
           fi
-          npx --yes wrangler@3 deploy
+          npx --yes wrangler@4 deploy
       - name: The custom domain answers
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: |

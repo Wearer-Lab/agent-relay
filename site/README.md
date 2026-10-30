@@ -67,6 +67,26 @@ python3 -m http.server 8080 -d site
 Then open the printed address. Opening `index.html` directly from disk also
 works.
 
+## The Team plan waitlist
+
+The home page's `#team` section posts a plain HTML form to
+`https://relay.next-notes.com/api/waitlist`. That one path is the only server
+code: `worker/index.mjs` at the repository root, routed by `run_worker_first`
+in `wrangler.jsonc`. It stores each sign-up as one entry in the `WAITLIST` KV
+namespace, keyed by email, and answers with a small thank-you page. The form
+needs no JavaScript, and it works from the GitHub Pages mirror too, because it
+posts to the canonical origin.
+
+Read the list:
+
+```sh
+npx wrangler kv key list --binding WAITLIST --remote
+npx wrangler kv key get --binding WAITLIST --remote "signup:you@company.com"
+```
+
+Test it locally with `npx wrangler dev`, which simulates the namespace; point
+the form at `/api/waitlist` in the browser, or post with `curl -F`.
+
 ## Deploy
 
 Merging to `main` publishes the site twice: the **Cloudflare** workflow deploys

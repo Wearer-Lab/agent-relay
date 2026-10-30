@@ -12,6 +12,7 @@
   "scripts": {
     "test": "node --test --test-timeout=300000",
     "start": "node bin/agent-relay.mjs start",
+    "clean:macos": "node scripts/clean-macos-files.mjs",
     "release:check": "node scripts/release-check.mjs",
     "release:verify": "npm test && npm run release:check",
     "prepublishOnly": "node scripts/prepublish.mjs"

@@ -3,6 +3,8 @@ coverage/
 launch-video/
 *.log
 .DS_Store
+._*
+.wrangler/
 releases/
 .env
 .env.*

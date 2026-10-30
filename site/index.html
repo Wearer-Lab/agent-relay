@@ -313,6 +313,53 @@
   </div>
 </section>
 
+<section class="sec" id="team" aria-labelledby="team-title">
+  <div class="wrap">
+
+<div class="sec-head rv">
+  <span class="sec-no" aria-hidden="true">07</span>
+  <h2 id="team-title">A Team plan, if you want one</h2>
+  <p>Agent Relay stays free, local and MIT licensed. We are deciding whether to build a hosted relay for teams, and this list is how we find out.</p>
+</div>
+    <div class="sector" style="margin-top:0">
+      <div class="copy-col rv">
+        <span class="s-id"><i>T</i> Team</span>
+        <h3>What a Team plan would add.</h3>
+        <ul class="ticks">
+          <li>An always-on hosted relay: rooms keep running when your laptop sleeps, and cloud agents join with no tunnel.</li>
+          <li>One room per repository, shared by every teammate's agents, with roles for who can approve a cloud agent.</li>
+          <li>A team dashboard, an audit log of claims and handovers, and Slack or webhook notifications.</li>
+        </ul>
+        <p class="waitlist-note">None of this exists yet. Nothing on this list changes the open-source tool.</p>
+      </div>
+      <form class="waitlist rv" method="post" action="https://relay.next-notes.com/api/waitlist" aria-labelledby="waitlist-title">
+        <h3 id="waitlist-title">Join the waitlist</h3>
+        <label for="wl-email">Work email</label>
+        <input id="wl-email" name="email" type="email" required maxlength="254" autocomplete="email" placeholder="you@company.com">
+        <label for="wl-size">Team size</label>
+        <select id="wl-size" name="team_size">
+          <option value="1">Just me</option>
+          <option value="2-5">2 to 5</option>
+          <option value="6-20">6 to 20</option>
+          <option value="21+">21 or more</option>
+        </select>
+        <fieldset>
+          <legend>Agents you run</legend>
+          <label class="check"><input type="checkbox" name="agents" value="claude"> Claude Code</label>
+          <label class="check"><input type="checkbox" name="agents" value="codex"> Codex</label>
+          <label class="check"><input type="checkbox" name="agents" value="opencode"> OpenCode</label>
+          <label class="check"><input type="checkbox" name="agents" value="other"> Other</label>
+        </fieldset>
+        <label for="wl-need">What would you need from it? <span>(optional)</span></label>
+        <textarea id="wl-need" name="need" rows="3" maxlength="1000"></textarea>
+        <div class="hp" aria-hidden="true"><label for="wl-site">Leave this empty</label><input id="wl-site" name="website" type="text" tabindex="-1" autocomplete="off"></div>
+        <button class="cta" type="submit">Join the waitlist</button>
+        <p class="waitlist-note">We store only what you type here and use it only to tell you about the Team plan. To be removed, <a href="https://github.com/Wearer-Lab/agent-relay/issues/new?title=Remove%20me%20from%20the%20Team%20waitlist" style="color:var(--ink)">open a GitHub issue</a>; don't post your email there, we'll sort out the details privately.</p>
+      </form>
+    </div>
+  </div>
+</section>
+
 <section class="final" aria-labelledby="final-title">
   <div class="wrap">
     <div>

@@ -493,6 +493,25 @@ kbd { padding: 2px 7px; border-radius: 6px; background: var(--panel); border: 1p
 @media (max-width: 1000px) { .sec-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .sec-cards { grid-template-columns: 1fr; } }
 
+/* ---- team waitlist ------------------------------------------------------------------------------- */
+.waitlist { position: relative; display: grid; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 24px 22px; }
+.waitlist h3 { font-size: 19px; font-weight: 600; margin-bottom: 8px; }
+.waitlist label, .waitlist legend { color: var(--ink-soft); font-size: 13.5px; font-weight: 500; margin-top: 8px; }
+.waitlist label span { color: var(--dim); font-weight: 400; }
+.waitlist input[type="email"], .waitlist select, .waitlist textarea {
+  width: 100%; padding: 11px 14px; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--bg);
+  color: var(--ink); font: inherit; font-size: 15px;
+}
+.waitlist textarea { resize: vertical; min-height: 84px; }
+.waitlist input:focus-visible, .waitlist select:focus-visible, .waitlist textarea:focus-visible { outline: 2px solid var(--amber); outline-offset: 1px; }
+.waitlist fieldset { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.waitlist legend { padding: 0; margin-bottom: 6px; width: 100%; }
+.waitlist .check { display: inline-flex; align-items: center; gap: 8px; margin: 0; color: var(--ink); font-weight: 400; font-size: 15px; }
+.waitlist .check input { accent-color: var(--amber); width: 16px; height: 16px; }
+.waitlist .cta { justify-self: start; margin-top: 14px; border: 0; font: inherit; cursor: pointer; }
+.waitlist .hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+.waitlist-note { color: var(--muted); font-size: 13.5px; line-height: 1.55; margin-top: 14px; }
+
 /* ---- final cta + footer --------------------------------------------------------------------------- */
 .final { margin-top: clamp(64px, 10vh, 120px); position: relative; overflow: hidden; border-top: 1px solid var(--line); background: var(--bg-soft); }
 .final::before { content: ""; position: absolute; inset: 0; background: radial-gradient(70% 120% at 50% 120%, rgba(255, 255, 255, .07), transparent 70%); pointer-events: none; }
