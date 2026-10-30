@@ -25,7 +25,7 @@ the navigation between them is ordinary relative links.
 | Path | Purpose |
 | --- | --- |
 | `styles.css` | The design system: tokens, layout, motion. One file for every page. |
-| `app.js` | Progressive enhancement only: mobile menu, install tabs and copy, dashboard view tabs, reveal on scroll, stat counters. No network access. |
+| `app.js` | Progressive enhancement only: mobile menu, install tabs and copy, dashboard view tabs, reveal on scroll, stat counters, and the Team plan pop-up (shown once per browser, remembered in `localStorage`). No network access. |
 | `favicon.svg`, `assets/logo.svg` | The Agent Relay mark: a white relay cross on black. |
 | `assets/hero.mp4`, `assets/hero-poster.jpg` | The hero film behind the home page headline (self-hosted, muted, looping) and its still frame, which stands in for it under reduced motion. |
 | `assets/fonts/` | Self-hosted fonts: Bubbledot (CC BY 4.0, credited in the footer), Geist Pixel Circle and Inter. Nothing is fetched from a third party. |
@@ -73,7 +73,7 @@ The home page's `#team` section posts a plain HTML form to
 `https://relay.next-notes.com/api/waitlist`. That one path is the only server
 code: `worker/index.mjs` at the repository root, routed by `run_worker_first`
 in `wrangler.jsonc`. It stores each sign-up as one entry in the `WAITLIST` KV
-namespace, keyed by email, and answers with a small thank-you page. The form
+namespace, keyed by email, and answers with a small thank-you page. Every page's header links to that section (**Team**), and `app.js` opens a short pop-up with the same offer and an email-only form once per browser, 2.5 seconds after the first visit. To see it again, run `localStorage.removeItem('agent-relay-team-pop')` in the console. The form
 needs no JavaScript, and it works from the GitHub Pages mirror too, because it
 posts to the canonical origin.
 

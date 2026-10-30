@@ -150,7 +150,7 @@ ul, ol { margin: 0; padding: 0; }
 .logo-button:hover { transform: scale(1.05); }
 .logo-button img { width: 74%; height: 74%; object-fit: contain; }
 .nav-pill {
-  flex: 1 1 auto; max-width: 520px; height: clamp(44px, 5.2vw, 48px); padding: 4px 8px;
+  flex: 1 1 auto; max-width: 600px; height: clamp(44px, 5.2vw, 48px); padding: 4px 8px;
   border-radius: 999px; background: #fff; box-shadow: 0 4px 14px rgba(0, 0, 0, .45);
   display: flex; align-items: stretch; justify-content: space-between;
 }
@@ -511,6 +511,31 @@ kbd { padding: 2px 7px; border-radius: 6px; background: var(--panel); border: 1p
 .waitlist .cta { justify-self: start; margin-top: 14px; border: 0; font: inherit; cursor: pointer; }
 .waitlist .hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
 .waitlist-note { color: var(--muted); font-size: 13.5px; line-height: 1.55; margin-top: 14px; }
+
+/* The Team link in the header carries a small amber dot: new, and not built yet. */
+.nav-team::before { content: ""; position: absolute; top: 9px; right: 4px; width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
+
+/* The one-time Team plan pop-up, built by app.js. */
+.team-pop { width: min(460px, calc(100% - 32px)); max-height: calc(100% - 32px); overflow: auto; padding: 0; border: 1px solid var(--line-strong); border-radius: 22px; background: var(--panel); color: var(--ink); box-shadow: 0 30px 80px -20px rgba(0, 0, 0, .9); }
+.team-pop::backdrop { background: rgba(0, 0, 0, .62); backdrop-filter: blur(3px); }
+.team-pop[open] { animation: popIn .32s var(--ease); }
+.team-pop-body { position: relative; padding: 26px 24px 22px; }
+.team-pop .kicker { margin-bottom: 10px; }
+.team-pop h2 { font-size: clamp(22px, 5vw, 28px); line-height: 1.1; letter-spacing: -.03em; font-weight: 600; margin: 0 34px 10px 0; }
+.team-pop p { color: var(--muted); font-size: 15px; line-height: 1.55; margin: 0; }
+.team-pop .ticks { margin-top: 16px; gap: 8px; }
+.team-pop .ticks li { font-size: 14.5px; }
+.team-pop form { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.team-pop input[type="email"] { flex: 1 1 200px; min-width: 0; padding: 11px 14px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--bg); color: var(--ink); font: inherit; font-size: 15px; }
+.team-pop input[type="email"]:focus-visible { outline: 2px solid var(--amber); outline-offset: 1px; }
+.team-pop .cta { border: 0; font: inherit; cursor: pointer; }
+.team-pop .hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+.team-pop-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 16px; margin-top: 16px; font-size: 13px; }
+.team-pop-foot a, .team-pop-foot button { color: var(--muted); background: none; border: 0; padding: 0; font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.team-pop-foot a:hover, .team-pop-foot button:hover { color: var(--ink); }
+.team-pop-close { position: absolute; top: 16px; right: 16px; width: 34px; height: 34px; border-radius: 50%; border: 0; background: var(--pill); color: var(--ink); font-size: 20px; line-height: 1; cursor: pointer; }
+.team-pop-close:hover { background: var(--pill-hi); }
+@keyframes popIn { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }
 
 /* ---- final cta + footer --------------------------------------------------------------------------- */
 .final { margin-top: clamp(64px, 10vh, 120px); position: relative; overflow: hidden; border-top: 1px solid var(--line); background: var(--bg-soft); }

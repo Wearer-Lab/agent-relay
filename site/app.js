@@ -1,5 +1,6 @@
 // Agent Relay website. Progressive enhancement only: mobile menu, install tabs and copy,
-// dashboard view tabs, reveal on scroll, stat counters. No network access, no analytics, no cookies.
+// dashboard view tabs, reveal on scroll, stat counters, and the one-time Team plan pop-up
+// (remembered in localStorage). No network access, no analytics, no cookies.
 (function () {
   'use strict';
   var doc = document, root = doc.documentElement;
@@ -154,4 +155,76 @@
       for (const entry of entries) entry.isIntersecting ? video.play().catch(() => {}) : video.pause();
     }).observe(video);
   }
+})();
+
+// ---- Team plan pop-up --------------------------------------------------------
+// Shown once per browser, a moment after the first visit to any page, so people
+// learn about the Team plan without scrolling to it. Whether it has been seen is
+// kept in localStorage (not a cookie). If storage is unavailable it never shows,
+// rather than nagging on every visit. The form posts to the same endpoint as
+// the full form on the home page, on the canonical origin.
+(function () {
+  'use strict';
+  var KEY = 'agent-relay-team-pop';
+  if (typeof HTMLDialogElement !== 'function') return;
+  try {
+    if (localStorage.getItem(KEY)) return;
+    // Storage that cannot be written would show the pop-up on every visit.
+    localStorage.setItem(KEY + '-probe', '1');
+    localStorage.removeItem(KEY + '-probe');
+  } catch (e) { return; }
+  var team = document.querySelector('a.nav-team');
+  var canonical = document.querySelector('link[rel="canonical"]');
+  if (!team || !canonical) return;
+  var seen = function () { try { localStorage.setItem(KEY, new Date().toISOString()); } catch (e) {} };
+  // Someone already on their way to the Team section does not need the pop-up.
+  if (location.hash === '#team') { seen(); return; }
+
+  var dialog = document.createElement('dialog');
+  dialog.className = 'team-pop';
+  dialog.setAttribute('aria-labelledby', 'team-pop-title');
+  dialog.innerHTML =
+    '<div class="team-pop-body">' +
+      '<button class="team-pop-close" type="button" aria-label="Close">&times;</button>' +
+      '<p class="kicker">Team plan &middot; waitlist</p>' +
+      '<h2 id="team-pop-title">Running agents across a team?</h2>' +
+      '<p>Agent Relay stays free, local and MIT licensed. We are deciding whether to build a hosted Team plan on top of it:</p>' +
+      '<ul class="ticks">' +
+        '<li>An always-on hosted relay: rooms keep running when your laptop sleeps, and cloud agents join with no tunnel.</li>' +
+        '<li>One room per repository, shared by every teammate’s agents, with roles for who can approve a cloud agent.</li>' +
+        '<li>A team dashboard, an audit log of claims and handovers, and Slack or webhook notifications.</li>' +
+      '</ul>' +
+      '<form method="post">' +
+        '<label class="hp" aria-hidden="true">Leave this empty <input name="website" type="text" tabindex="-1" autocomplete="off"></label>' +
+        '<input name="email" type="email" required maxlength="254" autocomplete="email" placeholder="you@company.com" aria-label="Work email">' +
+        '<button class="cta" type="submit">Join the waitlist</button>' +
+      '</form>' +
+      '<div class="team-pop-foot">' +
+        '<a class="team-pop-more">Tell us more about your team</a>' +
+        '<button type="button" class="team-pop-later">Not now</button>' +
+      '</div>' +
+    '</div>';
+  dialog.querySelector('form').action = new URL('/api/waitlist', canonical.href).href;
+  var more = dialog.querySelector('.team-pop-more');
+  more.href = team.getAttribute('href');
+  var close = function () { dialog.close(); };
+  dialog.querySelector('.team-pop-close').addEventListener('click', close);
+  dialog.querySelector('.team-pop-later').addEventListener('click', close);
+  more.addEventListener('click', close);
+  // A click on the dimmed backdrop lands on the dialog element itself.
+  dialog.addEventListener('click', function (e) { if (e.target === dialog) close(); });
+  document.body.appendChild(dialog);
+
+  var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // It counts as seen only once it has actually opened, so leaving the page
+  // before the delay does not use it up.
+  var open = function () {
+    if (location.hash === '#team') { seen(); return; }
+    // Do not cover the mobile menu; try again once it has had time to close.
+    var burger = document.querySelector('.burger');
+    if (burger && burger.getAttribute('aria-expanded') === 'true') { setTimeout(open, 2000); return; }
+    dialog.showModal();
+    seen();
+  };
+  setTimeout(open, calm ? 800 : 2500);
 })();
