@@ -1,0 +1,3 @@
+# macOS writes these next to real files on external drives; never upload them.
+._*
+.DS_Store
