@@ -62,7 +62,8 @@ export async function waitlist(request, env, now = new Date()) {
   return page(200, 'You are on the list', thanks);
 }
 
-const thanks = 'Thank you. We will write only about the Team plan, and you can ask us to delete your entry at any time.';
+const thanks = 'Thank you. We will write only about the Team plan. To be removed at any time, open an issue on GitHub; no need to post your email there.';
+const REMOVE_ISSUE = 'https://github.com/Wearer-Lab/agent-relay/issues/new?title=Remove%20me%20from%20the%20Team%20waitlist';
 
 const escape = text => text.replace(/[&<>"']/g, ch => `&#${ch.charCodeAt(0)};`);
 
@@ -84,6 +85,7 @@ function page(status, title, body, headers = {}) {
 <h1 style="font-size:clamp(28px,5vw,48px);letter-spacing:-.04em">${escape(title)}</h1>
 <p style="color:var(--muted);max-width:52ch;margin:0 auto">${escape(body)}</p>
 <p><a class="cta" href="/">Back to Agent Relay</a></p>
+<p style="font-size:13.5px"><a href="${REMOVE_ISSUE}" style="color:var(--muted)">Ask to be removed from the waitlist</a></p>
 </main>
 </body>
 </html>`;
