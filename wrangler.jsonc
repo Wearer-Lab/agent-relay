@@ -2,12 +2,23 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "agent-relay-site",
   "compatibility_date": "2026-10-24",
-  // The marketing site is static: no Worker script, just the files in site/.
+  // The marketing site is static files from site/. The one exception is the
+  // Team plan waitlist: only /api/* reaches worker/index.mjs, which stores
+  // sign-ups in the WAITLIST KV namespace.
   // "404-page" serves site/404.html for any missing path.
+  "main": "worker/index.mjs",
   "assets": {
     "directory": "./site",
-    "not_found_handling": "404-page"
+    "binding": "ASSETS",
+    "not_found_handling": "404-page",
+    "run_worker_first": ["/api/*"]
   },
+  // No id: wrangler 4 creates the namespace on the first deploy and reuses it.
+  "kv_namespaces": [
+    {
+      "binding": "WAITLIST"
+    }
+  ],
   "routes": [
     {
       "pattern": "relay.next-notes.com",
