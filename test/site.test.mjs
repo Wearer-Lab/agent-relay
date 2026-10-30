@@ -98,7 +98,7 @@ test('the landing page variants are self-contained drafts with valid references'
 });
 
 test('the navigation is the same on every page and marks the current page',async()=>{
- const links=['product/','dashboard/','architecture/','security/','start/'];
+ const links=['product/','dashboard/','architecture/','security/','start/','#team'];
  for(const page of PAGES){
   const source=await readFile(path.join(site,page),'utf8');
   for(const link of links)assert.ok(source.includes(`href="${link}"`)||source.includes(`href="../${link}"`),`${page} is missing the ${link} link`);
