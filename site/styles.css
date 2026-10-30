@@ -516,10 +516,16 @@ kbd { padding: 2px 7px; border-radius: 6px; background: var(--panel); border: 1p
 .nav-team::before { content: ""; position: absolute; top: 9px; right: 4px; width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
 
 /* The one-time Team plan pop-up, built by app.js. */
-.team-pop { width: min(460px, calc(100% - 32px)); max-height: calc(100% - 32px); overflow: auto; padding: 0; border: 1px solid var(--line-strong); border-radius: 22px; background: var(--panel); color: var(--ink); box-shadow: 0 30px 80px -20px rgba(0, 0, 0, .9); }
+.team-pop { width: min(820px, calc(100% - 32px)); max-height: calc(100% - 32px); overflow: auto; padding: 0; border: 1px solid var(--line-strong); border-radius: 22px; background: var(--panel); color: var(--ink); box-shadow: 0 30px 80px -20px rgba(0, 0, 0, .9); }
 .team-pop::backdrop { background: rgba(0, 0, 0, .62); backdrop-filter: blur(3px); }
 .team-pop[open] { animation: popIn .32s var(--ease); }
-.team-pop-body { position: relative; padding: 26px 24px 22px; }
+.team-pop-body { position: relative; padding: 24px clamp(20px, 3.4vw, 32px) 22px; }
+.team-pop-scene { display: block; width: 100%; height: 270px; background: #000; border-bottom: 1px solid var(--line); font-family: var(--font-mono); }
+@media (min-width: 720px) {
+  .team-pop .ticks { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .team-pop h2 { margin-right: 0; }
+}
+@media (max-width: 520px) { .team-pop-scene { height: 230px; } }
 .team-pop .kicker { margin-bottom: 10px; }
 .team-pop h2 { font-size: clamp(22px, 5vw, 28px); line-height: 1.1; letter-spacing: -.03em; font-weight: 600; margin: 0 34px 10px 0; }
 .team-pop p { color: var(--muted); font-size: 15px; line-height: 1.55; margin: 0; }
@@ -533,7 +539,7 @@ kbd { padding: 2px 7px; border-radius: 6px; background: var(--panel); border: 1p
 .team-pop-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 16px; margin-top: 16px; font-size: 13px; }
 .team-pop-foot a, .team-pop-foot button { color: var(--muted); background: none; border: 0; padding: 0; font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .team-pop-foot a:hover, .team-pop-foot button:hover { color: var(--ink); }
-.team-pop-close { position: absolute; top: 16px; right: 16px; width: 34px; height: 34px; border-radius: 50%; border: 0; background: var(--pill); color: var(--ink); font-size: 20px; line-height: 1; cursor: pointer; }
+.team-pop-close { position: absolute; z-index: 1; top: 14px; right: 14px; width: 34px; height: 34px; border-radius: 50%; border: 0; background: var(--pill); color: var(--ink); font-size: 20px; line-height: 1; cursor: pointer; }
 .team-pop-close:hover { background: var(--pill-hi); }
 @keyframes popIn { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }
 

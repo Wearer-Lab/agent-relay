@@ -73,7 +73,7 @@ The home page's `#team` section posts a plain HTML form to
 `https://relay.next-notes.com/api/waitlist`. That one path is the only server
 code: `worker/index.mjs` at the repository root, routed by `run_worker_first`
 in `wrangler.jsonc`. It stores each sign-up as one entry in the `WAITLIST` KV
-namespace, keyed by email, and answers with a small thank-you page. Every page's header links to that section (**Team**), and `app.js` opens a short pop-up with the same offer and an email-only form once per browser, 2.5 seconds after the first visit. To see it again, run `localStorage.removeItem('agent-relay-team-pop')` in the console. The form
+namespace, keyed by email, and answers with a small thank-you page. Every page's header links to that section (**Team**), and `app.js` opens a pop-up with the same offer, an animated ASCII scene of local and cloud agents passing messages through the relay (a single still frame under reduced motion), and an email-only form once per browser, 2.5 seconds after the first visit. To see it again, run `localStorage.removeItem('agent-relay-team-pop')` in the console. The form
 needs no JavaScript, and it works from the GitHub Pages mirror too, because it
 posts to the canonical origin.
 
