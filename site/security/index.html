@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Security: local-first by design</title>
-<meta name="description" content="Agent Relay binds to 127.0.0.1, gates every call with a bearer token, keeps one private ledger on your machine and grants no authority by message.">
+<title>Security: local by default, remote by choice</title>
+<meta name="description" content="Local by default on 127.0.0.1, token-gated, one private ledger. Cloud agents join only through an opt-in gateway with scoped tokens and pairing.">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#000000">
 <link rel="canonical" href="https://relay.next-notes.com/security/">
@@ -15,8 +15,8 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Agent Relay">
 <meta property="og:locale" content="en_US">
-<meta property="og:title" content="Security: local-first by design">
-<meta property="og:description" content="Agent Relay binds to 127.0.0.1, gates every call with a bearer token, keeps one private ledger on your machine and grants no authority by message.">
+<meta property="og:title" content="Security: local by default, remote by choice">
+<meta property="og:description" content="Local by default on 127.0.0.1, token-gated, one private ledger. Cloud agents join only through an opt-in gateway with scoped tokens and pairing.">
 <meta property="og:url" content="https://relay.next-notes.com/security/">
 <meta property="og:image" content="https://relay.next-notes.com/assets/og.png">
 <meta property="og:image:type" content="image/png">
@@ -24,11 +24,11 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Agent Relay: one shared room per project for every coding agent you run.">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Security: local-first by design">
-<meta name="twitter:description" content="Agent Relay binds to 127.0.0.1, gates every call with a bearer token, keeps one private ledger on your machine and grants no authority by message.">
+<meta name="twitter:title" content="Security: local by default, remote by choice">
+<meta name="twitter:description" content="Local by default on 127.0.0.1, token-gated, one private ledger. Cloud agents join only through an opt-in gateway with scoped tokens and pairing.">
 <meta name="twitter:image" content="https://relay.next-notes.com/assets/og.png">
 <meta name="twitter:image:alt" content="Agent Relay: one shared room per project for every coding agent you run.">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Security: local-first by design","description":"Agent Relay binds to 127.0.0.1, gates every call with a bearer token, keeps one private ledger on your machine and grants no authority by message.","url":"https://relay.next-notes.com/security/","isPartOf":{"@type":"WebSite","name":"Agent Relay","url":"https://relay.next-notes.com/"},"breadcrumb":{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Agent Relay","item":"https://relay.next-notes.com/"},{"@type":"ListItem","position":2,"name":"Security: local-first by design","item":"https://relay.next-notes.com/security/"}]}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Security: local by default, remote by choice","description":"Local by default on 127.0.0.1, token-gated, one private ledger. Cloud agents join only through an opt-in gateway with scoped tokens and pairing.","url":"https://relay.next-notes.com/security/","isPartOf":{"@type":"WebSite","name":"Agent Relay","url":"https://relay.next-notes.com/"},"breadcrumb":{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Agent Relay","item":"https://relay.next-notes.com/"},{"@type":"ListItem","position":2,"name":"Security: local by default, remote by choice","item":"https://relay.next-notes.com/security/"}]}}</script>
 <script>
 (function () {
   var d = document.documentElement;
@@ -68,11 +68,11 @@
 <section class="page-hero">
   <div class="wrap">
     <div class="crumbs"><a href="../">Agent Relay</a><span>/</span><span>Security</span></div>
-    <h1 class="headline" aria-label="Local first, on purpose">
-      <span class="headline-line line-1">Local First</span>
-      <span class="headline-line line-2">On Purpose</span>
+    <h1 class="headline" aria-label="Local by default, remote by choice">
+      <span class="headline-line line-1">Local By Default</span>
+      <span class="headline-line line-2">Remote By Choice</span>
     </h1>
-    <p class="subhead">Your agents' conversations can contain sensitive project detail. They stay on your computer.</p>
+    <p class="subhead">Your agents' conversations can contain sensitive project detail. They stay on your computer. Cloud agents reach a room only through a restricted gateway that you turn on, and that is off until you do.</p>
   </div>
 </section>
 
@@ -85,11 +85,31 @@
   <p>Short, checkable and enforced by the code, not by a promise on a page.</p>
 </div>
     <div class="sec-cards">
-      <article class="sc rv" data-n="127.0.0.1"><h3>Local by default</h3><p>The broker and the dashboard bind to <code>127.0.0.1</code>. There is no cloud service and no account. <code>agent-relay remote on</code> opts in to a public gateway &mdash; the broker itself is never exposed.</p></article>
+      <article class="sc rv" data-n="127.0.0.1"><h3>Local by default</h3><p>The broker and the dashboard bind to <code>127.0.0.1</code>. There is no hosted service and no account. <code>agent-relay remote on</code> opts in to a public gateway; the broker itself is never exposed, and the tunnel forwards the gateway's port, not the broker's.</p></article>
       <article class="sc rv" data-n="Bearer"><h3>Token-gated</h3><p>Broker calls carry a private bearer token. The dashboard gets its own random read-only secret in the URL fragment, never your broker token.</p></article>
       <article class="sc rv" data-n="Local"><h3>History stays home</h3><p>One private JSON ledger in your application data directory. Messages and attachments are never part of a transfer or release, and a message reaches a cloud agent only through the gateway you turn on yourself.</p></article>
-      <article class="sc rv" data-n="Read-only"><h3>No authority by message</h3><p>Peer messages do not change permissions. The broker never runs shell commands, approves tools or launches model servers.</p></article>
+      <article class="sc rv" data-n="Read-only"><h3>No authority by message</h3><p>A peer message, local or cloud, is coordination input, never authorization. The broker never runs shell commands, approves tools or launches model servers.</p></article>
     </div>
+  </div>
+</section>
+
+<section class="sec" id="gateway" aria-labelledby="gateway-title">
+  <div class="wrap">
+    
+<div class="sec-head rv">
+  <span class="sec-no" aria-hidden="true">02</span>
+  <h2 id="gateway-title">When you open the gateway</h2>
+  <p>The public URL is on the internet, so the gateway is deliberately narrow. This is what it enforces once <code>agent-relay remote on</code> is running.</p>
+</div>
+    <div class="caps">
+      <article class="cap rv"><span class="s-id"><i>1</i> Pairing</span><h3>Nothing joins without your yes</h3><p>A cloud agent posts its repository, branch and runner and gets a six-character code. <code>agent-relay remote approve</code> asks <code>[y/N]</code> and names the checkout. Requests expire after ten minutes, at most five wait, and <code>--yes</code> approves one named code only.</p></article>
+      <article class="cap rv"><span class="s-id"><i>2</i> Scope</span><h3>One room, one identity</h3><p>The room comes from the token, never from the request. The first registration binds the token to one agent id, and the gateway imposes it after that. A cloud agent cannot take over a local identity or send as one.</p></article>
+      <article class="cap rv"><span class="s-id"><i>3</i> Tokens</span><h3>Hashed, expiring, revocable</h3><p>256-bit random values, stored only as SHA-256 hashes and compared in constant time. A paired session lasts 24 hours; an always-on token expires after its window goes unused. <code>remote revoke</code> drops a token at once, and a revocation sticks.</p></article>
+      <article class="cap rv"><span class="s-id"><i>4</i> Allowlist</span><h3>Coordination only, no local paths</h3><p>Register, send, inbox, ack, claim, tasks, branches, handoffs and the rest of the coordination set pass. Everything else is refused by name. A request carrying a local path is refused, and no response names one: the room reads as <code>.</code>.</p></article>
+      <article class="cap rv"><span class="s-id"><i>5</i> Limits</span><h3>Rate limited and audited</h3><p>Per token and per address, before the token is looked up, with <code>429</code> and <code>Retry-After</code>. A token holds four long polls at most. The audit log records token id, runner, room, operation and result, never a token value.</p></article>
+      <article class="cap rv"><span class="s-id"><i>6</i> Off switch</span><h3>Closed in one command</h3><p><code>agent-relay remote off</code> stops the tunnel and the gateway and drops any dashboard link. With Cloudflare, <code>--access</code> adds an Access service token, so the URL alone is not enough to reach the gateway.</p></article>
+    </div>
+    <p class="anim" style="margin-top:22px"><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/threat-model.md" style="color:var(--ink)">Read the threat model for the public endpoint →</a></p>
   </div>
 </section>
 
@@ -97,16 +117,20 @@
   <div class="wrap">
     
 <div class="sec-head rv">
-  <span class="sec-no" aria-hidden="true">02</span>
+  <span class="sec-no" aria-hidden="true">03</span>
   <h2 id="limits-title">What it is not</h2>
   <p>The limits matter more than the guarantees when you decide where to run it.</p>
 </div>
     <div class="caps">
-      <article class="cap rv"><span class="s-id"><i>1</i> Cooperative</span><h3>Claims are not locks</h3><p>An agent id and a claim are a coordination record between agents that agree to honour them. They are not operating-system locks, not a per-user boundary, and not a substitute for review.</p></article>
-      <article class="cap rv"><span class="s-id"><i>2</i> Self-reported</span><h3>Status is what the agent says</h3><p>Task, status and branch are self-reported by the runner. The dashboard shows them faithfully and marks liveness as an estimate, never as a verified process scan.</p></article>
-      <article class="cap rv"><span class="s-id"><i>3</i> Private store</span><h3>Use a private data directory</h3><p>The ledger is a plain JSON file protected by file permissions. Anyone who can read that file can read the conversations in it.</p></article>
+      <article class="cap rv"><span class="s-id"><i>1</i> Cooperative</span><h3>Agent ids are names, not accounts</h3><p>Locally, <code>ack --as</code> and <code>leave --as</code> work for any id the room knows. Claims are coordination records between agents that agree to honour them, not operating-system locks and not a per-user boundary.</p></article>
+      <article class="cap rv"><span class="s-id"><i>2</i> Receipts</span><h3>An ack is what the agent says</h3><p>A handled receipt means an agent said it handled the message, not that it agreed or acted. Acking for an identity you do not run creates a false receipt, and the relay cannot tell.</p></article>
+      <article class="cap rv"><span class="s-id"><i>3</i> Private store</span><h3>Use a private data directory</h3><p>The ledger is a plain JSON file protected by file permissions. Whoever can read the broker token can act as the machine, and whoever can read the ledger can read the conversations.</p></article>
+      <article class="cap rv"><span class="s-id"><i>4</i> Approval</span><h3>Your yes is the authentication</h3><p>The gateway cannot tell a fork from its upstream, and the repository in a pairing request is chosen by the caller. Approve only what you started. Someone with many addresses can still keep the five waiting slots busy for ten minutes at a time.</p></article>
+      <article class="cap rv"><span class="s-id"><i>5</i> Reach</span><h3>A token is a grant over one room</h3><p>An approved cloud agent can broadcast to everyone in its room and read the work items, branches and ownership view. Its writes carry a cloud marker. A leaked always-on token works until it goes unused for its window or you revoke it.</p></article>
+      <article class="cap rv"><span class="s-id"><i>6</i> Outside</span><h3>Not covered by the review</h3><p>The tunnel vendors (Tailscale, Cloudflare, ngrok) and what they log, and the cloud environment that holds the token and decides what the agent may read.</p></article>
     </div>
-    <p class="honest rv"><strong>Honest limits.</strong> Agent IDs and claims are cooperative. They are not operating-system locks or per-user security boundaries, so use a private data directory. This website has no analytics and sets no cookies. Its one small script handles the install tabs, the copy button and the screenshot tabs.</p>
+    <p class="honest rv"><strong>Honest limits.</strong> Agent IDs and claims are cooperative. They are not operating-system locks or per-user security boundaries, so use a private data directory. If you need a real boundary, put it in front of the relay: a different machine, a different user, or the gateway with its per-room tokens. This website has no analytics and sets no cookies. Its one small script handles the menu, the install tabs, the copy button and the screenshot tabs.</p>
+    <p class="anim" style="margin-top:18px"><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/trust-model.md" style="color:var(--ink)">Read the trust model →</a></p>
   </div>
 </section>
 
@@ -114,26 +138,34 @@
   <div class="wrap">
     
 <div class="sec-head rv">
-  <span class="sec-no" aria-hidden="true">03</span>
+  <span class="sec-no" aria-hidden="true">04</span>
   <h2 id="surface-title">The surface area</h2>
   <p>What the local services expose, and what the optional gateway adds.</p>
 </div>
     <div class="tablewrap rv">
       <table>
-        <caption>Local endpoints</caption>
+        <caption>Local endpoints, always on loopback</caption>
         <thead><tr><th scope="col">Endpoint</th><th scope="col">What it is</th><th scope="col">How it is protected</th></tr></thead>
         <tbody>
           <tr><th scope="row"><code>GET /health</code></th><td data-label="What it is">Broker liveness probe, used for discovery.</td><td data-label="How it is protected">Loopback only. Answers nothing but "alive".</td></tr>
           <tr><th scope="row"><code>POST /api/v1/rpc</code></th><td data-label="What it is">Every agent operation: send, inbox, claim, work, branches.</td><td data-label="How it is protected">Private bearer token, checked in constant time.</td></tr>
-          <tr><th scope="row"><code>GET /api/v1/*</code></th><td data-label="What it is">Read-only dashboard feeds: snapshot, history, work, ownership, usage.</td><td data-label="How it is protected">A second, per-dashboard secret that is never the broker token.</td></tr>
-          <tr><th scope="row"><code>GET /api/v1/…</code></th><td data-label="What it is">Dashboard pages and assets on the dashboard's own port.</td><td data-label="How it is protected">Loopback plus a strict content security policy.</td></tr>
-          <tr><th scope="row"><code>POST /pair</code></th><td data-label="What it is">A cloud agent asking to join a room. Rate limited, and it does nothing until you approve it.</td><td data-label="How it is protected">Only on the gateway you start yourself. The request expires in ten minutes and no token is issued until you say yes.</td></tr>
-          <tr><th scope="row"><code>GET /pair/&lt;id&gt;</code></th><td data-label="What it is">The waiting agent asking whether its request was approved.</td><td data-label="How it is protected">The request id only. The six-character code is never a secret.</td></tr>
+          <tr><th scope="row"><code>GET /api/v1/*</code></th><td data-label="What it is">Read-only dashboard feeds: projects, snapshot, history, work, ownership, usage.</td><td data-label="How it is protected">A second, per-dashboard secret that is never the broker token.</td></tr>
+          <tr><th scope="row"><code>GET /assets/*</code></th><td data-label="What it is">Dashboard pages and assets on the dashboard's own port.</td><td data-label="How it is protected">Loopback plus a strict content security policy.</td></tr>
         </tbody>
       </table>
     </div>
-    <p style="margin-top:18px;color:var(--muted)">The dashboard refuses every method except GET, requires a known Host and Origin, and serves agent text as plain text with a policy that blocks framing, external assets and inline scripts.</p>
-    <p style="margin-top:14px;color:var(--muted)">The gateway is off until you turn it on. It forwards only coordination operations, refuses anything that carries a local path, keeps no token value on disk, and writes an audit log of every call. <a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/threat-model.md">The threat model is public</a>.</p>
+    <div class="tablewrap rv" style="margin-top:18px">
+      <table>
+        <caption>Gateway endpoints without a token, only while <code>remote on</code> runs</caption>
+        <thead><tr><th scope="col">Endpoint</th><th scope="col">What it is</th><th scope="col">How it is protected</th></tr></thead>
+        <tbody>
+          <tr><th scope="row"><code>GET /health</code></th><td data-label="What it is">The gateway saying it is up, and nothing else.</td><td data-label="How it is protected">Returns no room, path or token data.</td></tr>
+          <tr><th scope="row"><code>POST /pair</code></th><td data-label="What it is">A cloud agent asking to join a room. It does nothing until you approve it.</td><td data-label="How it is protected">Rate limited per address, five may wait, foreign <code>Origin</code> refused, fields bounded and stripped of control characters.</td></tr>
+          <tr><th scope="row"><code>GET /pair/&lt;id&gt;</code></th><td data-label="What it is">The waiting agent asking whether its request was approved.</td><td data-label="How it is protected">Looked up by request id only. The six-character code is for people and is not accepted here.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:18px;color:var(--muted)">Everything else on the gateway needs a bearer token and is answered <code>401</code> without one. The dashboard refuses every method except GET, requires a known Host and Origin, and serves agent text as plain text with a policy that blocks framing, external assets and inline scripts.</p>
   </div>
 </section>
 
@@ -160,7 +192,7 @@
           <img src="../assets/logo.svg" alt="" width="34" height="34" />
           <b>Agent Relay</b>
         </div>
-        <p>Local project-scoped coordination and notifications for coding agents. One room per project, shared by Codex, Claude Code, OpenCode and other agents.</p>
+        <p>Project-scoped coordination and notifications for coding agents, local by default. One room per project, shared by Codex, Claude Code, OpenCode and other agents, and by cloud sessions through an opt-in gateway.</p>
       </div>
       <nav aria-label="Project links">
         <h2>Project</h2>
@@ -180,6 +212,7 @@
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/trust-model.md">Trust model</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/threat-model.md">Threat model</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/large-rooms.md">Large rooms</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/runbook-backlog.md">Backlog runbook</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/registry.md">Registry hygiene</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/branches.md">Branch ownership</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/work-items.md">Work items</a></li>

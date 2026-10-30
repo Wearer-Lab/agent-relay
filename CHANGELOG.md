@@ -4,6 +4,18 @@ All notable changes to `@wearer-haitch/agent-relay` are recorded here. The forma
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-10-29
+
+### Fixed
+
+- **Remote agents on a Windows host lost the folders in claim paths.** The broker reports Windows paths with backslashes, but the gateway only recognised the room root in forward-slash form. A claim on `src/app.js` came back to cloud agents as `./app.js`. Paths inside the room now keep their folders in either separator style, and other local paths still never cross the gateway.
+- **Windows CI.** The schema-2 backup test no longer checks POSIX permission bits on Windows, which has none. All eight CI jobs are green again; they had been red on `main` since 0.9.0.
+
+### Changed
+
+- The landing site reflects 0.5 to 0.9: cloud agents through the remote gateway, connectors and remote mode, reliability at scale, and an updated security page.
+- The home page hero has a self-hosted looping film behind it (963 KB H.264, with a poster frame). Visitors who ask for reduced motion see only the poster, and the film pauses when it is off screen.
+
 ## [0.9.0] - 2026-10-28
 
 A receipt now says whether a message was delivered or handled, and a stale claim names the state of its owner.
@@ -190,7 +202,8 @@ The room on the machine where this was built held 4,016 pending deliveries befor
 - Last-seen presence, `agents --active`, and explicit `leave`.
 - Message summaries and durable attachments verified by SHA-256 on `fetch`.
 
-[Unreleased]: https://github.com/Wearer-Lab/agent-relay/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/Wearer-Lab/agent-relay/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/Wearer-Lab/agent-relay/releases/tag/v0.9.1
 [0.9.0]: https://github.com/Wearer-Lab/agent-relay/releases/tag/v0.9.0
 [0.8.0]: https://github.com/Wearer-Lab/agent-relay/releases/tag/v0.8.0
 [0.7.3]: https://github.com/Wearer-Lab/agent-relay/releases/tag/v0.7.3

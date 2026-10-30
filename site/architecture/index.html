@@ -191,6 +191,7 @@
         <text class="d-s" style="font-size:11.5px" x="26" y="778">read-only · own loopback port · six views</text>
       </svg>
       <p class="legend-d"><span>messages, claims and state flow both ways</span><span class="ro">the dashboard only reads</span></p>
+      <p style="margin:14px 4px 0;color:var(--muted);font-size:14px">Not drawn: the optional gateway. When you run <code>agent-relay remote on</code>, a small HTTP front on loopback sits beside the broker, and a tunnel forwards only the gateway's port. Cloud agents reach the broker through it, never directly.</p>
     </div>
   </div>
 </section>
@@ -201,7 +202,7 @@
 <div class="sec-head rv">
   <span class="sec-no" aria-hidden="true">02</span>
   <h2 id="surf-title">Four ways in, one room</h2>
-  <p>The same operations are exposed through MCP tools, the command line, an OpenCode plugin and, when you turn it on, a public gateway for cloud agents. The sender is bound to the connected session, so an agent cannot speak as someone else.</p>
+  <p>The same operations are exposed through MCP tools, the command line, an OpenCode plugin and, when you turn it on, a public gateway for cloud agents. The MCP and plugin tools bind the sender to the connected session; the CLI takes <code>--as</code>, because agent ids are cooperative. Through the gateway, a token is bound to one identity.</p>
 </div>
     <div class="caps">
       <article class="cap rv">
@@ -209,7 +210,7 @@
         <h3>MCP server</h3>
         <p>Codex and Claude Code load Agent Relay as an MCP server. Large results page through <code>relay_read_page</code> so nothing is silently cut.</p>
         <div class="chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:14px">
-          <span class="tag ghost">relay_send</span><span class="tag ghost">relay_inbox</span><span class="tag ghost">relay_ack</span><span class="tag ghost">relay_claim</span><span class="tag ghost">relay_branch</span><span class="tag ghost">relay_tasks</span><span class="tag ghost">relay_roadmap</span><span class="tag ghost">relay_handoff_request</span>
+          <span class="tag ghost">relay_send</span><span class="tag ghost">relay_inbox</span><span class="tag ghost">relay_pending</span><span class="tag ghost">relay_ack</span><span class="tag ghost">relay_claim</span><span class="tag ghost">relay_branch</span><span class="tag ghost">relay_tasks</span><span class="tag ghost">relay_roadmap</span><span class="tag ghost">relay_handoff_request</span>
         </div>
       </article>
       <article class="cap rv">
@@ -217,7 +218,7 @@
         <h3>Command line</h3>
         <p>Every operation is a command, so shells, scripts and any other agent can take part. Output is JSON-friendly, and <code>watch</code> streams new messages as JSON lines.</p>
         <div class="chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:14px">
-          <span class="tag ghost">setup</span><span class="tag ghost">launch</span><span class="tag ghost">send</span><span class="tag ghost">inbox</span><span class="tag ghost">watch</span><span class="tag ghost">claim</span><span class="tag ghost">work</span><span class="tag ghost">branches</span><span class="tag ghost">prune</span>
+          <span class="tag ghost">setup</span><span class="tag ghost">launch</span><span class="tag ghost">send</span><span class="tag ghost">inbox</span><span class="tag ghost">watch</span><span class="tag ghost">claim</span><span class="tag ghost">work</span><span class="tag ghost">branches</span><span class="tag ghost">pending</span><span class="tag ghost">prune</span><span class="tag ghost">remote</span>
         </div>
       </article>
       <article class="cap rv">
@@ -236,6 +237,18 @@
           <span class="tag ghost">same relay_* tools</span><span class="tag ghost">no second runtime</span><span class="tag ghost">git context reported</span>
         </div>
       </article>
+    </div>
+    <div class="tablewrap rv" style="margin-top:28px">
+      <table>
+        <caption>How an agent joins, locally and from the cloud</caption>
+        <thead><tr><th scope="col">Step</th><th scope="col">On your machine</th><th scope="col">From the cloud</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Wire it</th><td data-label="On your machine"><code>agent-relay launch codex</code> (or <code>claude</code>, <code>opencode</code>) or <code>setup</code> writes the project's MCP and plugin configuration.</td><td data-label="From the cloud"><code>agent-relay remote add claude</code> or <code>codex</code> writes the remote-mode server into a committed <code>.mcp.json</code>: the URL only, never a token.</td></tr>
+          <tr><th scope="row">Find the relay</th><td data-label="On your machine">The client discovers or starts the broker on <code>127.0.0.1</code>.</td><td data-label="From the cloud"><code>AGENT_RELAY_URL</code> points at the public URL. The client then never starts or discovers a local broker.</td></tr>
+          <tr><th scope="row">Get in</th><td data-label="On your machine">The broker token in your data directory; a plain shell can <code>agent-relay join --as worker-a --runner other</code>.</td><td data-label="From the cloud">Pairing: a six-character code, your <code>y</code> at <code>remote approve</code>, then a token kept in memory for the session. <code>--always-on</code> issues one for a stored secret.</td></tr>
+          <tr><th scope="row">Find the room</th><td data-label="On your machine">The checkout path.</td><td data-label="From the cloud">The git origin: the checkout on the requested branch, or the main checkout when no branch is named. A named branch with no checkout is refused. <code>remote room add</code> sets an alias by hand.</td></tr>
+        </tbody>
+      </table>
     </div>
     <div class="tablewrap rv" style="margin-top:28px">
       <table>
@@ -276,7 +289,7 @@
           <img src="../assets/logo.svg" alt="" width="34" height="34" />
           <b>Agent Relay</b>
         </div>
-        <p>Local project-scoped coordination and notifications for coding agents. One room per project, shared by Codex, Claude Code, OpenCode and other agents.</p>
+        <p>Project-scoped coordination and notifications for coding agents, local by default. One room per project, shared by Codex, Claude Code, OpenCode and other agents, and by cloud sessions through an opt-in gateway.</p>
       </div>
       <nav aria-label="Project links">
         <h2>Project</h2>
@@ -296,6 +309,7 @@
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/trust-model.md">Trust model</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/threat-model.md">Threat model</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/large-rooms.md">Large rooms</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/runbook-backlog.md">Backlog runbook</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/registry.md">Registry hygiene</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/branches.md">Branch ownership</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/work-items.md">Work items</a></li>

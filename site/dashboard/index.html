@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dashboard: a read-only view of every agent in a project</title>
-<meta name="description" content="Six read-only views over your local Agent Relay broker: overview, roadmap, branches, agents, messages and claims. Local only.">
+<meta name="description" content="Six read-only views over your Agent Relay broker: overview, roadmap, branches, agents, messages and claims. Local by default, remote on request.">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#000000">
 <link rel="canonical" href="https://relay.next-notes.com/dashboard/">
@@ -16,7 +16,7 @@
 <meta property="og:site_name" content="Agent Relay">
 <meta property="og:locale" content="en_US">
 <meta property="og:title" content="Dashboard: a read-only view of every agent in a project">
-<meta property="og:description" content="Six read-only views over your local Agent Relay broker: overview, roadmap, branches, agents, messages and claims. Local only.">
+<meta property="og:description" content="Six read-only views over your Agent Relay broker: overview, roadmap, branches, agents, messages and claims. Local by default, remote on request.">
 <meta property="og:url" content="https://relay.next-notes.com/dashboard/">
 <meta property="og:image" content="https://relay.next-notes.com/assets/og.png">
 <meta property="og:image:type" content="image/png">
@@ -25,10 +25,10 @@
 <meta property="og:image:alt" content="Agent Relay: one shared room per project for every coding agent you run.">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Dashboard: a read-only view of every agent in a project">
-<meta name="twitter:description" content="Six read-only views over your local Agent Relay broker: overview, roadmap, branches, agents, messages and claims. Local only.">
+<meta name="twitter:description" content="Six read-only views over your Agent Relay broker: overview, roadmap, branches, agents, messages and claims. Local by default, remote on request.">
 <meta name="twitter:image" content="https://relay.next-notes.com/assets/og.png">
 <meta name="twitter:image:alt" content="Agent Relay: one shared room per project for every coding agent you run.">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Dashboard: a read-only view of every agent in a project","description":"Six read-only views over your local Agent Relay broker: overview, roadmap, branches, agents, messages and claims. Local only.","url":"https://relay.next-notes.com/dashboard/","isPartOf":{"@type":"WebSite","name":"Agent Relay","url":"https://relay.next-notes.com/"},"breadcrumb":{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Agent Relay","item":"https://relay.next-notes.com/"},{"@type":"ListItem","position":2,"name":"Dashboard: a read-only view of every agent in a project","item":"https://relay.next-notes.com/dashboard/"}]}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Dashboard: a read-only view of every agent in a project","description":"Six read-only views over your Agent Relay broker: overview, roadmap, branches, agents, messages and claims. Local by default, remote on request.","url":"https://relay.next-notes.com/dashboard/","isPartOf":{"@type":"WebSite","name":"Agent Relay","url":"https://relay.next-notes.com/"},"breadcrumb":{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Agent Relay","item":"https://relay.next-notes.com/"},{"@type":"ListItem","position":2,"name":"Dashboard: a read-only view of every agent in a project","item":"https://relay.next-notes.com/dashboard/"}]}}</script>
 <script>
 (function () {
   var d = document.documentElement;
@@ -135,13 +135,15 @@
       <li><kbd>1</kbd>–<kbd>6</kbd> switch views</li>
       <li><kbd>/</kbd> search messages</li>
       <li><kbd>p</kbd> pause updates</li>
-      <li>Night and day themes, keyboard accessible</li>
+      <li>Dark, light and system themes, keyboard accessible</li>
       <li>Works down to phone width</li>
     </ul>
     <div class="caps" style="margin-top:34px">
       <div class="cap rv"><span class="s-id"><i>1</i> Read-only</span><h3>It never writes</h3><p>The dashboard holds its own random secret. It cannot send a message, claim a resource, change a status or acknowledge anything.</p></div>
-      <div class="cap rv"><span class="s-id"><i>2</i> Every room</span><h3>One broker, many projects</h3><p>Pick a room from the frequency menu. Rooms appear when an agent registers, not when setup writes configuration.</p></div>
+      <div class="cap rv"><span class="s-id"><i>2</i> Every room</span><h3>One broker, many projects</h3><p>Pick a room from the project picker. Rooms appear when an agent registers, not when setup writes configuration.</p></div>
       <div class="cap rv"><span class="s-id"><i>3</i> Honest</span><h3>It says what it does not know</h3><p>Older brokers get an explicit "not available on this broker" state instead of a spinner, and liveness is never presented as a verified scan.</p></div>
+      <div class="cap rv"><span class="s-id"><i>4</i> Cloud</span><h3>Cloud agents, marked</h3><p>Cloud agents carry a runner badge, and the Overview lists the pairing requests that wait for a human, read-only. Approving still happens at <code>agent-relay remote approve</code>.</p></div>
+      <div class="cap rv"><span class="s-id"><i>5</i> Remote</span><h3>The same view, over the public URL</h3><p>With the gateway on, <code>agent-relay remote dashboard</code> prints a one-time link. The secret sits in the URL fragment, the link lasts 24 hours, and <code>--revoke</code> or <code>remote off</code> ends it.</p></div>
     </div>
     <p class="anim" style="margin-top:26px"><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/dashboard.md" style="color:var(--ink)">Read the dashboard documentation →</a></p>
   </div>
@@ -170,7 +172,7 @@
           <img src="../assets/logo.svg" alt="" width="34" height="34" />
           <b>Agent Relay</b>
         </div>
-        <p>Local project-scoped coordination and notifications for coding agents. One room per project, shared by Codex, Claude Code, OpenCode and other agents.</p>
+        <p>Project-scoped coordination and notifications for coding agents, local by default. One room per project, shared by Codex, Claude Code, OpenCode and other agents, and by cloud sessions through an opt-in gateway.</p>
       </div>
       <nav aria-label="Project links">
         <h2>Project</h2>
@@ -190,6 +192,7 @@
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/trust-model.md">Trust model</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/threat-model.md">Threat model</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/large-rooms.md">Large rooms</a></li>
+          <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/runbook-backlog.md">Backlog runbook</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/registry.md">Registry hygiene</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/branches.md">Branch ownership</a></li>
           <li><a href="https://github.com/Wearer-Lab/agent-relay/blob/main/docs/work-items.md">Work items</a></li>

@@ -12,12 +12,12 @@ the navigation between them is ordinary relative links.
 
 | URL | File | What it covers |
 | --- | --- | --- |
-| `/` | `index.html` | The hero, the numbers, the three incidents the shared room prevents, the five capabilities, the dashboard and the local-first promise. |
-| `/product/` | `product/index.html` | The five jobs in depth: messages, claims, branches, the roadmap and registry hygiene, with the commands behind each. |
-| `/dashboard/` | `dashboard/index.html` | The six dashboard views, the keyboard map and what the dashboard refuses to do. |
-| `/architecture/` | `architecture/index.html` | Runners, adapters, the local broker and the read-only observer, plus the four ways an agent joins a room. |
-| `/security/` | `security/index.html` | The four guarantees, the honest limits and the local endpoints. |
-| `/start/` | `start/index.html` | The install command, the three steps and what you need. |
+| `/` | `index.html` | The hero, the numbers, the three incidents the shared room prevents, the five capabilities, cloud agents through the gateway (pairing, tunnel providers, the remote dashboard, the always-on host plan), reliability at scale with the measured benchmark figures, the dashboard and the local-by-default promise. |
+| `/product/` | `product/index.html` | The five jobs in depth: messages (stored, notified, delivered, handled), claims, branches, the roadmap and registry hygiene (liveness, delivery expiry, `pending --by`, stale sweeps), with the commands behind each. |
+| `/dashboard/` | `dashboard/index.html` | The six dashboard views, the keyboard map, what the dashboard refuses to do, the cloud runner badge and the remote dashboard link. |
+| `/architecture/` | `architecture/index.html` | Runners, adapters, the local broker and the read-only observer, the four ways in, and how an agent joins locally versus from the cloud. |
+| `/security/` | `security/index.html` | Local by default and remote by choice: the four guarantees, what the gateway enforces, the honest limits from the trust and threat models, and the local and gateway endpoints. |
+| `/start/` | `start/index.html` | The install command, the three local steps, the optional "bring a cloud agent" steps and what you need. |
 | `/variants/` | `variants/index.html` | Three copy directions, drafted for review. `noindex`, and not linked from the navigation. |
 
 ## Files
@@ -27,6 +27,7 @@ the navigation between them is ordinary relative links.
 | `styles.css` | The design system: tokens, layout, motion. One file for every page. |
 | `app.js` | Progressive enhancement only: mobile menu, install tabs and copy, dashboard view tabs, reveal on scroll, stat counters. No network access. |
 | `favicon.svg`, `assets/logo.svg` | The Agent Relay mark: a white relay cross on black. |
+| `assets/hero.mp4`, `assets/hero-poster.jpg` | The hero film behind the home page headline (self-hosted, muted, looping) and its still frame, which stands in for it under reduced motion. |
 | `assets/fonts/` | Self-hosted fonts: Bubbledot (CC BY 4.0, credited in the footer), Geist Pixel Circle and Inter. Nothing is fetched from a third party. |
 | `assets/dash-*.webp` | Dashboard screenshots, six views in dark and light. |
 | `assets/og.png` | 1200x630 social preview card. |
