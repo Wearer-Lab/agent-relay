@@ -13,10 +13,12 @@
     "not_found_handling": "404-page",
     "run_worker_first": ["/api/*"]
   },
-  // No id: wrangler 4 creates the namespace on the first deploy and reuses it.
+  // Created by the first deploy on 2026-10-30 as "agent-relay-site-waitlist".
+  // Keep the id pinned, or a later deploy could provision a new, empty namespace.
   "kv_namespaces": [
     {
-      "binding": "WAITLIST"
+      "binding": "WAITLIST",
+      "id": "7a20b95844f047be9ed88a941f3b81f1"
     }
   ],
   "routes": [
