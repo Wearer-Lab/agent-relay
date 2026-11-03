@@ -223,6 +223,8 @@ offered party is live, or any project or machine claim overlaps a handoff resour
 `--preserve-owner <id>` permits claims held by that live successor in this room,
 provided it is outside the original handoff parties. Those claims remain unchanged,
 and the cancellation and audit record name the preserved owner.
+The original requester may withdraw its own request when every other original or
+offered party is inactive; another operator cannot use that exception.
 It never transfers or releases a claim. A successful cancellation retains the original
 request and generations, records the operator and reason, and appends a bounded audit
 event. Repeating a cancelled request makes no further change. Accepted and declined

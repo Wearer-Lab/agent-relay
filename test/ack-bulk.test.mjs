@@ -191,6 +191,18 @@ test('orphan cancellation preserves an explicitly named live successor without r
   assert.equal((await f.auditEntries()).at(-1).preservedOwner, 'successor');
 });
 
+test('only the live requester may withdraw its own unheld request to inactive counterparties', async t => {
+  const f = await orphanFixture(t);
+  await f.rpc({ op: 'release', agentId: 'holder' });
+  assert.equal((await f.cancel({ agentId: 'requester' })).error.code, 'HANDOFF_LIVE');
+  await f.restart(idle(['holder'], 48));
+  assert.equal((await f.cancel()).error.code, 'HANDOFF_LIVE');
+  const result = await f.cancel({ agentId: 'requester' });
+  assert.equal(result.cancelled, true, JSON.stringify(result));
+  assert.equal(result.handoff.respondedBy, 'requester');
+  assert.deepEqual((await f.readState()).rooms[0].claims, []);
+});
+
 test('bulk leave never strands an obligation: the holder is kept and stays active', async t => {
   const f = await fixture(t);
   await f.register('holder');
