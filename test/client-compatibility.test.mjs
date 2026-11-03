@@ -48,6 +48,8 @@ test('combined options require every feature before submission',async t=>{
   {fields:{op:'receipt',messageId:'m'},advertised:['receipts'],missing:[]},
   {fields:{op:'claimNarrow',agentId:'a',resources:['r']},advertised:[],missing:['claim-narrow']},
   {fields:{op:'claimNarrow',agentId:'a',resources:['r']},advertised:['claim-narrow'],missing:[]},
+  {fields:{op:'cancelOrphanHandoff',agentId:'operator',id:'handoff',reason:'Preserved'},advertised:['handoffs'],missing:['orphan-handoff-cancel']},
+  {fields:{op:'cancelOrphanHandoff',agentId:'operator',id:'handoff',reason:'Preserved'},advertised:['orphan-handoff-cancel'],missing:[]},
  ];
  for(const c of cases){
   const calls=[];

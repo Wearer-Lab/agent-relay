@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
+import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { createBroker, validateStore, verifyAttachmentReferences, offlineRestore, MAX_STORE, MAX_AGENTS_PER_PROJECT, MAX_RETAINED_AGENTS, MAX_PROCESSES, MAX_ROOMS, noticeAllowance } from '../lib/broker.mjs';
 const runNode = promisify(execFile);
@@ -35,6 +36,34 @@ async function fixture(t) {
     get broker() { return broker; },
     async restart() { await broker.close(); broker = await createBroker({ dataDir }); return broker; } };
 }
+
+test('real CLI cancels a retired-party orphan only after its dry run', async t => {
+  const f = await fixture(t);
+  await fs.writeFile(path.join(f.dataDir, 'broker.json'), JSON.stringify({
+    pid: process.pid, url: f.broker.url, token: f.broker.token
+  }));
+  for (const id of ['requester', 'holder', 'operator']) await f.register(id);
+  await f.rpc({ op: 'claim', agentId: 'holder', resources: ['file.js'] });
+  const { handoff } = await f.rpc({ op: 'requestHandoff', agentId: 'requester', to: 'holder',
+    resources: ['file.js'], reason: 'Original ownership request' });
+  await f.rpc({ op: 'release', agentId: 'holder' });
+  for (const id of ['requester', 'holder'])
+    await f.rpc({ op: 'retire', agentId: id, relinquish: true });
+  await f.register('successor');
+  await f.rpc({ op: 'claim', agentId: 'successor', resources: ['file.js'] });
+  const args = [fileURLToPath(new URL('../bin/agent-relay.mjs', import.meta.url)),
+    'handoff-cancel-orphan', '--project', f.project, '--data-dir', f.dataDir, '--as', 'operator',
+    '--id', handoff.id, '--reason', 'Preserved recovery snapshot', '--preserve-owner', 'successor'];
+  const dry = JSON.parse((await runNode(process.execPath, [...args, '--dry-run'])).stdout);
+  assert.equal(dry.dryRun, true);
+  assert.equal((await f.rpc({ op: 'handoffs' })).handoffs[0].state, 'pending');
+  const result = JSON.parse((await runNode(process.execPath, args)).stdout);
+  assert.equal(result.cancelled, true);
+  assert.equal(result.handoff.respondedBy, 'operator');
+  assert.equal(result.handoff.preservedOwner, 'successor');
+  assert.equal((await f.rpc({ op: 'agents' })).claims[0].agentId, 'successor');
+  assert.ok((await f.rpc({ op: 'capabilities' })).features.includes('orphan-handoff-cancel'));
+});
 
 test('loopback health reveals no metadata; authentication and bounds reject invalid input', async t => {
   const f = await fixture(t);

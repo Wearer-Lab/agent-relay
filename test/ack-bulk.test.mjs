@@ -85,6 +85,112 @@ const ageClaims = hours => state => {
   for (const room of state.rooms) for (const claim of room.claims) claim.claimedAt = ago(hours);
 };
 
+async function orphanFixture(t) {
+  const f = await fixture(t);
+  for (const id of ['requester', 'holder', 'operator']) await f.register(id);
+  await f.rpc({ op: 'claim', agentId: 'holder', resources: ['unfinished/file.js'] });
+  const requested = await f.rpc({ op: 'requestHandoff', agentId: 'requester', to: 'holder',
+    resources: ['unfinished/file.js'], reason: 'Review unfinished work' });
+  const id = requested.handoff.id;
+  return { ...f, id, cancel: extra => f.request({ op: 'cancelOrphanHandoff', agentId: 'operator', id,
+    reason: 'Work preserved and reassigned by the project owner', ...extra }) };
+}
+
+test('operator cancels an unheld orphan handoff with durable provenance, dry run and safe replay', async t => {
+  const f = await orphanFixture(t);
+  await f.rpc({ op: 'release', agentId: 'holder' });
+  await f.restart(idle(['requester', 'holder'], 48));
+  const before = (await f.readState()).rooms[0].handoffs[0];
+  const dry = await f.cancel({ dryRun: true });
+  assert.equal(dry.ok, true, JSON.stringify(dry));
+  assert.equal(dry.dryRun, true);
+  assert.deepEqual((await f.readState()).rooms[0].handoffs[0], before);
+  const result = await f.cancel();
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(result.cancelled, true);
+  const state = await f.readState(), saved = state.rooms[0].handoffs[0];
+  assert.equal(saved.state, 'cancelled');
+  assert.equal(saved.respondedBy, 'operator');
+  assert.equal(saved.cancellationReason, 'Work preserved and reassigned by the project owner');
+  for (const field of ['from', 'to', 'resources', 'generations', 'reason', 'requestedAt'])
+    assert.deepEqual(saved[field], before[field], field);
+  assert.deepEqual(state.rooms[0].claims, []);
+  const audit = (await f.auditEntries()).filter(row => row.event === 'cancel-orphan-handoff');
+  assert.equal(audit.length, 1);
+  assert.equal(audit[0].actor, 'operator');
+  assert.equal(audit[0].handoffId, f.id);
+  await f.restart();
+  assert.equal((await f.readState()).rooms[0].handoffs[0].state, 'cancelled');
+  assert.equal((await f.cancel()).cancelled, false);
+  assert.equal((await f.auditEntries()).filter(row => row.event === 'cancel-orphan-handoff').length, 1);
+  const prune = await f.rpc({ op: 'prune', idleMinutes: 60 });
+  assert.ok(prune.candidates.some(row => row.agentId === 'requester'));
+  assert.ok(prune.candidates.some(row => row.agentId === 'holder'));
+});
+
+test('orphan cancellation refuses live parties and exact, parent or machine-held resources', async t => {
+  const f = await orphanFixture(t);
+  await f.rpc({ op: 'release', agentId: 'holder' });
+  assert.equal((await f.cancel()).error.code, 'HANDOFF_LIVE');
+  await f.restart(idle(['requester', 'holder'], 48));
+  for (const resource of ['unfinished/file.js', 'unfinished']) {
+    await f.rpc({ op: 'claim', agentId: 'operator', resources: [resource] });
+    assert.equal((await f.cancel()).error.code, 'HANDOFF_HELD');
+    await f.rpc({ op: 'release', agentId: 'operator' });
+  }
+  await f.rpc({ op: 'claim', agentId: 'operator', scope: 'machine', resources: ['unfinished/file.js'] });
+  assert.equal((await f.cancel()).error.code, 'HANDOFF_HELD');
+  await f.rpc({ op: 'release', agentId: 'operator', scope: 'machine' });
+  await fs.mkdir(path.join(f.project, 'unfinished'));
+  await fs.symlink(path.join(f.project, 'unfinished'), path.join(f.project, 'alias'),
+    process.platform === 'win32' ? 'junction' : 'dir');
+  await f.rpc({ op: 'claim', agentId: 'operator', scope: 'machine', resources: ['alias/file.js'] });
+  assert.equal((await f.cancel()).error.code, 'HANDOFF_HELD');
+  await f.rpc({ op: 'release', agentId: 'operator', scope: 'machine' });
+  await f.restart(state => {
+    const holder = f.agentRow(state, 'holder');
+    holder.transport = { adapter: 'test', state: 'connected', ts: new Date().toISOString() };
+  });
+  assert.equal((await f.cancel()).error.code, 'HANDOFF_LIVE');
+  assert.equal((await f.readState()).rooms[0].handoffs[0].state, 'pending');
+  assert.equal((await f.auditEntries()).filter(row => row.event === 'cancel-orphan-handoff').length, 0);
+});
+
+test('orphan cancellation requires actor and reason, preserves closed decisions and scopes ids to a room', async t => {
+  const f = await orphanFixture(t);
+  assert.equal((await f.cancel({ agentId: 'missing' })).error.code, 'UNKNOWN_AGENT');
+  assert.equal((await f.cancel({ reason: '' })).error.code, 'INVALID_INPUT');
+  assert.equal((await f.cancel({ dryRun: 'yes' })).error.code, 'INVALID_INPUT');
+  assert.equal((await f.cancel({ id: 'missing' })).error.code, 'UNKNOWN_HANDOFF');
+  await f.rpc({ op: 'respondHandoff', agentId: 'holder', id: f.id, accept: false });
+  await f.restart(idle(['requester', 'holder'], 48));
+  assert.equal((await f.cancel()).error.code, 'HANDOFF_CLOSED');
+  const other = path.join(f.root, 'other');
+  await fs.mkdir(other);
+  await f.rpc({ op: 'register', agentId: 'operator', runner: 'test' }, other);
+  const result = await f.request({ op: 'cancelOrphanHandoff', agentId: 'operator', id: f.id,
+    reason: 'Wrong room' }, other);
+  assert.equal(result.error.code, 'UNKNOWN_HANDOFF');
+});
+
+test('orphan cancellation preserves an explicitly named live successor without releasing its claims', async t => {
+  const f = await orphanFixture(t);
+  await f.rpc({ op: 'release', agentId: 'holder' });
+  await f.restart(idle(['requester', 'holder'], 48));
+  await f.register('successor');
+  await f.rpc({ op: 'claim', agentId: 'successor', resources: ['unfinished'] });
+  const claims = (await f.readState()).rooms[0].claims;
+  assert.equal((await f.cancel()).error.code, 'HANDOFF_HELD');
+  assert.equal((await f.cancel({ preserveOwner: 'operator' })).error.code, 'HANDOFF_HELD');
+  assert.equal((await f.cancel({ preserveOwner: 'holder' })).error.code, 'INVALID_INPUT');
+  assert.equal((await f.cancel({ preserveOwner: 'missing' })).error.code, 'INVALID_INPUT');
+  const result = await f.cancel({ preserveOwner: 'successor' });
+  assert.equal(result.cancelled, true, JSON.stringify(result));
+  assert.equal(result.handoff.preservedOwner, 'successor');
+  assert.deepEqual((await f.readState()).rooms[0].claims, claims);
+  assert.equal((await f.auditEntries()).at(-1).preservedOwner, 'successor');
+});
+
 test('bulk leave never strands an obligation: the holder is kept and stays active', async t => {
   const f = await fixture(t);
   await f.register('holder');

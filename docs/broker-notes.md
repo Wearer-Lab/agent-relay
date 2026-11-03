@@ -27,6 +27,7 @@ release claims, or execute work.
 | `status` | `agentId`, optional `status`, `frozen`, `resources`, `task` | `{agent}` |
 | `claim` | `agentId`, `resources`, optional `scope` | `{claims,owned}` |
 | `release` | `agentId`, optional `resources`, `scope`, `force` | `{released,claims}` |
+| `cancelOrphanHandoff` | registered operator `agentId`, `id`, `reason`, optional `preserveOwner`, `dryRun` | `{cancelled,handoff}`; refuses live parties and held resources |
 | `leave` | `agentId` | `{left:agentId}` |
 | `fetch` | `agentId`, `messageId`, absolute `out` directory | `{files}` with name, hash, size and output path |
 | `wait` | `agentId`, optional `after` (0), `timeoutMs` (25000) | `{messages,cursor}` |
@@ -212,3 +213,18 @@ with a missing destination it does not create a directory. An actual import crea
 a missing destination with mode 0700 and writes state with mode 0600. Dry-run
 reports missing/corrupt attachments as `valid: false`; actual incomplete imports
 require `--allow-incomplete`. Stop the broker before offline maintenance.
+
+## Cancel an orphaned handoff
+
+After preserving the work and resolving stale claims, a registered operator can run
+`agent-relay handoff-cancel-orphan --as <operator> --id <handoff-id> --reason <reason> --dry-run`,
+then repeat without `--dry-run`. The broker refuses cancellation while any original or
+offered party is live, or any project or machine claim overlaps a handoff resource. An explicit
+`--preserve-owner <id>` permits claims held by that live successor in this room,
+provided it is outside the original handoff parties. Those claims remain unchanged,
+and the cancellation and audit record name the preserved owner.
+It never transfers or releases a claim. A successful cancellation retains the original
+request and generations, records the operator and reason, and appends a bounded audit
+event. Repeating a cancelled request makes no further change. Accepted and declined
+handoffs stay closed. The `cancelled` state requires a broker with this capability;
+do not downgrade an updated ledger to a broker that only accepts the older states.
